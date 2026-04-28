@@ -36,6 +36,7 @@ import { AlertTriangle, Camera, X, Sparkles, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 import { ImageRecognitionButton } from "./ImageRecognitionButton";
+import { AiFeatureGuard } from "@/components/AiFeatureGuard";
 import { NativeCameraInput } from "@/components/NativeCameraInput";
 
 const incidentSchema = z.object({
@@ -438,10 +439,12 @@ export function IncidentReportDialogSimple({
                 {/* AI Recognition Button - Auto-trigger on image */}
                 {selectedImages.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <ImageRecognitionButton
-                      imageFile={selectedImages[0]}
-                      onResult={handleAiResult}
-                    />
+                    <AiFeatureGuard silent>
+                      <ImageRecognitionButton
+                        imageFile={selectedImages[0]}
+                        onResult={handleAiResult}
+                      />
+                    </AiFeatureGuard>
                     {aiSuggestion && (
                       <Badge variant="secondary" className="gap-1 text-xs">
                         <Sparkles className="h-3 w-3" />

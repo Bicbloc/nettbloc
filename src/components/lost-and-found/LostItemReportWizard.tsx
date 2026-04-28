@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAiFeatures } from "@/hooks/use-ai-features";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -113,6 +114,7 @@ export function LostItemReportWizard({
   trigger,
   onSuccess,
 }: LostItemReportWizardProps) {
+  const { aiEnabled } = useAiFeatures(hotelId);
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<WizardStep>('photo');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -232,9 +234,11 @@ export function LostItemReportWizard({
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke('recognize-lost-item', {
-        body: { imageBase64: base64.split(',')[1] }
-      });
+      const { data, error } = aiEnabled
+        ? await supabase.functions.invoke('recognize-lost-item', {
+            body: { imageBase64: base64.split(',')[1] }
+          })
+        : { data: null, error: null };
 
       if (error) throw error;
 
@@ -299,9 +303,11 @@ export function LostItemReportWizard({
         reader.readAsDataURL(selectedImage);
       });
 
-      const { data, error } = await supabase.functions.invoke('recognize-lost-item', {
-        body: { imageBase64: base64.split(',')[1] }
-      });
+      const { data, error } = aiEnabled
+        ? await supabase.functions.invoke('recognize-lost-item', {
+            body: { imageBase64: base64.split(',')[1] }
+          })
+        : { data: null, error: null };
 
       if (error) throw error;
 

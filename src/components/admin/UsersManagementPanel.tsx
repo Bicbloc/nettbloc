@@ -21,7 +21,7 @@ import {
   User, Shield, Trash2, UserPlus, Ban, CheckCircle, CreditCard, 
   Calendar, Search, RefreshCw, Crown, Star, Zap, Eye, Mail, Building,
   ArrowUpDown, Filter, Download, MoreHorizontal, Hotel, Wrench, UserCheck,
-  KeyRound, Users
+  KeyRound, Users, Sparkles, LogIn
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -37,6 +37,7 @@ interface AllUser {
   linked_hotel_id?: string | null;
   linked_hotel_name?: string | null;
   role?: string | null;
+  ai_features_enabled?: boolean | null;
 }
 
 interface HotelInfo {
@@ -302,6 +303,69 @@ export function UsersManagementPanel() {
       loadUsers();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Erreur", description: error.message });
+    }
+  };
+
+  const toggleAiFeatures = async (userId: string, enabled: boolean) => {
+    try {
+      const { error } = await supabase.rpc('admin_set_ai_features_enabled', {
+        p_user_id: userId,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+      toast({
+        title: enabled ? 'IA activée' : 'IA désactivée',
+        description: `Comptage de linge IA et reconnaissance d'image ${enabled ? 'activés' : 'désactivés'} pour ce client`,
+      });
+      loadUsers();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e.message });
+    }
+  };
+
+  const impersonateUser = async (targetUser: AllUser) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Non authentifié');
+
+      // Save current admin session
+      const adminAccess = session.access_token;
+      const adminRefresh = session.refresh_token;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-impersonate-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${adminAccess}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId: targetUser.id }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || 'Échec impersonation');
+
+      // Use the magic link's hashed_token to create a session for the target user
+      const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+        type: 'magiclink',
+        token_hash: result.hashed_token,
+      });
+      if (verifyErr || !verifyData.session) throw verifyErr || new Error('Session impossible');
+
+      // Persist admin session for restoration
+      localStorage.setItem('admin_impersonation', JSON.stringify({
+        adminAccessToken: adminAccess,
+        adminRefreshToken: adminRefresh,
+        targetEmail: result.email,
+        startedAt: Date.now(),
+      }));
+
+      toast({ title: 'Impersonation réussie', description: `Connecté en tant que ${result.email}` });
+      window.location.href = '/';
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur impersonation', description: e.message });
     }
   };
 
@@ -693,6 +757,21 @@ export function UsersManagementPanel() {
                             <KeyRound className="h-4 w-4 mr-2" />
                             Réinitialiser le mot de passe
                           </DropdownMenuItem>
+
+                          {user.user_type === 'establishment' && user.role !== 'super_admin' && (
+                            <>
+                              <DropdownMenuItem onClick={() => impersonateUser(user)}>
+                                <LogIn className="h-4 w-4 mr-2" />
+                                Se connecter en tant que
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => toggleAiFeatures(user.id, !(user.ai_features_enabled !== false))}
+                              >
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                {user.ai_features_enabled === false ? 'Activer IA (linge + image)' : 'Désactiver IA (linge + image)'}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           
                           {user.user_type === 'establishment' && user.role !== 'super_admin' && (
                             <>

@@ -18,6 +18,7 @@ import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
+import { ImpersonationBanner } from "./components/admin/ImpersonationBanner";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
 // Lazy-loaded pages
@@ -80,6 +81,7 @@ const App = () => (
                       <TooltipProvider>
                         <Toaster />
                         <Sonner />
+                        <ImpersonationBanner />
                         {import.meta.env.DEV && <ConnectionDebugPanel />}
                         <div className="flex flex-col min-h-screen">
                           <div className="flex-grow">

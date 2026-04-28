@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Camera, X, CheckCircle, Minus, Plus, Loader2, Pause, Play, ImageIcon, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAiFeatures } from '@/hooks/use-ai-features';
+import { Lock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +48,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   onCountComplete,
   onClose,
 }) => {
+  const { aiEnabled, loading: aiLoading } = useAiFeatures(hotelId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -509,6 +512,23 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   }, [liveResult?.pileBounds, liveResult?.pileDetected]);
 
   const displayCount = hasManualOverride ? editCount : (liveResult?.count ?? editCount);
+
+  if (!aiLoading && !aiEnabled) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
+        <div className="max-w-sm text-center space-y-4">
+          <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+            <Lock className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold">AI scanner disabled</h2>
+          <p className="text-sm text-muted-foreground">
+            Image-based linen counting has been disabled for your account. Please contact support to re-enable it.
+          </p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
