@@ -37,6 +37,7 @@ interface AllUser {
   linked_hotel_id?: string | null;
   linked_hotel_name?: string | null;
   role?: string | null;
+  ai_features_enabled?: boolean | null;
 }
 
 interface HotelInfo {
