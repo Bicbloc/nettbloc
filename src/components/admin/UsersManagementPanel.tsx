@@ -306,7 +306,68 @@ export function UsersManagementPanel() {
     }
   };
 
-  const createUser = async () => {
+  const toggleAiFeatures = async (userId: string, enabled: boolean) => {
+    try {
+      const { error } = await supabase.rpc('admin_set_ai_features_enabled', {
+        p_user_id: userId,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+      toast({
+        title: enabled ? 'IA activée' : 'IA désactivée',
+        description: `Comptage de linge IA et reconnaissance d'image ${enabled ? 'activés' : 'désactivés'} pour ce client`,
+      });
+      loadUsers();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e.message });
+    }
+  };
+
+  const impersonateUser = async (targetUser: AllUser) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Non authentifié');
+
+      // Save current admin session
+      const adminAccess = session.access_token;
+      const adminRefresh = session.refresh_token;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-impersonate-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${adminAccess}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId: targetUser.id }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || 'Échec impersonation');
+
+      // Use the magic link's hashed_token to create a session for the target user
+      const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+        type: 'magiclink',
+        token_hash: result.hashed_token,
+      });
+      if (verifyErr || !verifyData.session) throw verifyErr || new Error('Session impossible');
+
+      // Persist admin session for restoration
+      localStorage.setItem('admin_impersonation', JSON.stringify({
+        adminAccessToken: adminAccess,
+        adminRefreshToken: adminRefresh,
+        targetEmail: result.email,
+        startedAt: Date.now(),
+      }));
+
+      toast({ title: 'Impersonation réussie', description: `Connecté en tant que ${result.email}` });
+      window.location.href = '/';
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur impersonation', description: e.message });
+    }
+  };
     if (!newUserEmail || !newUserPassword) {
       toast({ variant: "destructive", title: "Erreur", description: "Email et mot de passe requis" });
       return;
