@@ -757,6 +757,21 @@ export function UsersManagementPanel() {
                             <KeyRound className="h-4 w-4 mr-2" />
                             Réinitialiser le mot de passe
                           </DropdownMenuItem>
+
+                          {user.user_type === 'establishment' && user.role !== 'super_admin' && (
+                            <>
+                              <DropdownMenuItem onClick={() => impersonateUser(user)}>
+                                <LogIn className="h-4 w-4 mr-2" />
+                                Se connecter en tant que
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => toggleAiFeatures(user.id, !(user.ai_features_enabled !== false))}
+                              >
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                {user.ai_features_enabled === false ? 'Activer IA (linge + image)' : 'Désactiver IA (linge + image)'}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           
                           {user.user_type === 'establishment' && user.role !== 'super_admin' && (
                             <>
