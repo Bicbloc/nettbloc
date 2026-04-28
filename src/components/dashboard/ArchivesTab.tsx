@@ -39,6 +39,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
   const [archivedLogs, setArchivedLogs] = useState<ArchivedLog[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'reports' | 'logs'>('reports');
