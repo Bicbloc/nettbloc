@@ -530,22 +530,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
-        <div className="max-w-sm text-center space-y-4">
-          <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-            <Lock className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h2 className="text-lg font-semibold">AI scanner disabled</h2>
-          <p className="text-sm text-muted-foreground">
-            Image-based linen counting has been disabled for your account. Please contact support to re-enable it.
-          </p>
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
