@@ -662,6 +662,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           </TabsList>
 
           <TabsContent value="reports" className="mt-4 space-y-4">
+            <div ref={exportRef} className="space-y-4 bg-background p-2">
             {dailyReports.length === 0 ? (
               <>
                 <Card className="p-8 text-center">
