@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +9,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle } from 'lucide-react';
+import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ArchivesTabProps {
   currentHotelId: string | null;
@@ -45,6 +46,34 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [activeSubTab, setActiveSubTab] = useState<'reports' | 'logs'>('reports');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [selectedLog, setSelectedLog] = useState<ArchivedLog | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExporting(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename: `archive-${dateStr}.pdf`,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(exportRef.current)
+        .save();
+      toast.success('PDF téléchargé');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erreur lors de la génération du PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Charger les dates disponibles
   useEffect(() => {
@@ -311,23 +340,23 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     const aBlancCleaned = aBlancRooms.filter((r: any) => getRoomStatus(r).cleaned);
     const recoucheCleaned = recoucheRooms.filter((r: any) => getRoomStatus(r).cleaned);
 
-    const Section = ({ title, icon, rooms: list, color, accent }: any) => {
+    const Section = ({ title, icon, rooms: list, color, accent, borderColor, bgColor }: any) => {
       if (list.length === 0) return null;
       return (
-        <Card className="p-3 bg-muted/30">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 font-medium text-sm">
+        <Card className={cn("p-4 border-l-4", borderColor, bgColor)}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 font-semibold text-sm">
               {icon}
               {title}
             </div>
-            <Badge className={accent}>{list.length}</Badge>
+            <Badge className={cn("text-base px-3 py-1", accent)}>{list.length}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {list.map((room: any, idx: number) => (
               <Badge
                 key={idx}
                 variant="outline"
-                className={cn("justify-center py-1.5", color)}
+                className={cn("justify-center py-1.5 font-medium", color)}
               >
                 {room.room_number || room.number}
               </Badge>
@@ -345,25 +374,31 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
         </h4>
         <div className="grid gap-3">
           <Section
-            title={`Nettoyées à blanc (${aBlancCleaned.length}/${aBlancRooms.length})`}
-            icon={<Sparkles className="h-4 w-4 text-blue-600" />}
+            title={`À blanc — Nettoyées (${aBlancCleaned.length}/${aBlancRooms.length})`}
+            icon={<Sparkles className="h-5 w-5 text-blue-600" />}
             rooms={aBlancRooms}
             color={cleaningTypeBadgeClasses('a_blanc')}
-            accent="bg-blue-500/15 text-blue-700 border-blue-300 dark:text-blue-400 dark:border-blue-700"
+            accent="bg-blue-600 text-white border-blue-700"
+            borderColor="border-l-blue-500"
+            bgColor="bg-blue-50/50 dark:bg-blue-950/20"
           />
           <Section
             title={`Recouches (${recoucheCleaned.length}/${recoucheRooms.length})`}
-            icon={<BedDouble className="h-4 w-4 text-amber-600" />}
+            icon={<BedDouble className="h-5 w-5 text-amber-600" />}
             rooms={recoucheRooms}
             color={cleaningTypeBadgeClasses('recouche')}
-            accent="bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700"
+            accent="bg-amber-600 text-white border-amber-700"
+            borderColor="border-l-amber-500"
+            bgColor="bg-amber-50/50 dark:bg-amber-950/20"
           />
           <Section
             title={`Non nettoyées (${notDoneRooms.length})`}
-            icon={<XCircle className="h-4 w-4 text-red-600" />}
+            icon={<XCircle className="h-5 w-5 text-red-600" />}
             rooms={notDoneRooms}
             color="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
-            accent="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
+            accent="bg-red-600 text-white border-red-700"
+            borderColor="border-l-red-500"
+            bgColor="bg-red-50/50 dark:bg-red-950/20"
           />
         </div>
       </div>
@@ -586,6 +621,16 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                 />
               </PopoverContent>
             </Popover>
+
+            <Button
+              variant="default"
+              className="gap-2"
+              onClick={handleExportPdf}
+              disabled={isExporting || (dailyReports.length === 0 && incidents.length === 0)}
+            >
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Télécharger PDF
+            </Button>
           </div>
         </CardHeader>
       </Card>
@@ -617,6 +662,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           </TabsList>
 
           <TabsContent value="reports" className="mt-4 space-y-4">
+            <div ref={exportRef} className="space-y-4 bg-background p-2">
             {dailyReports.length === 0 ? (
               <>
                 <Card className="p-8 text-center">
@@ -675,6 +721,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                 )}
               </>
             )}
+            </div>
           </TabsContent>
 
           <TabsContent value="logs" className="mt-4 space-y-4">
