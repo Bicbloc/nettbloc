@@ -48,6 +48,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   onCountComplete,
   onClose,
 }) => {
+  const { aiEnabled, loading: aiLoading } = useAiFeatures(hotelId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
