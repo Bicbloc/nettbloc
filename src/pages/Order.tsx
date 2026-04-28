@@ -409,7 +409,7 @@ export default function Order() {
               </div>
               <div className="flex items-center gap-3">
                 <Badge className="text-lg px-4 py-2 bg-primary">
-                  {recommendedCount} femme{recommendedCount > 1 ? 's' : ''} de chambre
+                  {`${recommendedCount} ${recommendedCount > 1 ? 'femmes de chambre' : 'femme de chambre'}`}
                 </Badge>
                 {!pdfAnalysisResult && (
                   <span className="text-sm text-muted-foreground">
