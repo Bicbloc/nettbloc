@@ -644,8 +644,10 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      {renderHousekeeperSummary(selectedReport.summary)}
                       {renderRoomData(selectedReport.room_data)}
+                      {renderHousekeeperSummary(selectedReport)}
+                      {renderIncidents()}
+                      {renderComments(selectedReport.summary)}
                       {renderLinenInventory(selectedReport.summary)}
 
                       {selectedReport.notes && (
