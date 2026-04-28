@@ -721,6 +721,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                 )}
               </>
             )}
+            </div>
           </TabsContent>
 
           <TabsContent value="logs" className="mt-4 space-y-4">
