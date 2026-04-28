@@ -340,23 +340,23 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     const aBlancCleaned = aBlancRooms.filter((r: any) => getRoomStatus(r).cleaned);
     const recoucheCleaned = recoucheRooms.filter((r: any) => getRoomStatus(r).cleaned);
 
-    const Section = ({ title, icon, rooms: list, color, accent }: any) => {
+    const Section = ({ title, icon, rooms: list, color, accent, borderColor, bgColor }: any) => {
       if (list.length === 0) return null;
       return (
-        <Card className="p-3 bg-muted/30">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 font-medium text-sm">
+        <Card className={cn("p-4 border-l-4", borderColor, bgColor)}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 font-semibold text-sm">
               {icon}
               {title}
             </div>
-            <Badge className={accent}>{list.length}</Badge>
+            <Badge className={cn("text-base px-3 py-1", accent)}>{list.length}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {list.map((room: any, idx: number) => (
               <Badge
                 key={idx}
                 variant="outline"
-                className={cn("justify-center py-1.5", color)}
+                className={cn("justify-center py-1.5 font-medium", color)}
               >
                 {room.room_number || room.number}
               </Badge>
@@ -374,25 +374,31 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
         </h4>
         <div className="grid gap-3">
           <Section
-            title={`Nettoyées à blanc (${aBlancCleaned.length}/${aBlancRooms.length})`}
-            icon={<Sparkles className="h-4 w-4 text-blue-600" />}
+            title={`À blanc — Nettoyées (${aBlancCleaned.length}/${aBlancRooms.length})`}
+            icon={<Sparkles className="h-5 w-5 text-blue-600" />}
             rooms={aBlancRooms}
             color={cleaningTypeBadgeClasses('a_blanc')}
-            accent="bg-blue-500/15 text-blue-700 border-blue-300 dark:text-blue-400 dark:border-blue-700"
+            accent="bg-blue-600 text-white border-blue-700"
+            borderColor="border-l-blue-500"
+            bgColor="bg-blue-50/50 dark:bg-blue-950/20"
           />
           <Section
             title={`Recouches (${recoucheCleaned.length}/${recoucheRooms.length})`}
-            icon={<BedDouble className="h-4 w-4 text-amber-600" />}
+            icon={<BedDouble className="h-5 w-5 text-amber-600" />}
             rooms={recoucheRooms}
             color={cleaningTypeBadgeClasses('recouche')}
-            accent="bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700"
+            accent="bg-amber-600 text-white border-amber-700"
+            borderColor="border-l-amber-500"
+            bgColor="bg-amber-50/50 dark:bg-amber-950/20"
           />
           <Section
             title={`Non nettoyées (${notDoneRooms.length})`}
-            icon={<XCircle className="h-4 w-4 text-red-600" />}
+            icon={<XCircle className="h-5 w-5 text-red-600" />}
             rooms={notDoneRooms}
             color="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
-            accent="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
+            accent="bg-red-600 text-white border-red-700"
+            borderColor="border-l-red-500"
+            bgColor="bg-red-50/50 dark:bg-red-950/20"
           />
         </div>
       </div>
