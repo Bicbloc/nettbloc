@@ -21,7 +21,7 @@ import {
   User, Shield, Trash2, UserPlus, Ban, CheckCircle, CreditCard, 
   Calendar, Search, RefreshCw, Crown, Star, Zap, Eye, Mail, Building,
   ArrowUpDown, Filter, Download, MoreHorizontal, Hotel, Wrench, UserCheck,
-  KeyRound, Users
+  KeyRound, Users, Sparkles, LogIn
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
