@@ -8,8 +8,11 @@ import { useAuth } from '@/contexts/AuthContext';
  *
  * The flag is controlled by a super_admin via `admin_set_ai_features_enabled`
  * and stored on `profiles.ai_features_enabled` (default: true).
+ *
+ * Pass `hotelId` to resolve the owner from the hotel (useful for staff
+ * sessions where there is no authenticated establishment user).
  */
-export function useAiFeatures() {
+export function useAiFeatures(hotelId?: string | null) {
   const { user, isAuthenticated } = useAuth();
   const [enabled, setEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
@@ -18,24 +21,35 @@ export function useAiFeatures() {
     let active = true;
 
     const load = async () => {
-      if (!isAuthenticated || !user) {
-        if (active) {
-          setEnabled(true);
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
-        // Resolve the parent owner id when the current user is a sub-account
-        let ownerId = user.id;
-        const { data: sub } = await supabase
-          .from('sub_accounts')
-          .select('parent_user_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (sub?.parent_user_id) ownerId = sub.parent_user_id;
+        let ownerId: string | null = null;
+
+        // Path 1: resolve owner from hotelId (works for staff)
+        if (hotelId) {
+          const { data: hotel } = await supabase
+            .from('hotels')
+            .select('user_id')
+            .eq('id', hotelId)
+            .maybeSingle();
+          ownerId = hotel?.user_id ?? null;
+        }
+
+        // Path 2: resolve owner from authenticated user (admin / sub-account)
+        if (!ownerId && isAuthenticated && user) {
+          ownerId = user.id;
+          const { data: sub } = await supabase
+            .from('sub_accounts')
+            .select('parent_user_id')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (sub?.parent_user_id) ownerId = sub.parent_user_id;
+        }
+
+        if (!ownerId) {
+          if (active) { setEnabled(true); setLoading(false); }
+          return;
+        }
 
         const { data, error } = await supabase
           .from('profiles')
@@ -60,7 +74,7 @@ export function useAiFeatures() {
 
     load();
     return () => { active = false; };
-  }, [user?.id, isAuthenticated]);
+  }, [user?.id, isAuthenticated, hotelId]);
 
   return { aiEnabled: enabled, loading };
 }
