@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { translations, Language, TranslationKeys } from '@/i18n/translations';
+import { useAutoTranslate } from '@/hooks/use-auto-translate';
 
 interface LanguageContextType {
   language: Language;
@@ -41,6 +42,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     // Update HTML lang attribute
     document.documentElement.lang = language;
   }, [language]);
+
+  // Runtime auto-translation of legacy hardcoded French strings when EN is active.
+  useAutoTranslate(language);
 
   const t = translations[language];
 
