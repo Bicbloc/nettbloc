@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, Upload, Loader2, AlertCircle } from "lucide-react";
+import { Camera, Upload, Loader2, AlertCircle, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { nativeCameraService } from "@/services/nativeCameraService";
+import { useAiFeatures } from "@/hooks/use-ai-features";
 
 interface LinenPhotoCounterProps {
   linenTypeId: string;
@@ -18,6 +19,7 @@ export const LinenPhotoCounter = ({
   hotelId,
   onCountComplete,
 }: LinenPhotoCounterProps) => {
+  const { aiEnabled, loading: aiLoading } = useAiFeatures(hotelId);
   const [isCounting, setIsCounting] = useState(false);
   const [preview, setPreview] = useState<string>("");
   const [result, setResult] = useState<any>(null);
