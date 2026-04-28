@@ -3643,6 +3643,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_features_enabled: boolean
           billing_address: string | null
           billing_city: string | null
           billing_company_name: string | null
@@ -3682,6 +3683,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_features_enabled?: boolean
           billing_address?: string | null
           billing_city?: string | null
           billing_company_name?: string | null
@@ -3721,6 +3723,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_features_enabled?: boolean
           billing_address?: string | null
           billing_city?: string | null
           billing_company_name?: string | null
@@ -5306,6 +5309,10 @@ export type Database = {
           p_xp_amount: number
         }
         Returns: Json
+      }
+      admin_set_ai_features_enabled: {
+        Args: { p_enabled: boolean; p_user_id: string }
+        Returns: boolean
       }
       analyze_error_trends: {
         Args: { p_days?: number; p_hotel_id: string }
