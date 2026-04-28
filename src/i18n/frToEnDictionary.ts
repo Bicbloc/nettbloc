@@ -842,7 +842,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Codes d'accès mobile": "Mobile access codes",
   "Code d'accès mobile": "Mobile access code",
   "Codes d'accès": "Access codes",
-  "Code d'accès": "Access code",
   "Chaque colonne affiche le code d'accès spécifique à chaque femme de chambre pour l'interface mobile.":
     "Each column shows the access code specific to each room attendant for the mobile interface.",
   "Chaque colonne affiche le code d'accès spécifique à chaque room attendant pour l'interface mobile.":
@@ -969,7 +968,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Mes Factures": "My invoices",
   "Historique de facturation et informations comptables": "Billing history and accounting information",
   "History de facturation et informations comptables": "Billing history and accounting information",
-  "Informations de facturation": "Billing information",
   "Ces informations apparaîtront sur vos factures": "This information will appear on your invoices",
   "Modifier": "Edit",
   "Établissement": "Establishment",
@@ -985,7 +983,6 @@ export const FR_EN_WORDS: Record<string, string> = {
     "Import today's PDF to automatically calculate the number of room attendants",
   "Importez le PDF du day pour calculer automatiquement le nombre de room attendants":
     "Import today's PDF to automatically calculate the number of room attendants",
-  "Cliquez pour importer votre rapport PDF": "Click to import your PDF report",
   "Recommandation": "Recommendation",
   "femmes de chambre": "room attendants",
   "(estimation basée sur": "(estimate based on",
@@ -994,7 +991,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Enregistrer": "Save",
   "Ces informations seront pré-remplies pour vos prochaines commandes":
     "This information will be pre-filled for your next orders",
-  "Téléphone": "Phone",
   "Email du fournisseur (enregistré)": "Supplier email (saved)",
   "Email du fournisseur": "Supplier email",
   "Configuration de la commande": "Order configuration",
@@ -1027,7 +1023,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "View les tarifs": "View pricing",
   "Simulateur en ligne": "Online simulator",
   "Simulator en ligne": "Online simulator",
-  "Créer un compte": "Create an account",
   "Create un compte": "Create an account",
   "J'ai déjà un compte, je commande via :": "I already have an account, I order via:",
   "J'ai déjà un compte, je commande via:": "I already have an account, I order via:",
@@ -1045,7 +1040,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "année": "year",
   "années": "years",
   "hôtel": "hotel",
-  "Hôtel": "Hotel",
   "établissement (établissement)": "establishment (property)",
   "établissement (property)": "establishment (property)",
 };
