@@ -1175,7 +1175,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Aperçu du nettoyage": "Cleaning overview",
   "Redistribuer les rooms": "Reassign rooms",
   "Réassigner les rooms": "Reassign rooms",
-  "11 femmes de room": "11 housekeepers",
   "femmes de room": "housekeepers",
   "femme de room": "housekeeper",
   "désélectionner": "deselect",
