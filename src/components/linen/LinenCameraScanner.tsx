@@ -530,8 +530,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   }
 
   return (
-
-  return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header - simplified with just the type name */}
       <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-center">
