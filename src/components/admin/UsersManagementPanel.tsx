@@ -368,6 +368,8 @@ export function UsersManagementPanel() {
       toast({ variant: 'destructive', title: 'Erreur impersonation', description: e.message });
     }
   };
+
+  const createUser = async () => {
     if (!newUserEmail || !newUserPassword) {
       toast({ variant: "destructive", title: "Erreur", description: "Email et mot de passe requis" });
       return;
