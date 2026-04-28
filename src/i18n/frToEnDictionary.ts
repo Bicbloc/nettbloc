@@ -921,6 +921,68 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "client présent": "guest in-house",
   "Sortie": "Check-out",
   "Sortie client": "Guest check-out",
+
+  // ============= PMS / Team / Premium (batch) =============
+  "Connectez votre PMS pour synchroniser automatiquement les chambres":
+    "Connect your PMS to automatically sync rooms",
+  "Connectez votre PMS pour synchroniser automatiquement les rooms":
+    "Connect your PMS to automatically sync rooms",
+  "Synchroniser automatiquement": "Sync automatically",
+  "Synchronisation automatique": "Automatic sync",
+  "Synchroniser": "Sync",
+  "Synchronisation": "Sync",
+  "Type de PMS": "PMS type",
+  "Type de PM": "PMS type",
+  "Configuration PMS": "PMS configuration",
+  "Connexion PMS": "PMS connection",
+  "Connecter le PMS": "Connect PMS",
+  "PMS connecté": "PMS connected",
+  "PMS non connecté": "PMS not connected",
+
+  "Gérez les accès de votre équipe avec des permissions personnalisées":
+    "Manage your team's access with custom permissions",
+  "Gérez les accès de votre team avec des permissions personnalisées":
+    "Manage your team's access with custom permissions",
+  "Gestion de l'équipe": "Team management",
+  "Gestion de l'team": "Team management",
+  "Gestion d'équipe": "Team management",
+  "Gérer l'équipe": "Manage team",
+  "Mon équipe": "My team",
+  "Permissions personnalisées": "Custom permissions",
+
+  "Dernière connexion": "Last login",
+  "Dernière connexion :": "Last login:",
+  "Dernière connexion:": "Last login:",
+  "Première connexion": "First login",
+  "Jamais connecté": "Never logged in",
+  "Jamais connectée": "Never logged in",
+
+  "Sélectionnez une femme de chambre existante ou ajoutez-en une nouvelle":
+    "Select an existing room attendant or add a new one",
+  "Sélectionnez une room attendant existante ou ajoutez-en une nouvelle":
+    "Select an existing room attendant or add a new one",
+  "Sélectionnez un membre existant ou ajoutez-en un nouveau":
+    "Select an existing member or add a new one",
+  "ajoutez-en une nouvelle": "add a new one",
+  "ajoutez-en un nouveau": "add a new one",
+  "Ajouter une nouvelle": "Add a new one",
+  "Ajouter un nouveau": "Add a new one",
+
+  // Premium / upgrade
+  "Passer au Premium": "Upgrade to Premium",
+  "Passer au premium": "Upgrade to Premium",
+  "Passer au premuim": "Upgrade to Premium",
+  "Passer en Premium": "Upgrade to Premium",
+  "Mettre à niveau": "Upgrade",
+  "Améliorer mon plan": "Upgrade my plan",
+  "Changer de plan": "Change plan",
+  "Mettre à niveau le plan": "Upgrade plan",
+  "Mise à niveau": "Upgrade",
+  "Fonctionnalité Premium": "Premium feature",
+  "Réservé au plan Premium": "Premium plan only",
+  "Disponible avec Premium": "Available with Premium",
+  "Débloquer cette fonctionnalité": "Unlock this feature",
+  "Débloquer": "Unlock",
 };
 
 // Word-by-word fallback for tokens often appearing alone
