@@ -24,39 +24,64 @@ function getSortedKeys(): string[] {
   return SORTED_KEYS;
 }
 
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Detect if a string starts/ends with a letter (incl. accented) for word-boundary logic.
 const LETTER = /[A-Za-zÀ-ÖØ-öø-ÿ]/;
 
-let BIG_REGEX: RegExp | null = null;
-function getRegex(): RegExp {
-  if (!BIG_REGEX) {
-    // Build alternation. We'll handle word boundaries manually after match
-    // because \b doesn't play well with accented chars.
-    const alternation = getSortedKeys().map(escapeRegExp).join('|');
-    BIG_REGEX = new RegExp(alternation, 'g');
+// Build a per-first-character index of keys (sorted longest-first) so we can
+// scan a string left-to-right and at each position try the LONGEST matching key.
+// JS regex alternation returns the FIRST alternative, not the longest, which
+// produced franglais output (e.g. "Commander chez BicBloc" -> "Order chez BicBloc"
+// instead of using the full-phrase entry). This index fixes that.
+let KEY_INDEX: Map<string, string[]> | null = null;
+function getKeyIndex(): Map<string, string[]> {
+  if (!KEY_INDEX) {
+    const idx = new Map<string, string[]>();
+    for (const k of getSortedKeys()) {
+      const ch = k[0];
+      const bucket = idx.get(ch);
+      if (bucket) bucket.push(k);
+      else idx.set(ch, [k]);
+    }
+    KEY_INDEX = idx;
   }
-  return BIG_REGEX;
+  return KEY_INDEX;
 }
 
 function translateString(input: string): string {
   if (!input || input.length < 2) return input;
   if (input.length > 5000) return input;
-  const regex = getRegex();
-  regex.lastIndex = 0;
-  return input.replace(regex, (match, offset: number, full: string) => {
-    // Word-boundary check: char before must not be a letter, char after must not be a letter
-    const before = full[offset - 1];
-    const after = full[offset + match.length];
-    const matchStartsWithLetter = LETTER.test(match[0]);
-    const matchEndsWithLetter = LETTER.test(match[match.length - 1]);
-    if (matchStartsWithLetter && before && LETTER.test(before)) return match;
-    if (matchEndsWithLetter && after && LETTER.test(after)) return match;
-    return FR_EN_PHRASES[match] ?? match;
-  });
+  const idx = getKeyIndex();
+  const len = input.length;
+  let out = '';
+  let i = 0;
+  while (i < len) {
+    const bucket = idx.get(input[i]);
+    let matched: string | null = null;
+    if (bucket) {
+      for (const key of bucket) {
+        const klen = key.length;
+        if (i + klen > len) continue;
+        if (input.substr(i, klen) !== key) continue;
+        if (LETTER.test(key[0])) {
+          const before = input[i - 1];
+          if (before && LETTER.test(before)) continue;
+        }
+        if (LETTER.test(key[klen - 1])) {
+          const after = input[i + klen];
+          if (after && LETTER.test(after)) continue;
+        }
+        matched = key;
+        break; // bucket is sorted longest-first -> this is the longest valid match
+      }
+    }
+    if (matched) {
+      out += FR_EN_PHRASES[matched];
+      i += matched.length;
+    } else {
+      out += input[i];
+      i++;
+    }
+  }
+  return out;
 }
 
 // Cache: remember the last value we set, so observer mutations on our own
