@@ -114,6 +114,7 @@ export function LostItemReportWizard({
   trigger,
   onSuccess,
 }: LostItemReportWizardProps) {
+  const { aiEnabled } = useAiFeatures(hotelId);
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<WizardStep>('photo');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
