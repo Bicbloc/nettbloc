@@ -234,9 +234,11 @@ export function LostItemReportWizard({
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke('recognize-lost-item', {
-        body: { imageBase64: base64.split(',')[1] }
-      });
+      const { data, error } = aiEnabled
+        ? await supabase.functions.invoke('recognize-lost-item', {
+            body: { imageBase64: base64.split(',')[1] }
+          })
+        : { data: null, error: null };
 
       if (error) throw error;
 
@@ -301,9 +303,11 @@ export function LostItemReportWizard({
         reader.readAsDataURL(selectedImage);
       });
 
-      const { data, error } = await supabase.functions.invoke('recognize-lost-item', {
-        body: { imageBase64: base64.split(',')[1] }
-      });
+      const { data, error } = aiEnabled
+        ? await supabase.functions.invoke('recognize-lost-item', {
+            body: { imageBase64: base64.split(',')[1] }
+          })
+        : { data: null, error: null };
 
       if (error) throw error;
 
