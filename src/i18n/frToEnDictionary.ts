@@ -403,7 +403,7 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Premium": "Premium",
   "Standard": "Standard",
   "Basique": "Basic",
-  "Entreprise": "Enterprise",
+  // (Entreprise -> Enterprise plan tier; deduplicated, "Entreprise" -> "Company" defined earlier)
   "Personnalisé": "Custom",
   "Mensuel": "Monthly",
   "Annuel": "Yearly",
