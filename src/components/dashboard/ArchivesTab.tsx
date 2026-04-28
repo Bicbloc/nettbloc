@@ -46,6 +46,34 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [activeSubTab, setActiveSubTab] = useState<'reports' | 'logs'>('reports');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [selectedLog, setSelectedLog] = useState<ArchivedLog | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExporting(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename: `archive-${dateStr}.pdf`,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(exportRef.current)
+        .save();
+      toast.success('PDF téléchargé');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erreur lors de la génération du PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Charger les dates disponibles
   useEffect(() => {
