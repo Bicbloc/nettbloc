@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { translations, Language, TranslationKeys } from '@/i18n/translations';
+import { useAutoTranslate } from '@/hooks/use-auto-translate';
 
 interface LanguageContextType {
   language: Language;
