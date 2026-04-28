@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAiFeatures } from "@/hooks/use-ai-features";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
