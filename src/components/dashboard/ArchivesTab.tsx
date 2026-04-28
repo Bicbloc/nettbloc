@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home } from 'lucide-react';
+import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ArchivesTabProps {
