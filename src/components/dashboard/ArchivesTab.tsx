@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home } from 'lucide-react';
+import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ArchivesTabProps {
@@ -39,6 +39,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
   const [archivedLogs, setArchivedLogs] = useState<ArchivedLog[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'reports' | 'logs'>('reports');
@@ -87,7 +88,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       try {
-        const [reportsRes, logsRes] = await Promise.all([
+        const [reportsRes, logsRes, incidentsRes] = await Promise.all([
           supabase
             .from('daily_reports')
             .select('*')
@@ -99,11 +100,19 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
             .select('*')
             .eq('hotel_id', currentHotelId)
             .eq('archive_date', dateStr)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('incidents')
+            .select('*')
+            .eq('hotel_id', currentHotelId)
+            .gte('created_at', dateStr + 'T00:00:00')
+            .lte('created_at', dateStr + 'T23:59:59')
             .order('created_at', { ascending: false })
         ]);
 
         setDailyReports(reportsRes.data || []);
         setArchivedLogs(logsRes.data || []);
+        setIncidents(incidentsRes.data || []);
 
         // Sélectionner automatiquement le premier rapport
         if (reportsRes.data && reportsRes.data.length > 0) {
@@ -145,11 +154,67 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     return 'bg-muted text-muted-foreground border-border';
   };
 
-  const renderHousekeeperSummary = (summary: any) => {
-    if (!summary) return null;
+  // Détermine le type de nettoyage d'une chambre
+  const getCleaningType = (room: any): 'a_blanc' | 'recouche' | 'none' | 'unknown' => {
+    const t = (room.cleaning_type || room.cleaningType || '').toLowerCase();
+    if (t === 'a_blanc' || t === 'full' || t === 'checkout') return 'a_blanc';
+    if (t === 'recouche' || t === 'quick' || t === 'stayover') return 'recouche';
+    if (t === 'none') return 'none';
+    return 'unknown';
+  };
 
+  const cleaningTypeLabel = (t: string) => {
+    if (t === 'a_blanc') return 'À blanc';
+    if (t === 'recouche') return 'Recouche';
+    if (t === 'none') return 'Sans nettoyage';
+    return 'Autre';
+  };
+
+  const cleaningTypeBadgeClasses = (t: string) => {
+    if (t === 'a_blanc') return 'bg-blue-500/15 text-blue-700 border-blue-300 dark:text-blue-400 dark:border-blue-700';
+    if (t === 'recouche') return 'bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700';
+    if (t === 'none') return 'bg-muted text-muted-foreground border-border';
+    return 'bg-muted text-muted-foreground border-border';
+  };
+
+  // Reconstruit la liste des femmes de chambre depuis summary.assignments + room_data
+  const buildHousekeepersFromSummary = (report: DailyReport | null) => {
+    if (!report) return [] as any[];
+    const summary = report.summary || {};
+    const roomData = Array.isArray(report.room_data) ? report.room_data : (report.room_data?.rooms || []);
+    const roomById: Record<string, any> = {};
+    const roomByNumber: Record<string, any> = {};
+    roomData.forEach((r: any) => {
+      if (r.id) roomById[r.id] = r;
+      const num = r.room_number || r.number;
+      if (num) roomByNumber[String(num)] = r;
+    });
+
+    // Format moderne: summary.assignments = { housekeeperName: [{room_number, room_id, status, ...}] }
+    const assignments = summary.assignments;
+    if (assignments && typeof assignments === 'object' && !Array.isArray(assignments)) {
+      return Object.entries(assignments).map(([name, list]: [string, any]) => ({
+        name,
+        rooms: (Array.isArray(list) ? list : []).map((a: any) => {
+          const fullRoom = (a.room_id && roomById[a.room_id]) || roomByNumber[String(a.room_number)] || {};
+          return {
+            ...fullRoom,
+            room_number: a.room_number || fullRoom.room_number,
+            status: a.status || fullRoom.status,
+            cleaning_type: fullRoom.cleaning_type || a.cleaning_type,
+          };
+        }),
+      }));
+    }
+
+    // Fallback ancien format
     const housekeepers = summary.housekeepers || summary.housekeeperSummary || [];
-    if (!Array.isArray(housekeepers) || housekeepers.length === 0) return null;
+    return Array.isArray(housekeepers) ? housekeepers : [];
+  };
+
+  const renderHousekeeperSummary = (report: DailyReport | null) => {
+    const housekeepers = buildHousekeepersFromSummary(report);
+    if (housekeepers.length === 0) return null;
 
     return (
       <div className="space-y-3">
@@ -160,16 +225,24 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
         <div className="grid gap-3">
           {housekeepers.map((hk: any, index: number) => {
             const rooms = hk.rooms || [];
-            const totalRooms = rooms.length || hk.totalRooms || hk.roomsCleaned || hk.completed || 0;
-            const cleanedCount = rooms.filter((r: any) => getRoomStatus(r).cleaned).length || hk.roomsCleaned || hk.completed || 0;
-            const notDoneCount = rooms.filter((r: any) => getRoomStatus(r).notDone).length || 0;
+            const totalRooms = rooms.length;
+            const cleanedCount = rooms.filter((r: any) => getRoomStatus(r).cleaned).length;
+            const notDoneCount = rooms.filter((r: any) => getRoomStatus(r).notDone).length;
+            const aBlanc = rooms.filter((r: any) => getCleaningType(r) === 'a_blanc');
+            const recouche = rooms.filter((r: any) => getCleaningType(r) === 'recouche');
             const progressPercent = totalRooms > 0 ? Math.round((cleanedCount / totalRooms) * 100) : 0;
 
             return (
               <Card key={index} className="p-4 bg-muted/30">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <span className="font-medium">{hk.name || hk.housekeeperName}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={cleaningTypeBadgeClasses('a_blanc')}>
+                      <Sparkles className="h-3 w-3 mr-1" />À blanc : {aBlanc.length}
+                    </Badge>
+                    <Badge className={cleaningTypeBadgeClasses('recouche')}>
+                      <BedDouble className="h-3 w-3 mr-1" />Recouche : {recouche.length}
+                    </Badge>
                     <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700">
                       ✓ {cleanedCount}
                     </Badge>
@@ -180,9 +253,8 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                     )}
                   </div>
                 </div>
-                {/* Progress bar */}
                 <div className="w-full bg-muted rounded-full h-2 mb-2">
-                  <div 
+                  <div
                     className={cn(
                       "h-2 rounded-full transition-all",
                       progressPercent === 100 ? "bg-emerald-500" : progressPercent > 0 ? "bg-amber-500" : "bg-red-400"
@@ -195,19 +267,28 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                 </p>
                 {rooms.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {rooms.map((room: any, idx: number) => (
-                      <Badge 
-                        key={idx} 
-                        variant="outline" 
-                        className={cn("text-xs", getRoomBadgeClasses(room))}
-                      >
-                        {room.number || room.room_number || room}
-                      </Badge>
-                    ))}
+                    {rooms.map((room: any, idx: number) => {
+                      const ct = getCleaningType(room);
+                      const { cleaned, notDone } = getRoomStatus(room);
+                      return (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className={cn(
+                            "text-xs",
+                            cleaned ? 'bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700'
+                            : notDone ? 'bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700'
+                            : cleaningTypeBadgeClasses(ct)
+                          )}
+                          title={cleaningTypeLabel(ct)}
+                        >
+                          {room.room_number || room.number}
+                          {ct === 'a_blanc' && ' ⚪'}
+                          {ct === 'recouche' && ' 🔄'}
+                        </Badge>
+                      );
+                    })}
                   </div>
-                )}
-                {hk.remarks && hk.remarks.length > 0 && (
-                  <Badge variant="secondary" className="mt-2">{hk.remarks.length} remarques</Badge>
                 )}
               </Card>
             );
@@ -223,9 +304,38 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     const rooms = Array.isArray(roomData) ? roomData : roomData.rooms || [];
     if (rooms.length === 0) return null;
 
-    const cleanedRooms = rooms.filter((r: any) => getRoomStatus(r).cleaned);
+    // Groupes par type de nettoyage + statut "non nettoyé"
+    const aBlancRooms = rooms.filter((r: any) => getCleaningType(r) === 'a_blanc');
+    const recoucheRooms = rooms.filter((r: any) => getCleaningType(r) === 'recouche');
     const notDoneRooms = rooms.filter((r: any) => getRoomStatus(r).notDone);
-    const otherRooms = rooms.filter((r: any) => !getRoomStatus(r).cleaned && !getRoomStatus(r).notDone);
+    const aBlancCleaned = aBlancRooms.filter((r: any) => getRoomStatus(r).cleaned);
+    const recoucheCleaned = recoucheRooms.filter((r: any) => getRoomStatus(r).cleaned);
+
+    const Section = ({ title, icon, rooms: list, color, accent }: any) => {
+      if (list.length === 0) return null;
+      return (
+        <Card className="p-3 bg-muted/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 font-medium text-sm">
+              {icon}
+              {title}
+            </div>
+            <Badge className={accent}>{list.length}</Badge>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {list.map((room: any, idx: number) => (
+              <Badge
+                key={idx}
+                variant="outline"
+                className={cn("justify-center py-1.5", color)}
+              >
+                {room.room_number || room.number}
+              </Badge>
+            ))}
+          </div>
+        </Card>
+      );
+    };
 
     return (
       <div className="space-y-3">
@@ -233,36 +343,130 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           <Home className="h-4 w-4" />
           Chambres ({rooms.length})
         </h4>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <div className="flex items-center gap-1 text-xs">
-            <span className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-400" />
-            Nettoyées ({cleanedRooms.length})
-          </div>
-          <div className="flex items-center gap-1 text-xs">
-            <span className="w-3 h-3 rounded bg-red-500/30 border border-red-400" />
-            Non effectuées ({notDoneRooms.length})
-          </div>
-          {otherRooms.length > 0 && (
-            <div className="flex items-center gap-1 text-xs">
-              <span className="w-3 h-3 rounded bg-muted border border-border" />
-              Autre ({otherRooms.length})
-            </div>
-          )}
+        <div className="grid gap-3">
+          <Section
+            title={`Nettoyées à blanc (${aBlancCleaned.length}/${aBlancRooms.length})`}
+            icon={<Sparkles className="h-4 w-4 text-blue-600" />}
+            rooms={aBlancRooms}
+            color={cleaningTypeBadgeClasses('a_blanc')}
+            accent="bg-blue-500/15 text-blue-700 border-blue-300 dark:text-blue-400 dark:border-blue-700"
+          />
+          <Section
+            title={`Recouches (${recoucheCleaned.length}/${recoucheRooms.length})`}
+            icon={<BedDouble className="h-4 w-4 text-amber-600" />}
+            rooms={recoucheRooms}
+            color={cleaningTypeBadgeClasses('recouche')}
+            accent="bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700"
+          />
+          <Section
+            title={`Non nettoyées (${notDoneRooms.length})`}
+            icon={<XCircle className="h-4 w-4 text-red-600" />}
+            rooms={notDoneRooms}
+            color="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
+            accent="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700"
+          />
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-          {rooms.map((room: any, index: number) => (
-            <Badge 
-              key={index} 
-              variant="outline"
-              className={cn("justify-center py-1.5", getRoomBadgeClasses(room))}
-            >
-              {room.number || room.room_number}
-            </Badge>
+      </div>
+    );
+  };
+
+  const priorityColor = (p: string) => {
+    if (p === 'urgent' || p === 'critical') return 'bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700';
+    if (p === 'high') return 'bg-orange-500/15 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700';
+    if (p === 'medium' || p === 'normal') return 'bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700';
+    return 'bg-muted text-muted-foreground border-border';
+  };
+
+  const renderIncidents = () => {
+    if (!incidents || incidents.length === 0) return null;
+    // Tri par priorité
+    const order: Record<string, number> = { urgent: 0, critical: 0, high: 1, medium: 2, normal: 2, low: 3 };
+    const sorted = [...incidents].sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9));
+    return (
+      <div className="space-y-3">
+        <h4 className="font-medium flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          Incidents signalés ({incidents.length})
+        </h4>
+        <div className="space-y-2">
+          {sorted.map((inc) => (
+            <Card key={inc.id} className="p-3 bg-muted/30">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <Badge className={priorityColor(inc.priority)}>{inc.priority || 'normal'}</Badge>
+                    <Badge variant="outline" className="text-xs">{inc.status}</Badge>
+                    {inc.location_reference && (
+                      <Badge variant="secondary" className="text-xs">
+                        {inc.location_type === 'room' ? `Chambre ${inc.location_reference}` : inc.location_reference}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="font-medium text-sm">{inc.title}</p>
+                  {inc.description && (
+                    <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{inc.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {inc.reported_by_name && `Signalé par ${inc.reported_by_name} • `}
+                    {format(parseISO(inc.created_at), 'HH:mm', { locale: fr })}
+                  </p>
+                </div>
+              </div>
+            </Card>
           ))}
         </div>
       </div>
     );
   };
+
+  const renderComments = (summary: any) => {
+    if (!summary) return null;
+    const remarks = summary.remarks || summary.notifications || [];
+    // Combiner remarks et notifications type "remark"/"comment"
+    const all: any[] = [];
+    (summary.remarks || []).forEach((r: any) => all.push({ ...r, _kind: 'remark' }));
+    (summary.notifications || []).forEach((n: any) => {
+      if (n.type === 'remark' || n.type === 'comment' || n.type === 'note') {
+        // Éviter doublon si déjà dans remarks
+        const exists = (summary.remarks || []).some((r: any) =>
+          r.description === n.description && r.created_at === n.created_at
+        );
+        if (!exists) all.push({ ...n, _kind: 'notification' });
+      }
+    });
+
+    if (all.length === 0) return null;
+
+    return (
+      <div className="space-y-3">
+        <h4 className="font-medium flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-blue-600" />
+          Commentaires ({all.length})
+        </h4>
+        <div className="space-y-2">
+          {all.map((c, idx) => (
+            <Card key={idx} className="p-3 bg-muted/30">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                {c.room_number && (
+                  <Badge variant="secondary" className="text-xs">Chambre {c.room_number}</Badge>
+                )}
+                {c.housekeeper_name && (
+                  <Badge variant="outline" className="text-xs">{c.housekeeper_name}</Badge>
+                )}
+                {c.created_at && (
+                  <span className="text-xs text-muted-foreground">
+                    {format(parseISO(c.created_at), 'HH:mm', { locale: fr })}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm whitespace-pre-wrap">{c.description || c.title}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
 
   const renderLinenInventory = (summary: any) => {
     const linen = summary?.linen_inventory || summary?.linenInventory;
@@ -391,7 +595,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="mt-2 text-muted-foreground">Chargement des archives...</p>
         </Card>
-      ) : dailyReports.length === 0 && archivedLogs.length === 0 ? (
+      ) : dailyReports.length === 0 && archivedLogs.length === 0 && incidents.length === 0 ? (
         <Card className="p-8 text-center">
           <Archive className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold text-lg mb-2">Aucune archive pour cette date</h3>
@@ -414,10 +618,22 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
 
           <TabsContent value="reports" className="mt-4 space-y-4">
             {dailyReports.length === 0 ? (
-              <Card className="p-8 text-center">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Aucun rapport pour cette date</p>
-              </Card>
+              <>
+                <Card className="p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Aucun rapport pour cette date</p>
+                </Card>
+                {incidents.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Incidents du jour</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {renderIncidents()}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             ) : (
               <>
                 {/* Résumé global */}
@@ -440,8 +656,10 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      {renderHousekeeperSummary(selectedReport.summary)}
                       {renderRoomData(selectedReport.room_data)}
+                      {renderHousekeeperSummary(selectedReport)}
+                      {renderIncidents()}
+                      {renderComments(selectedReport.summary)}
                       {renderLinenInventory(selectedReport.summary)}
 
                       {selectedReport.notes && (
