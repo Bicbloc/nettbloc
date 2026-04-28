@@ -618,10 +618,22 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
 
           <TabsContent value="reports" className="mt-4 space-y-4">
             {dailyReports.length === 0 ? (
-              <Card className="p-8 text-center">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Aucun rapport pour cette date</p>
-              </Card>
+              <>
+                <Card className="p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Aucun rapport pour cette date</p>
+                </Card>
+                {incidents.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Incidents du jour</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {renderIncidents()}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             ) : (
               <>
                 {/* Résumé global */}
