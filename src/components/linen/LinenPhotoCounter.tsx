@@ -81,6 +81,20 @@ export const LinenPhotoCounter = ({
     }
   };
 
+  if (!aiLoading && !aiEnabled) {
+    return (
+      <Card className="p-6 flex items-start gap-3 bg-muted/40 border-dashed">
+        <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
+        <div>
+          <p className="text-sm font-medium">AI photo counting disabled</p>
+          <p className="text-xs text-muted-foreground">
+            This feature has been disabled for your account. Please contact support to re-enable it.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
