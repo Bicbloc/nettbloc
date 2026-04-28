@@ -43,6 +43,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = language;
   }, [language]);
 
+  // Runtime auto-translation of legacy hardcoded French strings when EN is active.
+  useAutoTranslate(language);
+
   const t = translations[language];
 
   return (
