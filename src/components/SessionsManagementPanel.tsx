@@ -366,7 +366,12 @@ export function SessionsManagementPanel() {
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {session.hotel_name || 'N/A'}
+                        {session.hotel_code && (
+                          <Badge variant="outline" className="font-mono text-xs mr-1">
+                            {session.hotel_code}
+                          </Badge>
+                        )}
+                        <span>{session.hotel_name || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
