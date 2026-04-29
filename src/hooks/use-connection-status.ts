@@ -14,19 +14,18 @@ export function useConnectionStatus() {
   const pingSupabase = useCallback(async () => {
     try {
       const start = Date.now();
-      
-      // Utiliser l'edge function ping qui bypasse RLS
       const { data, error } = await supabase.functions.invoke('ping');
-      
+
       if (error || !data?.ok) {
         setConsecutiveFailures(prev => prev + 1);
-        // Attendre 2 échecs consécutifs avant de marquer déconnecté
-        if (consecutiveFailures >= 1) {
+        // Reconnexion silencieuse, on ne marque PAS déconnecté tant que le navigateur est online.
+        try { realtimeManager.forceReconnect(); } catch {}
+        if (!navigator.onLine) {
           setIsSupabaseConnected(false);
         }
         return false;
       }
-      
+
       const pingTime = data.latency || (Date.now() - start);
       setLastPingTime(pingTime);
       setIsSupabaseConnected(true);
@@ -35,12 +34,13 @@ export function useConnectionStatus() {
       return true;
     } catch (error) {
       setConsecutiveFailures(prev => prev + 1);
-      if (consecutiveFailures >= 1) {
+      try { realtimeManager.forceReconnect(); } catch {}
+      if (!navigator.onLine) {
         setIsSupabaseConnected(false);
       }
       return false;
     }
-  }, [consecutiveFailures]);
+  }, []);
 
   // Écouter les changements de statut du RealtimeManager
   useEffect(() => {
@@ -49,11 +49,10 @@ export function useConnectionStatus() {
         setIsSupabaseConnected(true);
         setConsecutiveFailures(0);
         setLastSuccessfulPing(new Date());
-      } else if (status === 'OFFLINE' || status === 'FAILED') {
-        setIsSupabaseConnected(false);
       }
+      // On ignore OFFLINE / FAILED tant que navigator.onLine — RealtimeManager se reconnecte seul.
     });
-    
+
     return () => { unsubscribe(); };
   }, []);
 
@@ -62,61 +61,53 @@ export function useConnectionStatus() {
     const handleOnline = () => {
       setIsOnline(true);
       setConsecutiveFailures(0);
-      toast({
-        title: "Connexion rétablie",
-        description: "Vous êtes de nouveau en ligne",
-      });
-      // Ping immédiat après retour en ligne
+      setIsSupabaseConnected(true);
+      try { realtimeManager.forceReconnect(); } catch {}
       setTimeout(() => pingSupabase(), 500);
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      // Toast uniquement si vraiment offline après délai
-      setTimeout(() => {
-        if (!navigator.onLine) {
-          toast({
-            variant: "destructive",
-            title: "Pas de connexion",
-            description: "Vérifiez votre connexion internet",
-          });
-        }
-      }, 3000);
+      // Aucun toast pour éviter les faux positifs (sleep mobile, switch wifi…)
+    };
+
+    // Reconnexion automatique au retour de focus / visibilité
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        try { realtimeManager.forceReconnect(); } catch {}
+        pingSupabase();
+      }
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
     };
   }, [pingSupabase]);
 
-  // Ping périodique - seulement si échecs récents ou pas de ping depuis 2min
+  // Ping périodique espacé (60s) — uniquement si nécessaire
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!isOnline) return;
-      
-      const shouldPing = consecutiveFailures > 0 || 
-        !lastSuccessfulPing || 
+
+      const shouldPing = consecutiveFailures > 0 ||
+        !lastSuccessfulPing ||
         (Date.now() - lastSuccessfulPing.getTime() > 120000);
-      
+
       if (shouldPing) {
-        const wasConnected = isSupabaseConnected;
-        const isConnected = await pingSupabase();
-        
-        if (!wasConnected && isConnected && consecutiveFailures >= 2) {
-          toast({
-            title: "Connexion rétablie",
-            description: "Synchronisation en cours...",
-          });
-        }
+        await pingSupabase();
       }
-    }, 45000); // 45 secondes
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, [isOnline, isSupabaseConnected, consecutiveFailures, lastSuccessfulPing, pingSupabase]);
+  }, [isOnline, consecutiveFailures, lastSuccessfulPing, pingSupabase]);
 
   // Initial ping (delayed to let edge function deploy)
   useEffect(() => {
