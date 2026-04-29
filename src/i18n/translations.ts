@@ -296,6 +296,11 @@ type TranslationSchema = {
     reportsCreated: string;
     missingData: string;
     missingInfo: string;
+    missingDataDesc: string;
+    distributionError: string;
+    distributionErrorDesc: string;
+    hotelCreateError: string;
+    genericError: string;
   };
 };
 
@@ -622,6 +627,11 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       reportsCreated: "Rapports créés",
       missingData: "Données manquantes",
       missingInfo: "Informations manquantes",
+      missingDataDesc: "Ajoutez des chambres et des femmes de chambre.",
+      distributionError: "Erreur de distribution",
+      distributionErrorDesc: "Erreur lors de la redistribution",
+      hotelCreateError: "Impossible de créer l'hôtel",
+      genericError: "Erreur",
     },
   },
   
@@ -947,6 +957,11 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       reportsCreated: "Reports created",
       missingData: "Missing data",
       missingInfo: "Missing information",
+      missingDataDesc: "Add rooms and housekeepers first.",
+      distributionError: "Distribution error",
+      distributionErrorDesc: "An error occurred during redistribution",
+      hotelCreateError: "Unable to create the hotel",
+      genericError: "Error",
     },
   },
 };
