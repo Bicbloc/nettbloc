@@ -112,25 +112,26 @@ export async function validateUserAccessToInterface(
 }
 
 /**
- * Messages d'erreur traduits pour redirection
+ * Messages indiquant à quel type de compte l'email est lié.
+ * Pas de redirection automatique : on informe seulement l'utilisateur.
  */
 export function getRedirectMessage(correctInterface: UserType, language: 'fr' | 'en' = 'fr'): string {
   const messages: Record<UserType, { fr: string; en: string }> = {
     establishment: {
-      fr: "Votre compte est un compte établissement. Veuillez vous connecter sur l'interface Établissement.",
-      en: "Your account is an establishment account. Please log in through the Establishment interface."
+      fr: "Cette adresse email est liée à un compte Établissement. Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
+      en: "This email is linked to an Establishment account. No redirection performed — please use the matching interface to sign in."
     },
     housekeeper: {
-      fr: "Votre compte est un compte femme de chambre. Veuillez vous connecter sur l'interface Équipe.",
-      en: "Your account is a housekeeper account. Please log in through the Team interface."
+      fr: "Cette adresse email est liée à un compte Femme de chambre (Housekeeper). Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
+      en: "This email is linked to a Housekeeper account. No redirection performed — please use the matching interface to sign in."
     },
     governess: {
-      fr: "Votre compte est un compte gouvernante. Veuillez vous connecter sur l'interface Gouvernante.",
-      en: "Your account is a governess account. Please log in through the Governess interface."
+      fr: "Cette adresse email est liée à un compte Gouvernante. Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
+      en: "This email is linked to a Governess account. No redirection performed — please use the matching interface to sign in."
     },
     technician: {
-      fr: "Votre compte est un compte technicien. Veuillez vous connecter sur l'interface Technicien.",
-      en: "Your account is a technician account. Please log in through the Technician interface."
+      fr: "Cette adresse email est liée à un compte Technicien. Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
+      en: "This email is linked to a Technician account. No redirection performed — please use the matching interface to sign in."
     }
   };
   
