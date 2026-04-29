@@ -88,10 +88,40 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   const MR = 50;  // margin right
   const CW = PAGE_W - ML - MR; // content width = 495
 
-  const amountHt  = (invoice.amount_ht / 100).toFixed(2).replace('.', ',');
-  const tvaAmount = (invoice.tva_amount / 100).toFixed(2).replace('.', ',');
-  const amountTtc = (invoice.amount_ttc / 100).toFixed(2).replace('.', ',');
-  const tvaRate   = invoice.tva_rate || 20;
+  const lang: 'fr' | 'en' = invoice._language === 'en' ? 'en' : 'fr';
+  const reverseCharge: boolean = !!invoice._reverse_charge;
+  const customerVat: string = invoice._customer_vat_number || '';
+
+  // Localised labels
+  const L = lang === 'en' ? {
+    invoice: 'INVOICE', number: 'No.', date: 'Date', period: 'Period', to: 'to',
+    issuer: 'Issuer', billedTo: 'Billed to', siret: 'Reg. No.', email: 'Email',
+    designation: 'Description', qty: 'Qty', uPrice: 'Unit price', total: 'Total',
+    subtotal: 'Subtotal (excl. VAT)', vat: 'VAT', totalTtc: 'Total (incl. VAT)',
+    paymentInfo: 'Payment information', status: 'Status', reference: 'Reference', method: 'Method',
+    paid: 'Paid', sepa: 'SEPA Direct Debit (GoCardless)', card: 'Credit card',
+    footerVatNote: reverseCharge
+      ? `Reverse charge — Article 196 of EU VAT Directive 2006/112/EC. Customer VAT No.: ${customerVat}`
+      : 'VAT not applicable, French CGI art. 293 B (unless otherwise indicated)',
+  } : {
+    invoice: 'FACTURE', number: 'N\u00b0', date: 'Date', period: 'P\u00e9riode', to: 'au',
+    issuer: '\u00c9metteur', billedTo: 'Factur\u00e9 \u00e0', siret: 'SIRET', email: 'Email',
+    designation: 'D\u00e9signation', qty: 'Qt\u00e9', uPrice: 'P.U. HT', total: 'Total HT',
+    subtotal: 'Total HT', vat: 'TVA', totalTtc: 'Total TTC',
+    paymentInfo: 'Informations de paiement', status: 'Statut', reference: 'R\u00e9f\u00e9rence', method: 'Mode',
+    paid: 'Pay\u00e9e', sepa: 'Pr\u00e9l\u00e8vement SEPA (GoCardless)', card: 'Carte bancaire',
+    footerVatNote: reverseCharge
+      ? `Autoliquidation — Article 196 de la directive TVA 2006/112/CE. N\u00b0 TVA client : ${customerVat}`
+      : 'TVA non applicable, art. 293 B du CGI (sauf indication contraire)',
+  };
+
+  const currency = '\u20ac';
+  const fmtAmount = (cents: number) => (cents / 100).toFixed(2).replace('.', lang === 'en' ? '.' : ',');
+
+  const amountHt  = fmtAmount(invoice.amount_ht);
+  const tvaAmount = fmtAmount(invoice.tva_amount);
+  const amountTtc = fmtAmount(invoice.amount_ttc);
+  const tvaRate   = invoice.tva_rate || 0;
 
   const sellerName    = invoice.seller_name || 'BicBloc';
   const sellerSiret   = invoice.seller_siret || '97864605700015';
@@ -107,8 +137,8 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   const invoiceDate = invoice.invoice_date || new Date().toISOString().split('T')[0];
   const periodStart = invoice.period_start || '';
   const periodEnd   = invoice.period_end || '';
-  const designation = invoice.plan_name || invoice.plan_type || 'Abonnement';
-  const statusLabel = invoice.status === 'paid' ? 'Pay\u00e9e' : invoice.status;
+  const designation = invoice.plan_name || invoice.plan_type || (lang === 'en' ? 'Subscription' : 'Abonnement');
+  const statusLabel = invoice.status === 'paid' ? L.paid : invoice.status;
 
   // Build content stream using PDF operators
   const ops: string[] = [];
