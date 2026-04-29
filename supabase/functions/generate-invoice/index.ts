@@ -229,7 +229,7 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   // Table header text (white)
   ops.push('1 1 1 rg');
-  const headers = ['D\u00e9signation', 'Qt\u00e9', 'P.U. HT', 'Total HT'];
+  const headers = [L.designation, L.qty, L.uPrice, L.total];
   let hx = tableX + 6;
   for (let i = 0; i < headers.length; i++) {
     text(hx, y - 16, headers[i], '/F2', 9);
@@ -251,8 +251,8 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   // Row content
   text(tableX + 6, y - 16, designation, '/F1', 9);
   text(tableX + colWidths[0] + 20, y - 16, '1', '/F1', 9);
-  textR(tableX + colWidths[0] + colWidths[1] + colWidths[2] - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
-  textR(tableX + tableW - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
+  textR(tableX + colWidths[0] + colWidths[1] + colWidths[2] - 6, y - 16, `${amountHt} ${currency}`, '/F1', 9);
+  textR(tableX + tableW - 6, y - 16, `${amountHt} ${currency}`, '/F1', 9);
 
   // --- Totals section ---
   y -= rowH + 20;
@@ -261,43 +261,44 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   // Sub-total HT
   rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
-  text(totX + 6, y - 15, 'Total HT', '/F2', 9);
-  textR(totX + totW - 6, y - 15, `${amountHt} \u20ac`, '/F1', 10);
+  text(totX + 6, y - 15, L.subtotal, '/F2', 9);
+  textR(totX + totW - 6, y - 15, `${amountHt} ${currency}`, '/F1', 10);
   y -= 22;
 
-  // TVA
+  // VAT
   rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
-  text(totX + 6, y - 15, `TVA (${tvaRate}%)`, '/F1', 9);
-  textR(totX + totW - 6, y - 15, `${tvaAmount} \u20ac`, '/F1', 10);
+  const vatLabel = reverseCharge ? `${L.vat} (0% — ${lang === 'en' ? 'reverse charge' : 'autoliquidation'})` : `${L.vat} (${tvaRate}%)`;
+  text(totX + 6, y - 15, vatLabel, '/F1', 9);
+  textR(totX + totW - 6, y - 15, `${tvaAmount} ${currency}`, '/F1', 10);
   y -= 22;
 
   // Total TTC
   rectFill(totX, y - 26, totW, 26, 0.15, 0.3, 0.6);
   ops.push('1 1 1 rg');
-  text(totX + 6, y - 18, 'Total TTC', '/F2', 11);
-  textR(totX + totW - 6, y - 18, `${amountTtc} \u20ac`, '/F2', 12);
+  text(totX + 6, y - 18, L.totalTtc, '/F2', 11);
+  textR(totX + totW - 6, y - 18, `${amountTtc} ${currency}`, '/F2', 12);
   ops.push('0 0 0 rg');
 
   // --- Payment info ---
   y -= 55;
   rectFill(ML, y - 50, CW, 50, 0.97, 0.97, 1);
   rect(ML, y - 50, CW, 50);
-  text(ML + 8, y - 14, 'Informations de paiement', '/F2', 10);
-  text(ML + 8, y - 28, `Statut : ${statusLabel}`, '/F1', 9);
+  text(ML + 8, y - 14, L.paymentInfo, '/F2', 10);
+  text(ML + 8, y - 28, `${L.status} : ${statusLabel}`, '/F1', 9);
   if (invoice.payment_reference) {
-    text(ML + 8, y - 40, `R\u00e9f\u00e9rence : ${invoice.payment_reference}`, '/F1', 9);
+    text(ML + 8, y - 40, `${L.reference} : ${invoice.payment_reference}`, '/F1', 9);
   }
   if (invoice.payment_method) {
-    const methodLabel = invoice.payment_method === 'gocardless_direct_debit' ? 'Pr\u00e9l\u00e8vement SEPA (GoCardless)' :
-                        invoice.payment_method === 'card' ? 'Carte bancaire' : invoice.payment_method;
-    text(ML + 250, y - 28, `Mode : ${methodLabel}`, '/F1', 9);
+    const methodLabel = invoice.payment_method === 'gocardless_direct_debit' ? L.sepa :
+                        invoice.payment_method === 'card' ? L.card : invoice.payment_method;
+    text(ML + 250, y - 28, `${L.method} : ${methodLabel}`, '/F1', 9);
   }
 
   // --- Footer ---
   ops.push('0.5 0.5 0.5 rg');
   line(ML, 60, PAGE_W - MR, 60);
   text(ML, 45, `${sellerName} - SIRET ${sellerSiret} - ${sellerAddress}`, '/F1', 7);
-  text(ML, 35, 'TVA non applicable, art. 293 B du CGI (sauf indication contraire)', '/F1', 7);
+  text(ML, 35, L.footerVatNote, '/F1', 7);
   ops.push('0 0 0 rg');
 
   // Set line width
