@@ -8,11 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Building, KeyRound, ArrowLeft, Mail, Lock } from 'lucide-react';
+import { Loader2, Building, KeyRound, ArrowLeft, Mail, Lock, Globe, Languages, Receipt } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
+import { EU_COUNTRIES, isValidVatNumberFormat } from '@/constants/euCountries';
 
 const EstablishmentAuth = () => {
   const { signIn, signUp, signOut, isAuthenticated, loading, isInitialized, user } = useAuth();
@@ -26,6 +28,9 @@ const EstablishmentAuth = () => {
     password: '',
     confirmPassword: '',
     companyName: '',
+    countryCode: 'FR',
+    preferredLanguage: 'fr' as 'fr' | 'en',
+    vatNumber: '',
     newPassword: '',
     confirmNewPassword: ''
   });
@@ -217,8 +222,18 @@ const EstablishmentAuth = () => {
       return;
     }
     
+    if (!formData.countryCode) {
+      toast({ variant: "destructive", title: "Erreur", description: "Veuillez sélectionner votre pays." });
+      return;
+    }
+
+    if (formData.vatNumber.trim() && !isValidVatNumberFormat(formData.vatNumber)) {
+      toast({ variant: "destructive", title: "Numéro de TVA invalide", description: "Le format du numéro de TVA intracommunautaire est invalide." });
+      return;
+    }
+
     setIsLoading(true);
-    
+
     // Vérifier que l'email n'est pas déjà utilisé sur une autre interface
     const validation = await validateEmailForUserType(formData.email, 'establishment');
     if (!validation.isValid) {
@@ -230,13 +245,18 @@ const EstablishmentAuth = () => {
       setIsLoading(false);
       return;
     }
-    
+
     const { error, needsEmailVerification } = await signUp(
       formData.email,
       formData.password,
-      formData.companyName
+      formData.companyName,
+      {
+        country_code: formData.countryCode,
+        preferred_language: formData.preferredLanguage,
+        vat_number: formData.vatNumber.trim() || undefined,
+      }
     );
-    
+
     if (error) {
       toast({
         variant: "destructive",
@@ -536,6 +556,53 @@ const EstablishmentAuth = () => {
                         className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-country" className="flex items-center gap-2 font-medium"><Globe className="h-4 w-4 text-emerald-600" />Pays</Label>
+                        <Select value={formData.countryCode} onValueChange={(v) => setFormData(prev => ({ ...prev, countryCode: v }))}>
+                          <SelectTrigger id="signup-country" className="h-12 bg-slate-50 border-slate-200">
+                            <SelectValue placeholder="Pays" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {EU_COUNTRIES.map((c) => (
+                              <SelectItem key={c.code} value={c.code}>{c.nameFr} ({c.code})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-language" className="flex items-center gap-2 font-medium"><Languages className="h-4 w-4 text-emerald-600" />Langue / Language</Label>
+                        <Select value={formData.preferredLanguage} onValueChange={(v) => setFormData(prev => ({ ...prev, preferredLanguage: v as 'fr' | 'en' }))}>
+                          <SelectTrigger id="signup-language" className="h-12 bg-slate-50 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fr">Français</SelectItem>
+                            <SelectItem value="en">English</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-vat" className="flex items-center gap-2 font-medium">
+                        <Receipt className="h-4 w-4 text-emerald-600" />
+                        N° TVA intracommunautaire <span className="text-xs text-slate-500">(optionnel)</span>
+                      </Label>
+                      <Input
+                        id="signup-vat"
+                        type="text"
+                        placeholder="FR12345678901"
+                        value={formData.vatNumber}
+                        onChange={(e) => setFormData(prev => ({ ...prev, vatNumber: e.target.value.toUpperCase() }))}
+                        className="h-12 bg-slate-50 border-slate-200"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Si vous renseignez un n° TVA UE valide (hors France), la facturation sera en autoliquidation (HT).
+                      </p>
+                    </div>
+
                     <Button 
                       type="submit" 
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg" 

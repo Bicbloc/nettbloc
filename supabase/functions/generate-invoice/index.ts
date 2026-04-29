@@ -13,6 +13,31 @@ const PLAN_NAMES: Record<string, string> = {
   platinum: "Plan Platinum Nettobloc",
 };
 
+// ---------------------------------------------------------------------------
+// EU VAT logic
+// ---------------------------------------------------------------------------
+const EU_COUNTRY_CODES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+const EU_VAT_PREFIXES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','EL','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+
+function isEUCountry(code?: string | null): boolean {
+  return !!code && EU_COUNTRY_CODES.includes(code.toUpperCase());
+}
+
+function isValidVatFormat(vat?: string | null): boolean {
+  if (!vat) return false;
+  const v = vat.replace(/\s/g, '').toUpperCase();
+  if (!/^[A-Z]{2}[A-Z0-9]{6,12}$/.test(v)) return false;
+  return EU_VAT_PREFIXES.includes(v.slice(0, 2));
+}
+
+function computeVat(country?: string | null, vatNumber?: string | null) {
+  const c = (country || '').toUpperCase();
+  if (!isEUCountry(c)) return { rate: 0, reverseCharge: false, reason: 'no_vat_outside_eu' as const };
+  if (c === 'FR') return { rate: 20, reverseCharge: false, reason: 'domestic' as const };
+  if (isValidVatFormat(vatNumber)) return { rate: 0, reverseCharge: true, reason: 'reverse_charge' as const };
+  return { rate: 20, reverseCharge: false, reason: 'eu_no_vat_number' as const };
+}
+
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[GENERATE-INVOICE] ${step}${detailsStr}`);
@@ -63,10 +88,40 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   const MR = 50;  // margin right
   const CW = PAGE_W - ML - MR; // content width = 495
 
-  const amountHt  = (invoice.amount_ht / 100).toFixed(2).replace('.', ',');
-  const tvaAmount = (invoice.tva_amount / 100).toFixed(2).replace('.', ',');
-  const amountTtc = (invoice.amount_ttc / 100).toFixed(2).replace('.', ',');
-  const tvaRate   = invoice.tva_rate || 20;
+  const lang: 'fr' | 'en' = invoice._language === 'en' ? 'en' : 'fr';
+  const reverseCharge: boolean = !!invoice._reverse_charge;
+  const customerVat: string = invoice._customer_vat_number || '';
+
+  // Localised labels
+  const L = lang === 'en' ? {
+    invoice: 'INVOICE', number: 'No.', date: 'Date', period: 'Period', to: 'to',
+    issuer: 'Issuer', billedTo: 'Billed to', siret: 'Reg. No.', email: 'Email',
+    designation: 'Description', qty: 'Qty', uPrice: 'Unit price', total: 'Total',
+    subtotal: 'Subtotal (excl. VAT)', vat: 'VAT', totalTtc: 'Total (incl. VAT)',
+    paymentInfo: 'Payment information', status: 'Status', reference: 'Reference', method: 'Method',
+    paid: 'Paid', sepa: 'SEPA Direct Debit (GoCardless)', card: 'Credit card',
+    footerVatNote: reverseCharge
+      ? `Reverse charge — Article 196 of EU VAT Directive 2006/112/EC. Customer VAT No.: ${customerVat}`
+      : 'VAT not applicable, French CGI art. 293 B (unless otherwise indicated)',
+  } : {
+    invoice: 'FACTURE', number: 'N\u00b0', date: 'Date', period: 'P\u00e9riode', to: 'au',
+    issuer: '\u00c9metteur', billedTo: 'Factur\u00e9 \u00e0', siret: 'SIRET', email: 'Email',
+    designation: 'D\u00e9signation', qty: 'Qt\u00e9', uPrice: 'P.U. HT', total: 'Total HT',
+    subtotal: 'Total HT', vat: 'TVA', totalTtc: 'Total TTC',
+    paymentInfo: 'Informations de paiement', status: 'Statut', reference: 'R\u00e9f\u00e9rence', method: 'Mode',
+    paid: 'Pay\u00e9e', sepa: 'Pr\u00e9l\u00e8vement SEPA (GoCardless)', card: 'Carte bancaire',
+    footerVatNote: reverseCharge
+      ? `Autoliquidation — Article 196 de la directive TVA 2006/112/CE. N\u00b0 TVA client : ${customerVat}`
+      : 'TVA non applicable, art. 293 B du CGI (sauf indication contraire)',
+  };
+
+  const currency = '\u20ac';
+  const fmtAmount = (cents: number) => (cents / 100).toFixed(2).replace('.', lang === 'en' ? '.' : ',');
+
+  const amountHt  = fmtAmount(invoice.amount_ht);
+  const tvaAmount = fmtAmount(invoice.tva_amount);
+  const amountTtc = fmtAmount(invoice.amount_ttc);
+  const tvaRate   = invoice.tva_rate || 0;
 
   const sellerName    = invoice.seller_name || 'BicBloc';
   const sellerSiret   = invoice.seller_siret || '97864605700015';
@@ -82,8 +137,8 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   const invoiceDate = invoice.invoice_date || new Date().toISOString().split('T')[0];
   const periodStart = invoice.period_start || '';
   const periodEnd   = invoice.period_end || '';
-  const designation = invoice.plan_name || invoice.plan_type || 'Abonnement';
-  const statusLabel = invoice.status === 'paid' ? 'Pay\u00e9e' : invoice.status;
+  const designation = invoice.plan_name || invoice.plan_type || (lang === 'en' ? 'Subscription' : 'Abonnement');
+  const statusLabel = invoice.status === 'paid' ? L.paid : invoice.status;
 
   // Build content stream using PDF operators
   const ops: string[] = [];
@@ -120,17 +175,17 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   text(ML + 120, y + 2, 'by bicbloc', '/F1', 10);
   ops.push('0 0 0 rg'); // back to black
 
-  text(ML + 300, y, 'FACTURE', '/F2', 22);
+  text(ML + 300, y, L.invoice, '/F2', 22);
   y -= 30;
 
   // Invoice number & date
   ops.push('0.4 0.4 0.4 rg');
-  text(ML + 300, y, `N\u00b0 ${invoice.invoice_number}`, '/F1', 11);
+  text(ML + 300, y, `${L.number} ${invoice.invoice_number}`, '/F1', 11);
   y -= 16;
-  text(ML + 300, y, `Date : ${invoiceDate}`, '/F1', 10);
+  text(ML + 300, y, `${L.date} : ${invoiceDate}`, '/F1', 10);
   if (periodStart && periodEnd) {
     y -= 14;
-    text(ML + 300, y, `P\u00e9riode : ${periodStart} au ${periodEnd}`, '/F1', 10);
+    text(ML + 300, y, `${L.period} : ${periodStart} ${L.to} ${periodEnd}`, '/F1', 10);
   }
   ops.push('0 0 0 rg');
 
@@ -138,28 +193,29 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   y -= 35;
   const sellerY = y;
   ops.push('0.3 0.3 0.3 rg');
-  text(ML, y, '\u00c9metteur', '/F2', 10);
+  text(ML, y, L.issuer, '/F2', 10);
   ops.push('0 0 0 rg');
   y -= 14;
   text(ML, y, sellerName, '/F2', 9);
   y -= 12;
-  text(ML, y, `SIRET : ${sellerSiret}`, '/F1', 8);
+  text(ML, y, `${L.siret} : ${sellerSiret}`, '/F1', 8);
   y -= 12;
   text(ML, y, sellerAddress, '/F1', 8);
   y -= 12;
-  text(ML, y, `Email : ${sellerEmail}`, '/F1', 8);
+  text(ML, y, `${L.email} : ${sellerEmail}`, '/F1', 8);
 
   // --- Client info (no frame, right side) ---
   const clientX = ML + 300;
   let cy = sellerY;
   ops.push('0.3 0.3 0.3 rg');
-  text(clientX, cy, 'Factur\u00e9 \u00e0', '/F2', 10);
+  text(clientX, cy, L.billedTo, '/F2', 10);
   ops.push('0 0 0 rg');
   cy -= 14;
   if (customerHotelName) { text(clientX, cy, customerHotelName, '/F2', 9); cy -= 12; }
-  if (customerSiret) { text(clientX, cy, `SIRET : ${customerSiret}`, '/F1', 8); cy -= 12; }
+  if (customerSiret) { text(clientX, cy, `${L.siret} : ${customerSiret}`, '/F1', 8); cy -= 12; }
   if (customerAddress) { text(clientX, cy, customerAddress, '/F1', 8); cy -= 12; }
-  if (customerEmail) { text(clientX, cy, `Email : ${customerEmail}`, '/F1', 8); cy -= 12; }
+  if (customerEmail) { text(clientX, cy, `${L.email} : ${customerEmail}`, '/F1', 8); cy -= 12; }
+  if (customerVat) { text(clientX, cy, `${lang === 'en' ? 'VAT No.' : 'N\u00b0 TVA'} : ${customerVat}`, '/F1', 8); cy -= 12; }
 
   // --- Table header ---
   y = Math.min(y, cy) - 30;
@@ -173,7 +229,7 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   // Table header text (white)
   ops.push('1 1 1 rg');
-  const headers = ['D\u00e9signation', 'Qt\u00e9', 'P.U. HT', 'Total HT'];
+  const headers = [L.designation, L.qty, L.uPrice, L.total];
   let hx = tableX + 6;
   for (let i = 0; i < headers.length; i++) {
     text(hx, y - 16, headers[i], '/F2', 9);
@@ -195,8 +251,8 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   // Row content
   text(tableX + 6, y - 16, designation, '/F1', 9);
   text(tableX + colWidths[0] + 20, y - 16, '1', '/F1', 9);
-  textR(tableX + colWidths[0] + colWidths[1] + colWidths[2] - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
-  textR(tableX + tableW - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
+  textR(tableX + colWidths[0] + colWidths[1] + colWidths[2] - 6, y - 16, `${amountHt} ${currency}`, '/F1', 9);
+  textR(tableX + tableW - 6, y - 16, `${amountHt} ${currency}`, '/F1', 9);
 
   // --- Totals section ---
   y -= rowH + 20;
@@ -205,43 +261,44 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   // Sub-total HT
   rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
-  text(totX + 6, y - 15, 'Total HT', '/F2', 9);
-  textR(totX + totW - 6, y - 15, `${amountHt} \u20ac`, '/F1', 10);
+  text(totX + 6, y - 15, L.subtotal, '/F2', 9);
+  textR(totX + totW - 6, y - 15, `${amountHt} ${currency}`, '/F1', 10);
   y -= 22;
 
-  // TVA
+  // VAT
   rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
-  text(totX + 6, y - 15, `TVA (${tvaRate}%)`, '/F1', 9);
-  textR(totX + totW - 6, y - 15, `${tvaAmount} \u20ac`, '/F1', 10);
+  const vatLabel = reverseCharge ? `${L.vat} (0% — ${lang === 'en' ? 'reverse charge' : 'autoliquidation'})` : `${L.vat} (${tvaRate}%)`;
+  text(totX + 6, y - 15, vatLabel, '/F1', 9);
+  textR(totX + totW - 6, y - 15, `${tvaAmount} ${currency}`, '/F1', 10);
   y -= 22;
 
   // Total TTC
   rectFill(totX, y - 26, totW, 26, 0.15, 0.3, 0.6);
   ops.push('1 1 1 rg');
-  text(totX + 6, y - 18, 'Total TTC', '/F2', 11);
-  textR(totX + totW - 6, y - 18, `${amountTtc} \u20ac`, '/F2', 12);
+  text(totX + 6, y - 18, L.totalTtc, '/F2', 11);
+  textR(totX + totW - 6, y - 18, `${amountTtc} ${currency}`, '/F2', 12);
   ops.push('0 0 0 rg');
 
   // --- Payment info ---
   y -= 55;
   rectFill(ML, y - 50, CW, 50, 0.97, 0.97, 1);
   rect(ML, y - 50, CW, 50);
-  text(ML + 8, y - 14, 'Informations de paiement', '/F2', 10);
-  text(ML + 8, y - 28, `Statut : ${statusLabel}`, '/F1', 9);
+  text(ML + 8, y - 14, L.paymentInfo, '/F2', 10);
+  text(ML + 8, y - 28, `${L.status} : ${statusLabel}`, '/F1', 9);
   if (invoice.payment_reference) {
-    text(ML + 8, y - 40, `R\u00e9f\u00e9rence : ${invoice.payment_reference}`, '/F1', 9);
+    text(ML + 8, y - 40, `${L.reference} : ${invoice.payment_reference}`, '/F1', 9);
   }
   if (invoice.payment_method) {
-    const methodLabel = invoice.payment_method === 'gocardless_direct_debit' ? 'Pr\u00e9l\u00e8vement SEPA (GoCardless)' :
-                        invoice.payment_method === 'card' ? 'Carte bancaire' : invoice.payment_method;
-    text(ML + 250, y - 28, `Mode : ${methodLabel}`, '/F1', 9);
+    const methodLabel = invoice.payment_method === 'gocardless_direct_debit' ? L.sepa :
+                        invoice.payment_method === 'card' ? L.card : invoice.payment_method;
+    text(ML + 250, y - 28, `${L.method} : ${methodLabel}`, '/F1', 9);
   }
 
   // --- Footer ---
   ops.push('0.5 0.5 0.5 rg');
   line(ML, 60, PAGE_W - MR, 60);
   text(ML, 45, `${sellerName} - SIRET ${sellerSiret} - ${sellerAddress}`, '/F1', 7);
-  text(ML, 35, 'TVA non applicable, art. 293 B du CGI (sauf indication contraire)', '/F1', 7);
+  text(ML, 35, L.footerVatNote, '/F1', 7);
   ops.push('0 0 0 rg');
 
   // Set line width
@@ -386,21 +443,32 @@ serve(async (req) => {
           hotelAddress = hotel.address || '';
         }
       }
-      // Fetch billing SIRET from profile
+      // Fetch billing SIRET, country, language and VAT number from profile
+      let customerCountry = '';
+      let customerLanguage: 'fr' | 'en' = 'fr';
+      let customerVatNumber = '';
       if (invoice.user_id) {
         const { data: prof } = await supabaseAdmin
           .from('profiles')
-          .select('billing_siret')
+          .select('billing_siret, country_code, preferred_language, vat_number')
           .eq('id', invoice.user_id)
           .maybeSingle();
         if (prof?.billing_siret) hotelSiret = prof.billing_siret;
+        customerCountry = (prof as any)?.country_code || '';
+        customerLanguage = ((prof as any)?.preferred_language === 'en' ? 'en' : 'fr');
+        customerVatNumber = (prof as any)?.vat_number || '';
       }
+
+      const vatInfoForPdf = computeVat(customerCountry, customerVatNumber);
 
       const enrichedInvoice = {
         ...invoice,
         _hotel_name: hotelName,
         _hotel_address: hotelAddress,
         _hotel_siret: hotelSiret || invoice.customer_siret || '',
+        _language: customerLanguage,
+        _reverse_charge: vatInfoForPdf.reverseCharge,
+        _customer_vat_number: customerVatNumber,
       };
 
       const pdfBytes = buildInvoicePdf(enrichedInvoice);
@@ -465,10 +533,10 @@ serve(async (req) => {
       .eq('user_id', user_id)
       .maybeSingle();
 
-    // Get user profile with billing info
+    // Get user profile with billing info + country/language/VAT for EU rules
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('email, company_name, billing_siret, billing_address, billing_email')
+      .select('email, company_name, billing_siret, billing_address, billing_email, country_code, preferred_language, vat_number')
       .eq('id', user_id)
       .single();
 
@@ -478,7 +546,8 @@ serve(async (req) => {
     }
 
     const amountHt = amount_cents;
-    const tvaRate = 20.00;
+    const vatInfo = computeVat((profile as any).country_code, (profile as any).vat_number);
+    const tvaRate = vatInfo.rate;
     const tvaAmount = Math.round(amountHt * (tvaRate / 100));
     const amountTtc = amountHt + tvaAmount;
 

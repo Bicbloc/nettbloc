@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText, Smartphone
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText, Smartphone, Megaphone
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
@@ -29,6 +29,7 @@ import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
+import AdminBannersPanel from '@/components/admin/AdminBannersPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { EnhancedAuditLogPanel } from '@/components/admin/EnhancedAuditLogPanel';
 import { UsersManagementPanel } from '@/components/admin/UsersManagementPanel';
@@ -944,6 +945,10 @@ const Admin = () => {
                 <FileText className="h-4 w-4" />
                 Pages légales
               </TabsTrigger>
+              <TabsTrigger value="banners" className="gap-2">
+                <Megaphone className="h-4 w-4" />
+                Bannières
+              </TabsTrigger>
               <TabsTrigger value="system" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Système
@@ -1177,6 +1182,10 @@ const Admin = () => {
               )}
             </TabsContent>
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="banners" className="space-y-4">
+          <AdminBannersPanel />
         </TabsContent>
 
         <TabsContent value="system" className="space-y-4">
