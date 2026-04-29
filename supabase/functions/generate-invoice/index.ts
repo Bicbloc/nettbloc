@@ -443,21 +443,32 @@ serve(async (req) => {
           hotelAddress = hotel.address || '';
         }
       }
-      // Fetch billing SIRET from profile
+      // Fetch billing SIRET, country, language and VAT number from profile
+      let customerCountry = '';
+      let customerLanguage: 'fr' | 'en' = 'fr';
+      let customerVatNumber = '';
       if (invoice.user_id) {
         const { data: prof } = await supabaseAdmin
           .from('profiles')
-          .select('billing_siret')
+          .select('billing_siret, country_code, preferred_language, vat_number')
           .eq('id', invoice.user_id)
           .maybeSingle();
         if (prof?.billing_siret) hotelSiret = prof.billing_siret;
+        customerCountry = (prof as any)?.country_code || '';
+        customerLanguage = ((prof as any)?.preferred_language === 'en' ? 'en' : 'fr');
+        customerVatNumber = (prof as any)?.vat_number || '';
       }
+
+      const vatInfoForPdf = computeVat(customerCountry, customerVatNumber);
 
       const enrichedInvoice = {
         ...invoice,
         _hotel_name: hotelName,
         _hotel_address: hotelAddress,
         _hotel_siret: hotelSiret || invoice.customer_siret || '',
+        _language: customerLanguage,
+        _reverse_charge: vatInfoForPdf.reverseCharge,
+        _customer_vat_number: customerVatNumber,
       };
 
       const pdfBytes = buildInvoicePdf(enrichedInvoice);
