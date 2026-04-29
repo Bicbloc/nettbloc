@@ -522,10 +522,10 @@ serve(async (req) => {
       .eq('user_id', user_id)
       .maybeSingle();
 
-    // Get user profile with billing info
+    // Get user profile with billing info + country/language/VAT for EU rules
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('email, company_name, billing_siret, billing_address, billing_email')
+      .select('email, company_name, billing_siret, billing_address, billing_email, country_code, preferred_language, vat_number')
       .eq('id', user_id)
       .single();
 
@@ -535,7 +535,8 @@ serve(async (req) => {
     }
 
     const amountHt = amount_cents;
-    const tvaRate = 20.00;
+    const vatInfo = computeVat((profile as any).country_code, (profile as any).vat_number);
+    const tvaRate = vatInfo.rate;
     const tvaAmount = Math.round(amountHt * (tvaRate / 100));
     const amountTtc = amountHt + tvaAmount;
 
