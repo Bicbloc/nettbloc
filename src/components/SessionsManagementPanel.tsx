@@ -366,7 +366,12 @@ export function SessionsManagementPanel() {
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {session.hotel_name || 'N/A'}
+                        {session.hotel_code && (
+                          <Badge variant="outline" className="font-mono text-xs mr-1">
+                            {session.hotel_code}
+                          </Badge>
+                        )}
+                        <span>{session.hotel_name || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -507,7 +512,12 @@ export function SessionsManagementPanel() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Hôtel</Label>
-                  <p className="text-sm mt-1">{selectedSession.hotel_name || 'N/A'}</p>
+                  <p className="text-sm mt-1 flex items-center gap-2">
+                    {selectedSession.hotel_code && (
+                      <Badge variant="outline" className="font-mono text-xs">{selectedSession.hotel_code}</Badge>
+                    )}
+                    <span>{selectedSession.hotel_name || 'N/A'}</span>
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">ID Hôtel</Label>
