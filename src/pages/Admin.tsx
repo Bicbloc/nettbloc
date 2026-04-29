@@ -29,6 +29,7 @@ import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
+import AdminBannersPanel from '@/components/admin/AdminBannersPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { EnhancedAuditLogPanel } from '@/components/admin/EnhancedAuditLogPanel';
 import { UsersManagementPanel } from '@/components/admin/UsersManagementPanel';
@@ -943,6 +944,10 @@ const Admin = () => {
               <TabsTrigger value="legal" className="gap-2">
                 <FileText className="h-4 w-4" />
                 Pages légales
+              </TabsTrigger>
+              <TabsTrigger value="banners" className="gap-2">
+                <Megaphone className="h-4 w-4" />
+                Bannières
               </TabsTrigger>
               <TabsTrigger value="system" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
