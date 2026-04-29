@@ -19,6 +19,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { ImpersonationBanner } from "./components/admin/ImpersonationBanner";
+import GlobalNotices from "./components/GlobalNotices";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
 // Lazy-loaded pages
