@@ -13,6 +13,31 @@ const PLAN_NAMES: Record<string, string> = {
   platinum: "Plan Platinum Nettobloc",
 };
 
+// ---------------------------------------------------------------------------
+// EU VAT logic
+// ---------------------------------------------------------------------------
+const EU_COUNTRY_CODES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+const EU_VAT_PREFIXES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','EL','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+
+function isEUCountry(code?: string | null): boolean {
+  return !!code && EU_COUNTRY_CODES.includes(code.toUpperCase());
+}
+
+function isValidVatFormat(vat?: string | null): boolean {
+  if (!vat) return false;
+  const v = vat.replace(/\s/g, '').toUpperCase();
+  if (!/^[A-Z]{2}[A-Z0-9]{6,12}$/.test(v)) return false;
+  return EU_VAT_PREFIXES.includes(v.slice(0, 2));
+}
+
+function computeVat(country?: string | null, vatNumber?: string | null) {
+  const c = (country || '').toUpperCase();
+  if (!isEUCountry(c)) return { rate: 0, reverseCharge: false, reason: 'no_vat_outside_eu' as const };
+  if (c === 'FR') return { rate: 20, reverseCharge: false, reason: 'domestic' as const };
+  if (isValidVatFormat(vatNumber)) return { rate: 0, reverseCharge: true, reason: 'reverse_charge' as const };
+  return { rate: 20, reverseCharge: false, reason: 'eu_no_vat_number' as const };
+}
+
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[GENERATE-INVOICE] ${step}${detailsStr}`);
