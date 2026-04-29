@@ -1184,6 +1184,10 @@ const Admin = () => {
           </Tabs>
         </TabsContent>
 
+        <TabsContent value="banners" className="space-y-4">
+          <AdminBannersPanel />
+        </TabsContent>
+
         <TabsContent value="system" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
