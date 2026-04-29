@@ -8,11 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Building, KeyRound, ArrowLeft, Mail, Lock } from 'lucide-react';
+import { Loader2, Building, KeyRound, ArrowLeft, Mail, Lock, Globe, Languages, Receipt } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
+import { EU_COUNTRIES, isValidVatNumberFormat } from '@/constants/euCountries';
 
 const EstablishmentAuth = () => {
   const { signIn, signUp, signOut, isAuthenticated, loading, isInitialized, user } = useAuth();
@@ -26,6 +28,9 @@ const EstablishmentAuth = () => {
     password: '',
     confirmPassword: '',
     companyName: '',
+    countryCode: 'FR',
+    preferredLanguage: 'fr' as 'fr' | 'en',
+    vatNumber: '',
     newPassword: '',
     confirmNewPassword: ''
   });
@@ -217,8 +222,18 @@ const EstablishmentAuth = () => {
       return;
     }
     
+    if (!formData.countryCode) {
+      toast({ variant: "destructive", title: "Erreur", description: "Veuillez sélectionner votre pays." });
+      return;
+    }
+
+    if (formData.vatNumber.trim() && !isValidVatNumberFormat(formData.vatNumber)) {
+      toast({ variant: "destructive", title: "Numéro de TVA invalide", description: "Le format du numéro de TVA intracommunautaire est invalide." });
+      return;
+    }
+
     setIsLoading(true);
-    
+
     // Vérifier que l'email n'est pas déjà utilisé sur une autre interface
     const validation = await validateEmailForUserType(formData.email, 'establishment');
     if (!validation.isValid) {
@@ -230,13 +245,18 @@ const EstablishmentAuth = () => {
       setIsLoading(false);
       return;
     }
-    
+
     const { error, needsEmailVerification } = await signUp(
       formData.email,
       formData.password,
-      formData.companyName
+      formData.companyName,
+      {
+        country_code: formData.countryCode,
+        preferred_language: formData.preferredLanguage,
+        vat_number: formData.vatNumber.trim() || undefined,
+      }
     );
-    
+
     if (error) {
       toast({
         variant: "destructive",
