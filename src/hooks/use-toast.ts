@@ -4,6 +4,7 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import { maybeTranslate } from "@/i18n/translateRuntime"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -141,6 +142,14 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+
+  // Auto-translate hardcoded FR strings to EN when the active language is English.
+  if (typeof props.title === "string") {
+    props.title = maybeTranslate(props.title)
+  }
+  if (typeof props.description === "string") {
+    props.description = maybeTranslate(props.description)
+  }
 
   const update = (props: ToasterToast) =>
     dispatch({
