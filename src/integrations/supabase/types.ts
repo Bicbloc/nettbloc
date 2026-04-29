@@ -150,6 +150,101 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_banner_dismissals: {
+        Row: {
+          banner_id: string
+          dismissed_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          banner_id: string
+          dismissed_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          banner_id?: string
+          dismissed_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_banner_dismissals_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "admin_banners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_banners: {
+        Row: {
+          action_label: string | null
+          action_label_en: string | null
+          action_url: string | null
+          banner_type: string
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          is_dismissible: boolean
+          message: string
+          message_en: string | null
+          starts_at: string
+          target_countries: string[] | null
+          target_hotel_ids: string[] | null
+          target_plans: string[] | null
+          target_scope: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_label_en?: string | null
+          action_url?: string | null
+          banner_type?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_dismissible?: boolean
+          message: string
+          message_en?: string | null
+          starts_at?: string
+          target_countries?: string[] | null
+          target_hotel_ids?: string[] | null
+          target_plans?: string[] | null
+          target_scope?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_label?: string | null
+          action_label_en?: string | null
+          action_url?: string | null
+          banner_type?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_dismissible?: boolean
+          message?: string
+          message_en?: string | null
+          starts_at?: string
+          target_countries?: string[] | null
+          target_hotel_ids?: string[] | null
+          target_plans?: string[] | null
+          target_scope?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       archived_daily_logs: {
         Row: {
           archive_date: string
@@ -3656,6 +3751,7 @@ export type Database = {
           billing_siret: string | null
           billing_tva_number: string | null
           company_name: string | null
+          country_code: string | null
           created_at: string
           current_hotel_id: string | null
           email: string
@@ -3663,10 +3759,12 @@ export type Database = {
           gocardless_customer_id: string | null
           gocardless_mandate_id: string | null
           id: string
+          is_b2b_reverse_charge: boolean | null
           is_suspended: boolean
           max_rooms: number | null
           onboarding_completed_at: string | null
           plan: string | null
+          preferred_language: string | null
           subscription_started_at: string | null
           subscription_status: string | null
           subscription_type: string | null
@@ -3681,6 +3779,7 @@ export type Database = {
           trial_start_date: string | null
           trial_warning_level: number | null
           updated_at: string
+          vat_number: string | null
         }
         Insert: {
           ai_features_enabled?: boolean
@@ -3696,6 +3795,7 @@ export type Database = {
           billing_siret?: string | null
           billing_tva_number?: string | null
           company_name?: string | null
+          country_code?: string | null
           created_at?: string
           current_hotel_id?: string | null
           email: string
@@ -3703,10 +3803,12 @@ export type Database = {
           gocardless_customer_id?: string | null
           gocardless_mandate_id?: string | null
           id: string
+          is_b2b_reverse_charge?: boolean | null
           is_suspended?: boolean
           max_rooms?: number | null
           onboarding_completed_at?: string | null
           plan?: string | null
+          preferred_language?: string | null
           subscription_started_at?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
@@ -3721,6 +3823,7 @@ export type Database = {
           trial_start_date?: string | null
           trial_warning_level?: number | null
           updated_at?: string
+          vat_number?: string | null
         }
         Update: {
           ai_features_enabled?: boolean
@@ -3736,6 +3839,7 @@ export type Database = {
           billing_siret?: string | null
           billing_tva_number?: string | null
           company_name?: string | null
+          country_code?: string | null
           created_at?: string
           current_hotel_id?: string | null
           email?: string
@@ -3743,10 +3847,12 @@ export type Database = {
           gocardless_customer_id?: string | null
           gocardless_mandate_id?: string | null
           id?: string
+          is_b2b_reverse_charge?: boolean | null
           is_suspended?: boolean
           max_rooms?: number | null
           onboarding_completed_at?: string | null
           plan?: string | null
+          preferred_language?: string | null
           subscription_started_at?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
@@ -3761,6 +3867,7 @@ export type Database = {
           trial_start_date?: string | null
           trial_warning_level?: number | null
           updated_at?: string
+          vat_number?: string | null
         }
         Relationships: [
           {
@@ -5429,6 +5536,22 @@ export type Database = {
           p_housekeeper_profile_id: string
         }
         Returns: string
+      }
+      get_active_banners_for_user: {
+        Args: never
+        Returns: {
+          action_label: string
+          action_label_en: string
+          action_url: string
+          banner_type: string
+          ends_at: string
+          id: string
+          is_dismissible: boolean
+          message: string
+          message_en: string
+          starts_at: string
+          title: string
+        }[]
       }
       get_approved_hotels_for_housekeeper: {
         Args: { p_housekeeper_profile_id: string }
