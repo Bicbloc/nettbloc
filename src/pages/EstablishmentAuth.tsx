@@ -154,8 +154,9 @@ const EstablishmentAuth = () => {
     if (!accessCheck.allowed && accessCheck.correctInterface) {
       toast({
         variant: "destructive",
-        title: "Mauvaise interface",
-        description: getRedirectMessage(accessCheck.correctInterface, 'fr')
+        title: "Compte lié à un autre type d'utilisateur",
+        description: getRedirectMessage(accessCheck.correctInterface, 'fr'),
+        duration: 8000,
       });
       setIsLoading(false);
       return;
