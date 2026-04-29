@@ -12,7 +12,8 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    companyName?: string
+    companyName?: string,
+    extras?: { country_code?: string; preferred_language?: 'fr' | 'en'; vat_number?: string }
   ) => Promise<{ error: AuthError | null; needsEmailVerification: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null; success: boolean }>;
   signOut: () => Promise<void>;
@@ -185,17 +186,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [refreshSession, startTokenRefresh, stopTokenRefresh]);
 
-  const signUp = useCallback(async (email: string, password: string, companyName?: string) => {
+  const signUp = useCallback(async (
+    email: string,
+    password: string,
+    companyName?: string,
+    extras?: { country_code?: string; preferred_language?: 'fr' | 'en'; vat_number?: string }
+  ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${APP_ORIGIN}/`,
-        data: { company_name: companyName }
+        data: {
+          company_name: companyName,
+          country_code: extras?.country_code,
+          preferred_language: extras?.preferred_language,
+          vat_number: extras?.vat_number,
+        }
       }
     });
 
-    // Si Supabase exige la confirmation email, il n'y aura pas de session immédiate.
+    // Si l'utilisateur a une session immédiatement, on persiste les champs profils.
+    if (!error && data?.user && extras) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            country_code: extras.country_code || null,
+            preferred_language: extras.preferred_language || 'fr',
+            vat_number: extras.vat_number?.trim() || null,
+          })
+          .eq('id', data.user.id);
+      } catch (e) {
+        // best-effort: les données restent dans raw_user_meta_data pour reprise ultérieure
+      }
+    }
+
     const needsEmailVerification = !error && !data?.session;
 
     return { error, needsEmailVerification };
