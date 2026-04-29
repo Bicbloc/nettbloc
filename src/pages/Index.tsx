@@ -182,7 +182,7 @@ const HotelLoadingScreen = () => {
 
 const IndexDashboard = () => {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { hotelId, hotelName, hotelCode: contextHotelCode } = useHotel();
   const { t } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
@@ -587,35 +587,39 @@ const IndexDashboard = () => {
   };
 
   const handleDistributeWithValidation = async () => {
-    if (!hotelCode.trim() || !userEmail.trim()) {
-      toast({ variant: "destructive", title: "Informations manquantes", description: "Renseignez le code hôtel et votre email." });
+    // Utilise les infos du contexte / session — pas de saisie manuelle
+    const effectiveHotelCode = (contextHotelCode || hotelCode || '').trim();
+    const effectiveEmail = (user?.email || userEmail || '').trim();
+
+    if (housekeeperNames.length === 0 || rooms.length === 0) {
+      toast({ variant: "destructive", title: t.toasts.missingData, description: t.toasts.missingDataDesc });
       return;
     }
-    
-    if (housekeeperNames.length === 0 || rooms.length === 0) {
-      toast({ variant: "destructive", title: "Données manquantes", description: "Ajoutez des chambres et des femmes de chambre." });
+
+    if (!effectiveHotelCode || !effectiveEmail) {
+      toast({ variant: "destructive", title: t.toasts.missingInfo, description: t.toasts.missingDataDesc });
       return;
     }
 
     try {
-      const deterministicHotelId = generateHotelId(hotelCode);
-      let hotel = await SupabaseService.getHotelByCode(hotelCode);
-      
+      const deterministicHotelId = generateHotelId(effectiveHotelCode);
+      let hotel = await SupabaseService.getHotelByCode(effectiveHotelCode);
+
       if (!hotel) {
-        hotel = await SupabaseService.createHotelWithId(deterministicHotelId, `Hôtel ${hotelCode}`, userEmail, hotelCode);
+        hotel = await SupabaseService.createHotelWithId(deterministicHotelId, hotelName || `Hôtel ${effectiveHotelCode}`, effectiveEmail, effectiveHotelCode);
       }
-      
+
       if (!hotel?.id) {
-        toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'hôtel" });
+        toast({ variant: "destructive", title: t.toasts.genericError, description: t.toasts.hotelCreateError });
         return;
       }
 
-      storageService.saveHotel({ id: hotel.id, name: hotel.name || `Hôtel ${hotelCode}`, code: hotelCode });
-      
+      storageService.saveHotel({ id: hotel.id, name: hotel.name || `Hôtel ${effectiveHotelCode}`, code: effectiveHotelCode });
+
       setSelectedHotel(hotel);
       await handleRedistribute('random');
     } catch (error) {
-      toast({ variant: "destructive", title: "Erreur", description: "Erreur de configuration" });
+      toast({ variant: "destructive", title: t.toasts.distributionError, description: t.toasts.distributionErrorDesc });
     }
   };
 
