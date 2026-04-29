@@ -175,17 +175,17 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   text(ML + 120, y + 2, 'by bicbloc', '/F1', 10);
   ops.push('0 0 0 rg'); // back to black
 
-  text(ML + 300, y, 'FACTURE', '/F2', 22);
+  text(ML + 300, y, L.invoice, '/F2', 22);
   y -= 30;
 
   // Invoice number & date
   ops.push('0.4 0.4 0.4 rg');
-  text(ML + 300, y, `N\u00b0 ${invoice.invoice_number}`, '/F1', 11);
+  text(ML + 300, y, `${L.number} ${invoice.invoice_number}`, '/F1', 11);
   y -= 16;
-  text(ML + 300, y, `Date : ${invoiceDate}`, '/F1', 10);
+  text(ML + 300, y, `${L.date} : ${invoiceDate}`, '/F1', 10);
   if (periodStart && periodEnd) {
     y -= 14;
-    text(ML + 300, y, `P\u00e9riode : ${periodStart} au ${periodEnd}`, '/F1', 10);
+    text(ML + 300, y, `${L.period} : ${periodStart} ${L.to} ${periodEnd}`, '/F1', 10);
   }
   ops.push('0 0 0 rg');
 
@@ -193,28 +193,29 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   y -= 35;
   const sellerY = y;
   ops.push('0.3 0.3 0.3 rg');
-  text(ML, y, '\u00c9metteur', '/F2', 10);
+  text(ML, y, L.issuer, '/F2', 10);
   ops.push('0 0 0 rg');
   y -= 14;
   text(ML, y, sellerName, '/F2', 9);
   y -= 12;
-  text(ML, y, `SIRET : ${sellerSiret}`, '/F1', 8);
+  text(ML, y, `${L.siret} : ${sellerSiret}`, '/F1', 8);
   y -= 12;
   text(ML, y, sellerAddress, '/F1', 8);
   y -= 12;
-  text(ML, y, `Email : ${sellerEmail}`, '/F1', 8);
+  text(ML, y, `${L.email} : ${sellerEmail}`, '/F1', 8);
 
   // --- Client info (no frame, right side) ---
   const clientX = ML + 300;
   let cy = sellerY;
   ops.push('0.3 0.3 0.3 rg');
-  text(clientX, cy, 'Factur\u00e9 \u00e0', '/F2', 10);
+  text(clientX, cy, L.billedTo, '/F2', 10);
   ops.push('0 0 0 rg');
   cy -= 14;
   if (customerHotelName) { text(clientX, cy, customerHotelName, '/F2', 9); cy -= 12; }
-  if (customerSiret) { text(clientX, cy, `SIRET : ${customerSiret}`, '/F1', 8); cy -= 12; }
+  if (customerSiret) { text(clientX, cy, `${L.siret} : ${customerSiret}`, '/F1', 8); cy -= 12; }
   if (customerAddress) { text(clientX, cy, customerAddress, '/F1', 8); cy -= 12; }
-  if (customerEmail) { text(clientX, cy, `Email : ${customerEmail}`, '/F1', 8); cy -= 12; }
+  if (customerEmail) { text(clientX, cy, `${L.email} : ${customerEmail}`, '/F1', 8); cy -= 12; }
+  if (customerVat) { text(clientX, cy, `${lang === 'en' ? 'VAT No.' : 'N\u00b0 TVA'} : ${customerVat}`, '/F1', 8); cy -= 12; }
 
   // --- Table header ---
   y = Math.min(y, cy) - 30;
