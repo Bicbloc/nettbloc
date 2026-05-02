@@ -13,6 +13,7 @@ import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { RoomIncidentsDialog } from "@/components/incident/RoomIncidentsDialog";
 import { EditRoomNoteDialog } from "@/components/EditRoomNoteDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { RoomCardIssuesOverlay } from "@/components/equipment/RoomCardIssuesOverlay";
 
 interface RoomCardProps {
   room: Room;
@@ -542,7 +543,7 @@ export function RoomCard({
   return (
     <div 
       ref={cardRef}
-      className={`p-4 border rounded-lg transition-all duration-200 ${
+      className={`relative p-4 border rounded-lg transition-all duration-200 ${
         dragging ? 'opacity-50' : ''
       } ${
         isSelected ? 'bg-blue-100 border-blue-500 border-2' :
@@ -556,6 +557,7 @@ export function RoomCard({
       onDragEnd={handleDragEnd}
       onClick={handleClick}
     >
+      <RoomCardIssuesOverlay hotelId={hotelId} roomNumber={room.number} compact={compact} />
       <div className="flex justify-between items-start mb-2">
         <div className="flex gap-2 items-center">
           <h3 className="text-lg font-bold">{room.number}</h3>
