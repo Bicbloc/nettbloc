@@ -115,6 +115,38 @@ export default function Equipment() {
     }
   };
 
+  const saveBulkEquipment = async (form: any, targetRoomIds: string[]) => {
+    try {
+      if (targetRoomIds.length === 0) {
+        toast({ title: 'Aucune chambre sélectionnée', variant: 'destructive' });
+        return;
+      }
+      const payload = targetRoomIds.map(rid => ({
+        hotel_id: hotelId!,
+        room_registry_id: rid,
+        common_space_id: null,
+        name: form.name || 'Sans nom',
+        brand: form.brand || null,
+        model: form.model || null,
+        reference: form.reference || null,
+        purchase_date: form.purchase_date || null,
+        warranty_end_date: form.warranty_end_date || null,
+        purchase_price: form.purchase_price || null,
+        supplier: form.supplier || null,
+        condition: form.condition || 'good',
+        quantity: form.quantity || 1,
+        notes: form.notes || null,
+      }));
+      const { error } = await supabase.from('equipments').insert(payload);
+      if (error) throw error;
+      toast({ title: `${payload.length} équipement(s) ajouté(s)` });
+      setBulkDialog(false);
+      eq.refresh();
+    } catch (e: any) {
+      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+    }
+  };
+
   const saveSpace = async (form: any) => {
     try {
       const payload = { ...form, hotel_id: hotelId, floor: form.floor ? Number(form.floor) : null, area_sqm: form.area_sqm ? Number(form.area_sqm) : null };
