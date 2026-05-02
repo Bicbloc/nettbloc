@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit, AlertTriangle, ArrowLeft, Building2, Sofa, Package } from 'lucide-react';
+import { Plus, Trash2, Edit, AlertTriangle, ArrowLeft, Building2, Sofa, Package, Layers } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 import { RoomIssuesOverlay } from '@/components/equipment/RoomIssuesOverlay';
 
 const CONDITIONS: { value: EquipmentCondition; label: string; color: string }[] = [
