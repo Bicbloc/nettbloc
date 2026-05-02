@@ -66,6 +66,48 @@ export function SubscriptionCard() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [changingPlan, setChangingPlan] = useState<PlanType | null>(null);
+
+  const planOrder: PlanType[] = ['decouverte', 'essentiel', 'confort', 'business', 'entreprise'];
+  const currentPlanIndex = planOrder.indexOf(plan);
+
+  const handleChangePlan = async (targetPlan: PlanType) => {
+    if (targetPlan === plan) return;
+    setChangingPlan(targetPlan);
+    try {
+      if (targetPlan === 'decouverte') {
+        // Downgrade vers gratuit = annulation
+        setShowCancelDialog(true);
+        return;
+      }
+      const config = PLAN_CONFIGS[targetPlan];
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          planType: targetPlan,
+          priceAmount: config.price * 100,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast({
+          title: 'Plan modifié',
+          description: `Votre plan a été changé pour ${config.displayName}.`,
+        });
+        refreshSubscription();
+        setShowDetails(false);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: extractErrorMessage(error) || 'Impossible de changer de plan.',
+      });
+    } finally {
+      setChangingPlan(null);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setIsLoading(true);
