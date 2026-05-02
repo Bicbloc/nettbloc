@@ -74,7 +74,6 @@ const DEFAULT_CHAR: Characteristics = {
 export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomRegistryDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [customFloor, setCustomFloor] = useState(false);
   const [characteristics, setCharacteristics] = useState<Characteristics>(DEFAULT_CHAR);
   const [newAmenity, setNewAmenity] = useState('');
