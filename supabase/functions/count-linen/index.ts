@@ -68,13 +68,21 @@ serve(async (req) => {
     // Get average thickness (default 2cm if not configured)
     const avgThickness = linenType.average_thickness_cm || 2.0;
 
-    // Model selection - Use better model for counting accuracy
+    // Model selection - Optimized for accuracy:
+    // - Quick/Live: Flash-lite (fast preview)
+    // - Detect: Flash (balanced)
+    // - Ruler/Validate: Pro (highest accuracy for final count)
     let model = 'google/gemini-2.5-flash';
     if (quickDetect) {
+      model = 'google/gemini-2.5-flash-lite';
+    } else if (liveMode) {
       model = 'google/gemini-2.5-flash';
-    } else if (detectMode || liveMode) {
+    } else if (detectMode) {
       model = 'google/gemini-2.5-flash';
     } else if (useRuler) {
+      model = 'google/gemini-2.5-pro';
+    } else {
+      // Validation mode = highest precision
       model = 'google/gemini-2.5-pro';
     }
     
@@ -82,70 +90,103 @@ serve(async (req) => {
     
     // Core counting methodology shared across modes
     const countingMethodology = `
-MÉTHODE DE COMPTAGE PRÉCISE (OBLIGATOIRE):
-Tu dois compter les articles de linge un par un en les NUMÉROTANT mentalement.
+MÉTHODOLOGIE DE COMPTAGE PRÉCIS (PROTOCOLE STRICT):
+Tu es un EXPERT certifié en inventaire textile hôtelier. Compte AVEC RIGUEUR.
 
-ÉTAPE 1 - IDENTIFIER LE TYPE D'EMPILEMENT:
-- "stacked_flat": Articles pliés empilés horizontalement (le plus courant dans les lingeries d'hôtel).
-- "stacked_vertical": Articles debout côte à côte.
-- "rolled": Articles roulés en cylindres.
-- "loose": Articles en vrac.
+ÉTAPE 1 — IDENTIFIER LE TYPE D'EMPILEMENT:
+- "stacked_flat": pliés empilés horizontalement (le plus courant en lingerie hôtelière).
+- "stacked_vertical": debout côte à côte (sur tranche).
+- "rolled": roulés en cylindres.
+- "loose": en vrac, non empilés.
 
-ÉTAPE 2 - COMPTER EN NUMÉROTANT:
-Pour stacked_flat (le plus fréquent):
-  1. Regarde le CÔTÉ de la pile pour voir les couches.
-  2. Commence par le BAS de la pile.
-  3. Numérote chaque article: "#1" (en bas), "#2" (au-dessus), "#3"...
-  4. Chaque pli/séparation visible = une frontière entre 2 articles.
-  5. ATTENTION: un article plié peut avoir un pli au milieu qui crée une fausse séparation. Un vrai article a un bord arrondi/replié distinct.
-  6. Épaisseur typique d'un article: ≈ ${avgThickness}cm.
+ÉTAPE 2 — IDENTIFIER LES FRONTIÈRES ENTRE ARTICLES:
+Chaque article a un BORD PLIÉ visible (un "ourlet" ou "tranche du pli").
+La frontière entre 2 articles est marquée par:
+  • Une ligne d'ombre fine et continue (créée par l'espace minuscule entre 2 plis).
+  • Un changement subtil de teinte ou texture.
+  • Un léger décalage horizontal du bord.
+NE PAS confondre avec:
+  • Les plis INTERNES d'un même article (un drap plié en 4 a 1 ou 2 plis internes
+    qui ne sont PAS des frontières).
+  • Les coutures décoratives.
+  • Les ombres portées par l'éclairage.
 
-ÉTAPE 3 - DOUBLE VÉRIFICATION:
-  1. Recompte depuis le HAUT vers le BAS.
-  2. Si les deux comptages diffèrent, recompte une 3ème fois.
-  3. Liste mentalement: "#1 bas, #2, #3... #N haut" = N articles.
+ÉTAPE 3 — COMPTER EN NUMÉROTANT (DEUX SENS):
+1) Comptage ASCENDANT: numérote chaque article du BAS vers le HAUT: #1, #2, #3, ... #N.
+2) Comptage DESCENDANT: recompte du HAUT vers le BAS: #N, #N-1, ... #1.
+3) Si les deux totaux DIFFÈRENT, fais un 3ème passage en zoomant mentalement
+   sur la zone d'incertitude et tranche.
+4) Énumère le résultat dans "counting_detail".
+
+ÉTAPE 4 — VALIDATION GÉOMÉTRIQUE:
+- Estime la HAUTEUR totale visible de la pile (en cm).
+- Épaisseur moyenne par article: ${avgThickness} cm.
+- Vérifie: hauteur_pile / ${avgThickness} ≈ N. Si écart > 25%, recompte.
+- Reporte ta hauteur estimée dans "pile_height_cm".
 
 PIÈGES À ÉVITER:
-- Un drap plié en deux peut ressembler à 2 draps → vérifie que les bords sont continus.
-- Des draps très fins peuvent sembler collés → regarde les ombres entre les couches.
-- Le haut et le bas de la pile peuvent être partiellement cachés → estime si un article est coupé.
+- Un article plié en deux peut paraître être 2 articles → vérifier la continuité
+  des bords latéraux (un seul article a des bords ALIGNÉS).
+- Articles très fins (taies) qui semblent collés → utiliser les ombres entre couches.
+- Haut/bas partiellement coupés par le cadre → estimer en signalant dans "notes".
+- Éclairage rasant qui crée de FAUSSES lignes d'ombre → croiser avec la géométrie.
+
+NIVEAU DE CONFIANCE:
+- 0.95+ : pile bien éclairée, frontières nettes, deux comptages identiques.
+- 0.80-0.95 : pile claire mais 1-2 zones d'incertitude.
+- 0.60-0.80 : éclairage moyen ou pile partiellement masquée.
+- < 0.60 : conditions difficiles, suggérer une nouvelle photo.
 `;
 
-    // QUICK DETECT
-    const quickDetectPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article: ${linenType.name}.
+    // QUICK DETECT (live preview - fastest)
+    const quickDetectPrompt = `Expert comptage linge hôtellerie. Article: ${linenType.name}.
 ${countingMethodology}
-ÉTAPE 4 - Estime la largeur totale de la pile en centimètres.
+ÉTAPE 5 — Estime la largeur totale de la pile en cm.
 
-RÉPONDS UNIQUEMENT avec ce JSON (aucun autre texte):
-{"pile":true,"count":NOMBRE,"confidence":0.0-1.0,"width_cm":LARGEUR_CM,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1 bas, #2, ... #N haut"}
+JSON UNIQUEMENT (aucun autre texte):
+{"pile":true,"count":N,"confidence":0.0-1.0,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1 bas, #2, ... #N haut"}
 
 Si AUCUNE pile visible:
 {"pile":false,"count":0,"confidence":0,"width_cm":0,"pile_type":"none","position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
     // Detection mode
-    const detectPrompt = `Compte précisément les articles de linge. Article: ${linenType.name}.
+    const detectPrompt = `Compte précisément les ${linenType.name}.
 ${countingMethodology}
 Estime la largeur en cm. Draps typiques: 200-240cm, serviettes: 50-100cm, taies: 50cm.
-JSON uniquement: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1, #2, ..."}`;
+JSON uniquement: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_height_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1, #2, ..."}`;
     
     // Live mode
     const livePrompt = `Compte les ${linenType.name} en numérotant chaque article du bas vers le haut.
 ${countingMethodology}
 JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","counting_detail":"#1, #2, ..."}`;
     
-    // RULER MODE
-    const rulerPrompt = `Compte les ${linenType.name} avec la règle. Chaque article ≈ ${avgThickness}cm d'épaisseur.
-Calcul: hauteur_pile_cm / ${avgThickness} = nombre d'articles.
-Vérifie visuellement en numérotant les couches.
-JSON uniquement: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation","counting_detail":"#1, #2, ..."}`;
-
-    // VALIDATION mode (full precision)
-    let fullPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article à compter: ${linenType.name}.
+    // RULER MODE (highest precision via measurement)
+    const rulerPrompt = `Compte les ${linenType.name} avec la règle visible dans l'image.
 ${countingMethodology}
-IMPORTANT: Dans le champ "counting_detail", liste CHAQUE article numéroté pour prouver ton comptage.
-Exemple pour 10 articles: "#1 bas, #2, #3, #4, #5, #6, #7, #8, #9, #10 haut"
 
-JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"description","counting_detail":"#1 bas, #2, ... #N haut"}`;
+PROTOCOLE RÈGLE:
+1) Identifie la règle (graduations en cm).
+2) Mesure la hauteur EXACTE de la pile en cm (utilise les graduations).
+3) Calcule: N = hauteur_cm / ${avgThickness}.
+4) Vérifie en comptant visuellement les couches → les 2 méthodes doivent concorder.
+5) Si écart > 10%, choisis la méthode visuelle (plus fiable que l'épaisseur moyenne).
+
+JSON uniquement: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation","counting_detail":"#1, #2, ...","visual_count":N,"calculated_count":N}`;
+
+    // VALIDATION mode (full precision with explicit step-by-step)
+    let fullPrompt = `Tu es un EXPERT en inventaire textile hôtelier (15 ans d'expérience).
+Article à compter: ${linenType.name}.
+${countingMethodology}
+
+EXIGENCES OBLIGATOIRES:
+1) Effectue les DEUX comptages (ascendant + descendant).
+2) Effectue la VALIDATION GÉOMÉTRIQUE (hauteur / épaisseur).
+3) Dans "counting_detail", liste CHAQUE article numéroté: "#1 bas, #2, #3, ..., #N haut".
+4) Dans "notes", indique tout doute ou zone difficile (ex: "ombre suspecte entre #4 et #5").
+5) Dans "pile_height_cm", reporte ta mesure de hauteur.
+6) Si confidence < 0.75, suggère explicitement une nouvelle photo dans "notes".
+
+JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm":N,"notes":"description","counting_detail":"#1 bas, #2, ... #N haut","ascending_count":N,"descending_count":N}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -154,18 +195,26 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
         .select('ai_predicted_count, actual_count, notes, scan_method, created_at')
         .eq('linen_type_id', linenTypeId)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(15);
 
       if (trainingSamples && trainingSamples.length > 0) {
         const corrections = trainingSamples.filter(s => s.ai_predicted_count !== s.actual_count);
         if (corrections.length > 0) {
-          const appendix = '\n\n⚠️ CORRECTIONS PASSÉES:\n' +
-            corrections.map((sample) => {
+          // Compute systematic bias
+          const totalDiff = corrections.reduce((sum, s) => sum + ((s.ai_predicted_count || 0) - s.actual_count), 0);
+          const avgBias = totalDiff / corrections.length;
+          const biasNote = Math.abs(avgBias) >= 0.5
+            ? `\n⚠️ BIAIS SYSTÉMATIQUE DÉTECTÉ: tu as tendance à ${avgBias > 0 ? 'SUR-COMPTER' : 'SOUS-COMPTER'} en moyenne de ${Math.abs(avgBias).toFixed(1)} article(s). CORRIGE ce biais.`
+            : '';
+
+          const appendix = `\n\n📚 HISTORIQUE DES CORRECTIONS (${corrections.length} corrections sur les 15 derniers scans):\n` +
+            corrections.slice(0, 10).map((sample) => {
               const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
               return diff > 0 
-                ? `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (−${diff})` 
-                : `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (+${-diff})`;
-            }).join(' | ');
+                ? `IA:${sample.ai_predicted_count} → Réel:${sample.actual_count} (sur-compté de ${diff})` 
+                : `IA:${sample.ai_predicted_count} → Réel:${sample.actual_count} (sous-compté de ${-diff})`;
+            }).join('\n') + biasNote +
+            '\n\nUTILISE CES CORRECTIONS pour calibrer ton comptage actuel.';
           
           fullPrompt += appendix;
         }
@@ -189,36 +238,58 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
     const modeLabel = quickDetect ? 'QUICK' : detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'VALIDATE';
     console.log(`[count-linen] Mode: ${modeLabel}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
-    // Call Lovable AI - Reasonable timeouts
-    const controller = new AbortController();
-    const timeout = quickDetect ? 8000 : (liveMode || detectMode) ? 10000 : 30000;
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    // Helper: single AI call returning parsed result
+    const callAI = async (prompt: string, temp: number, maxTokens: number, timeoutMs: number) => {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: { url: image } }
+                ]
+              }
+            ],
+            temperature: temp,
+            max_tokens: maxTokens
+          }),
+          signal: ctrl.signal
+        });
+        clearTimeout(tid);
+        return r;
+      } catch (e) {
+        clearTimeout(tid);
+        throw e;
+      }
+    };
+
+    const parseAIResult = (raw: string): any => {
+      try {
+        let jsonStr = raw.trim();
+        jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+        const jsonMatch = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+        if (jsonMatch) jsonStr = jsonMatch[0];
+        return JSON.parse(jsonStr);
+      } catch {
+        return null;
+      }
+    };
+
+    const timeout = quickDetect ? 8000 : (liveMode || detectMode) ? 10000 : 45000;
 
     try {
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: systemPrompt },
-                { type: 'image_url', image_url: { url: image } }
-              ]
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: quickDetect ? 120 : (liveMode || detectMode) ? 150 : 300
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
+      // ===== PASS 1 =====
+      const aiResponse = await callAI(systemPrompt, 0.1, quickDetect ? 120 : (liveMode || detectMode) ? 200 : 500, timeout);
 
       // Handle specific error codes
       if (aiResponse.status === 402) {
@@ -256,39 +327,70 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
 
       const aiData = await aiResponse.json();
       const aiContent = aiData.choices?.[0]?.message?.content || '';
-      
-      // Parse AI response - handle markdown blocks, incomplete JSON, text responses
-      let result;
-      try {
-        let jsonStr = aiContent.trim();
-        
-        // Remove markdown code blocks
-        jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-        
-        // Extract JSON object
-        const jsonMatch = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-        }
-        
-        // Try to parse
-        result = JSON.parse(jsonStr);
-      } catch (parseError) {
+      let result = parseAIResult(aiContent);
+      if (!result) {
         console.error('[count-linen] Parse failed, raw:', aiContent.substring(0, 100));
-        
-        // Fallback: return default detection result
         result = {
-          pile: false,
-          count: 0,
-          confidence: 0,
-          width_cm: 0,
-          position: 'center',
-          bounds: { x: 0, y: 0, w: 0, h: 0 },
+          pile: false, count: 0, confidence: 0, width_cm: 0,
+          position: 'center', bounds: { x: 0, y: 0, w: 0, h: 0 },
           notes: 'Detection failed - try repositioning'
         };
       }
 
-      console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
+      // ===== PASS 2 (CONSENSUS) — only in VALIDATE mode for max accuracy =====
+      // Trigger a second independent pass when:
+      //   - we are in full validation mode AND
+      //   - confidence < 0.92 OR count > 5 (higher counts = more error-prone)
+      const shouldConsensus = !liveMode && !quickDetect && !detectMode && !useRuler
+        && (result.count > 5 || (result.confidence ?? 0) < 0.92)
+        && (result.count > 0);
+
+      if (shouldConsensus) {
+        try {
+          const consensusPrompt = systemPrompt +
+            `\n\nUNE PREMIÈRE ANALYSE A DONNÉ: count=${result.count}, confidence=${result.confidence}, height=${result.pile_height_cm || '?'}cm.` +
+            `\nRECOMPTE INDÉPENDAMMENT (oublie cette première estimation).` +
+            `\nSi tu trouves le MÊME nombre, augmente "confidence" à 0.95+.` +
+            `\nSi tu trouves un nombre DIFFÉRENT, prends ton nouveau résultat (le plus précis).`;
+          const r2 = await callAI(consensusPrompt, 0.2, 500, 30000);
+          if (r2.ok) {
+            const d2 = await r2.json();
+            const c2 = d2.choices?.[0]?.message?.content || '';
+            const result2 = parseAIResult(c2);
+            if (result2 && typeof result2.count === 'number') {
+              console.log(`[count-linen] Consensus: pass1=${result.count} pass2=${result2.count}`);
+              if (result2.count === result.count) {
+                // Same count → boost confidence
+                result.confidence = Math.max(result.confidence || 0.8, 0.96);
+                result.notes = (result.notes || '') + ' [Consensus: 2 passes identiques]';
+              } else {
+                // Different counts → use pass 2 (independent recount) but note the disagreement
+                const diff = Math.abs(result2.count - result.count);
+                result = {
+                  ...result2,
+                  confidence: Math.min(result2.confidence || 0.7, 0.85),
+                  notes: (result2.notes || '') + ` [Désaccord: pass1=${result.count}, pass2=${result2.count}, écart=${diff}]`,
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[count-linen] Consensus pass failed:', (e as Error).message);
+        }
+      }
+
+      // ===== GEOMETRIC VALIDATION (cross-check via thickness) =====
+      if (!quickDetect && !liveMode && result.pile_height_cm && result.count > 0 && avgThickness > 0) {
+        const expectedCount = result.pile_height_cm / avgThickness;
+        const ratio = result.count / expectedCount;
+        if (ratio < 0.6 || ratio > 1.6) {
+          // Big mismatch → lower confidence and warn
+          result.confidence = Math.min(result.confidence || 0.5, 0.65);
+          result.notes = (result.notes || '') + ` [⚠️ Vérification géométrique: ${result.count} articles vs ${expectedCount.toFixed(1)} attendus (${result.pile_height_cm}cm / ${avgThickness}cm)]`;
+        }
+      }
+
+      console.log(`[count-linen] Final: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
 
       // Build response with detection-specific fields
       const response: any = {
@@ -303,7 +405,9 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
         ruler_detected: result.ruler_detected || false,
         pile_height_cm: result.pile_height_cm || null,
         measurement_method: result.measurement_method || 'visual_count',
-        item_thickness_cm: avgThickness
+        item_thickness_cm: avgThickness,
+        ascending_count: result.ascending_count ?? null,
+        descending_count: result.descending_count ?? null,
       };
 
       // Add detection-specific fields
@@ -313,13 +417,10 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
         response.dimensions = result.dimensions || { width_cm: result.width_cm || null, height_cm: null };
         response.pile_detected = result.pile_detected ?? result.pile ?? false;
         response.pile_type = result.pile_type || 'stacked_flat';
-        
-        // Pile position and bounds for UI display
         response.pile_position = result.position || 'center';
         response.pile_bounds = result.bounds || null;
       }
       
-      // Always include pile_type if available
       if (result.pile_type) {
         response.pile_type = result.pile_type;
       }
@@ -330,7 +431,6 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
       );
 
     } catch (fetchError: any) {
-      clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
         console.error('[count-linen] Request timeout');
         return new Response(
