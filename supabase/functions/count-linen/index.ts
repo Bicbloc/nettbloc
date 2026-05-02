@@ -90,70 +90,103 @@ serve(async (req) => {
     
     // Core counting methodology shared across modes
     const countingMethodology = `
-MÉTHODE DE COMPTAGE PRÉCISE (OBLIGATOIRE):
-Tu dois compter les articles de linge un par un en les NUMÉROTANT mentalement.
+MÉTHODOLOGIE DE COMPTAGE PRÉCIS (PROTOCOLE STRICT):
+Tu es un EXPERT certifié en inventaire textile hôtelier. Compte AVEC RIGUEUR.
 
-ÉTAPE 1 - IDENTIFIER LE TYPE D'EMPILEMENT:
-- "stacked_flat": Articles pliés empilés horizontalement (le plus courant dans les lingeries d'hôtel).
-- "stacked_vertical": Articles debout côte à côte.
-- "rolled": Articles roulés en cylindres.
-- "loose": Articles en vrac.
+ÉTAPE 1 — IDENTIFIER LE TYPE D'EMPILEMENT:
+- "stacked_flat": pliés empilés horizontalement (le plus courant en lingerie hôtelière).
+- "stacked_vertical": debout côte à côte (sur tranche).
+- "rolled": roulés en cylindres.
+- "loose": en vrac, non empilés.
 
-ÉTAPE 2 - COMPTER EN NUMÉROTANT:
-Pour stacked_flat (le plus fréquent):
-  1. Regarde le CÔTÉ de la pile pour voir les couches.
-  2. Commence par le BAS de la pile.
-  3. Numérote chaque article: "#1" (en bas), "#2" (au-dessus), "#3"...
-  4. Chaque pli/séparation visible = une frontière entre 2 articles.
-  5. ATTENTION: un article plié peut avoir un pli au milieu qui crée une fausse séparation. Un vrai article a un bord arrondi/replié distinct.
-  6. Épaisseur typique d'un article: ≈ ${avgThickness}cm.
+ÉTAPE 2 — IDENTIFIER LES FRONTIÈRES ENTRE ARTICLES:
+Chaque article a un BORD PLIÉ visible (un "ourlet" ou "tranche du pli").
+La frontière entre 2 articles est marquée par:
+  • Une ligne d'ombre fine et continue (créée par l'espace minuscule entre 2 plis).
+  • Un changement subtil de teinte ou texture.
+  • Un léger décalage horizontal du bord.
+NE PAS confondre avec:
+  • Les plis INTERNES d'un même article (un drap plié en 4 a 1 ou 2 plis internes
+    qui ne sont PAS des frontières).
+  • Les coutures décoratives.
+  • Les ombres portées par l'éclairage.
 
-ÉTAPE 3 - DOUBLE VÉRIFICATION:
-  1. Recompte depuis le HAUT vers le BAS.
-  2. Si les deux comptages diffèrent, recompte une 3ème fois.
-  3. Liste mentalement: "#1 bas, #2, #3... #N haut" = N articles.
+ÉTAPE 3 — COMPTER EN NUMÉROTANT (DEUX SENS):
+1) Comptage ASCENDANT: numérote chaque article du BAS vers le HAUT: #1, #2, #3, ... #N.
+2) Comptage DESCENDANT: recompte du HAUT vers le BAS: #N, #N-1, ... #1.
+3) Si les deux totaux DIFFÈRENT, fais un 3ème passage en zoomant mentalement
+   sur la zone d'incertitude et tranche.
+4) Énumère le résultat dans "counting_detail".
+
+ÉTAPE 4 — VALIDATION GÉOMÉTRIQUE:
+- Estime la HAUTEUR totale visible de la pile (en cm).
+- Épaisseur moyenne par article: ${avgThickness} cm.
+- Vérifie: hauteur_pile / ${avgThickness} ≈ N. Si écart > 25%, recompte.
+- Reporte ta hauteur estimée dans "pile_height_cm".
 
 PIÈGES À ÉVITER:
-- Un drap plié en deux peut ressembler à 2 draps → vérifie que les bords sont continus.
-- Des draps très fins peuvent sembler collés → regarde les ombres entre les couches.
-- Le haut et le bas de la pile peuvent être partiellement cachés → estime si un article est coupé.
+- Un article plié en deux peut paraître être 2 articles → vérifier la continuité
+  des bords latéraux (un seul article a des bords ALIGNÉS).
+- Articles très fins (taies) qui semblent collés → utiliser les ombres entre couches.
+- Haut/bas partiellement coupés par le cadre → estimer en signalant dans "notes".
+- Éclairage rasant qui crée de FAUSSES lignes d'ombre → croiser avec la géométrie.
+
+NIVEAU DE CONFIANCE:
+- 0.95+ : pile bien éclairée, frontières nettes, deux comptages identiques.
+- 0.80-0.95 : pile claire mais 1-2 zones d'incertitude.
+- 0.60-0.80 : éclairage moyen ou pile partiellement masquée.
+- < 0.60 : conditions difficiles, suggérer une nouvelle photo.
 `;
 
-    // QUICK DETECT
-    const quickDetectPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article: ${linenType.name}.
+    // QUICK DETECT (live preview - fastest)
+    const quickDetectPrompt = `Expert comptage linge hôtellerie. Article: ${linenType.name}.
 ${countingMethodology}
-ÉTAPE 4 - Estime la largeur totale de la pile en centimètres.
+ÉTAPE 5 — Estime la largeur totale de la pile en cm.
 
-RÉPONDS UNIQUEMENT avec ce JSON (aucun autre texte):
-{"pile":true,"count":NOMBRE,"confidence":0.0-1.0,"width_cm":LARGEUR_CM,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1 bas, #2, ... #N haut"}
+JSON UNIQUEMENT (aucun autre texte):
+{"pile":true,"count":N,"confidence":0.0-1.0,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1 bas, #2, ... #N haut"}
 
 Si AUCUNE pile visible:
 {"pile":false,"count":0,"confidence":0,"width_cm":0,"pile_type":"none","position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
     // Detection mode
-    const detectPrompt = `Compte précisément les articles de linge. Article: ${linenType.name}.
+    const detectPrompt = `Compte précisément les ${linenType.name}.
 ${countingMethodology}
 Estime la largeur en cm. Draps typiques: 200-240cm, serviettes: 50-100cm, taies: 50cm.
-JSON uniquement: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1, #2, ..."}`;
+JSON uniquement: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_height_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1, #2, ..."}`;
     
     // Live mode
     const livePrompt = `Compte les ${linenType.name} en numérotant chaque article du bas vers le haut.
 ${countingMethodology}
 JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","counting_detail":"#1, #2, ..."}`;
     
-    // RULER MODE
-    const rulerPrompt = `Compte les ${linenType.name} avec la règle. Chaque article ≈ ${avgThickness}cm d'épaisseur.
-Calcul: hauteur_pile_cm / ${avgThickness} = nombre d'articles.
-Vérifie visuellement en numérotant les couches.
-JSON uniquement: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation","counting_detail":"#1, #2, ..."}`;
-
-    // VALIDATION mode (full precision)
-    let fullPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article à compter: ${linenType.name}.
+    // RULER MODE (highest precision via measurement)
+    const rulerPrompt = `Compte les ${linenType.name} avec la règle visible dans l'image.
 ${countingMethodology}
-IMPORTANT: Dans le champ "counting_detail", liste CHAQUE article numéroté pour prouver ton comptage.
-Exemple pour 10 articles: "#1 bas, #2, #3, #4, #5, #6, #7, #8, #9, #10 haut"
 
-JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"description","counting_detail":"#1 bas, #2, ... #N haut"}`;
+PROTOCOLE RÈGLE:
+1) Identifie la règle (graduations en cm).
+2) Mesure la hauteur EXACTE de la pile en cm (utilise les graduations).
+3) Calcule: N = hauteur_cm / ${avgThickness}.
+4) Vérifie en comptant visuellement les couches → les 2 méthodes doivent concorder.
+5) Si écart > 10%, choisis la méthode visuelle (plus fiable que l'épaisseur moyenne).
+
+JSON uniquement: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation","counting_detail":"#1, #2, ...","visual_count":N,"calculated_count":N}`;
+
+    // VALIDATION mode (full precision with explicit step-by-step)
+    let fullPrompt = `Tu es un EXPERT en inventaire textile hôtelier (15 ans d'expérience).
+Article à compter: ${linenType.name}.
+${countingMethodology}
+
+EXIGENCES OBLIGATOIRES:
+1) Effectue les DEUX comptages (ascendant + descendant).
+2) Effectue la VALIDATION GÉOMÉTRIQUE (hauteur / épaisseur).
+3) Dans "counting_detail", liste CHAQUE article numéroté: "#1 bas, #2, #3, ..., #N haut".
+4) Dans "notes", indique tout doute ou zone difficile (ex: "ombre suspecte entre #4 et #5").
+5) Dans "pile_height_cm", reporte ta mesure de hauteur.
+6) Si confidence < 0.75, suggère explicitement une nouvelle photo dans "notes".
+
+JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm":N,"notes":"description","counting_detail":"#1 bas, #2, ... #N haut","ascending_count":N,"descending_count":N}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -162,18 +195,26 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"descrip
         .select('ai_predicted_count, actual_count, notes, scan_method, created_at')
         .eq('linen_type_id', linenTypeId)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(15);
 
       if (trainingSamples && trainingSamples.length > 0) {
         const corrections = trainingSamples.filter(s => s.ai_predicted_count !== s.actual_count);
         if (corrections.length > 0) {
-          const appendix = '\n\n⚠️ CORRECTIONS PASSÉES:\n' +
-            corrections.map((sample) => {
+          // Compute systematic bias
+          const totalDiff = corrections.reduce((sum, s) => sum + ((s.ai_predicted_count || 0) - s.actual_count), 0);
+          const avgBias = totalDiff / corrections.length;
+          const biasNote = Math.abs(avgBias) >= 0.5
+            ? `\n⚠️ BIAIS SYSTÉMATIQUE DÉTECTÉ: tu as tendance à ${avgBias > 0 ? 'SUR-COMPTER' : 'SOUS-COMPTER'} en moyenne de ${Math.abs(avgBias).toFixed(1)} article(s). CORRIGE ce biais.`
+            : '';
+
+          const appendix = `\n\n📚 HISTORIQUE DES CORRECTIONS (${corrections.length} corrections sur les 15 derniers scans):\n` +
+            corrections.slice(0, 10).map((sample) => {
               const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
               return diff > 0 
-                ? `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (−${diff})` 
-                : `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (+${-diff})`;
-            }).join(' | ');
+                ? `IA:${sample.ai_predicted_count} → Réel:${sample.actual_count} (sur-compté de ${diff})` 
+                : `IA:${sample.ai_predicted_count} → Réel:${sample.actual_count} (sous-compté de ${-diff})`;
+            }).join('\n') + biasNote +
+            '\n\nUTILISE CES CORRECTIONS pour calibrer ton comptage actuel.';
           
           fullPrompt += appendix;
         }
