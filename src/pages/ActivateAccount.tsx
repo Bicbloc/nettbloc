@@ -48,18 +48,25 @@ export default function ActivateAccount() {
     setError(null);
 
     try {
-      const { data: invitationData, error: invitationError } = await supabase
-        .from("sub_account_invitations")
-        .select("*, sub_accounts(*, hotels(id, name, hotel_code))")
-        .eq("invitation_code", invitationCode)
-        .single();
+      // Use SECURITY DEFINER RPC: returns only the row matching this unguessable code
+      const { data: rpcData, error: invitationError } = await supabase
+        .rpc("get_invitation_by_code", { p_code: invitationCode });
 
-      if (invitationError || !invitationData) {
+      const payload = rpcData as { invitation: any; sub_account: any; hotel: any } | null;
+
+      if (invitationError || !payload || !payload.invitation) {
         setInvitation(null);
         setSubAccount(null);
         setError("Code d'invitation invalide ou expiré");
         return false;
       }
+
+      const invitationData = {
+        ...payload.invitation,
+        sub_accounts: payload.sub_account
+          ? { ...payload.sub_account, hotels: payload.hotel }
+          : null,
+      };
 
       if (invitationData.status === "accepted" || invitationData.accepted_at) {
         setInvitation(null);
