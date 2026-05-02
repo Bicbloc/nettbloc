@@ -6154,6 +6154,7 @@ export type Database = {
         }[]
       }
       get_housekeeper_profile_id: { Args: never; Returns: string }
+      get_invitation_by_code: { Args: { p_code: string }; Returns: Json }
       get_sub_account_info: {
         Args: { p_user_id: string }
         Returns: {
