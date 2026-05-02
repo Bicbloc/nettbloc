@@ -55,6 +55,7 @@ const RoomRegistry = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoom, setSelectedRoom] = useState<RoomRegistryItem | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBulkEquipOpen, setIsBulkEquipOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
