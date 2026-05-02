@@ -31,18 +31,19 @@ export default function Equipment() {
   const { hotelId } = useHotel();
 
   const eq = useEquipment(hotelId);
-  const [rooms, setRooms] = useState<{ id: string; room_number: string; floor: number | null }[]>([]);
+  const [rooms, setRooms] = useState<{ id: string; room_number: string; floor: number | null; room_type: string | null }[]>([]);
 
   // dialog state
   const [equipDialog, setEquipDialog] = useState<{ open: boolean; data?: Partial<Equipment>; locationType?: 'room' | 'space'; locationId?: string }>({ open: false });
   const [issueDialog, setIssueDialog] = useState<{ open: boolean; equipmentId?: string; roomId?: string; spaceId?: string }>({ open: false });
   const [spaceDialog, setSpaceDialog] = useState<{ open: boolean; data?: any }>({ open: false });
   const [buildingDialog, setBuildingDialog] = useState<{ open: boolean; data?: any }>({ open: false });
+  const [bulkDialog, setBulkDialog] = useState(false);
 
   useEffect(() => {
     if (!hotelId) return;
     supabase.from('hotel_rooms_registry')
-      .select('id, room_number, floor')
+      .select('id, room_number, floor, room_type')
       .eq('hotel_id', hotelId)
       .eq('is_active', true)
       .order('room_number')
