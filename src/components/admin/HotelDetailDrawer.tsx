@@ -38,8 +38,8 @@ export function HotelDetailDrawer({ hotelId, onClose }: Props) {
       const hotelRes = await supabase.from('hotels').select('*').eq('id', hotelId).maybeSingle();
       const roomsRes = await supabase.from('rooms').select('id, room_number, status, floor').eq('hotel_id', hotelId).order('room_number');
       const hkRes = await supabase.from('housekeepers').select('id, name, email, is_active, created_at').eq('hotel_id', hotelId);
-      const govRes = await supabase.from('governess_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
-      const techRes = await supabase.from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
+      const govRes = await (supabase as any).from('governess_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
+      const techRes = await (supabase as any).from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
       const sessionsRes = await supabase.from('user_sessions').select('id, user_name, user_type, login_time, last_activity, is_active').eq('hotel_id', hotelId).order('last_activity', { ascending: false }).limit(50);
 
       let owner: any = null;
