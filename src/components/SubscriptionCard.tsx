@@ -1,12 +1,14 @@
-import { Crown, Zap, Settings, AlertCircle, CreditCard } from 'lucide-react';
+import { Crown, Zap, Settings, AlertCircle, CreditCard, ArrowUp, ArrowDown, Check, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { UpgradeButton } from './UpgradeButton';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, PLAN_CONFIGS, PlanType } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { extractErrorMessage } from '@/utils/checkoutErrors';
 import {
   Dialog,
   DialogContent,
