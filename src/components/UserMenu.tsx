@@ -89,6 +89,10 @@ const UserMenu = () => {
           <Building2 className="mr-2 h-4 w-4" />
           <span>Registre des chambres</span>
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/equipment')}>
+          <Wrench className="mr-2 h-4 w-4" />
+          <span>Équipements & caractéristiques</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate('/plans')}>
           <CreditCard className="mr-2 h-4 w-4" />
           <span>Abonnement</span>
