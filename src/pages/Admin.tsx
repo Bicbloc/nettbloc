@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,7 +52,14 @@ const SECTION_TITLES: Record<AdminSection, string> = {
 const Admin = () => {
   const { user, loading } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [section, setSection] = useState<AdminSection>('dashboard');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialSection = (searchParams.get('section') as AdminSection) || 'dashboard';
+  const [section, setSectionState] = useState<AdminSection>(initialSection);
+
+  const setSection = (s: AdminSection) => {
+    setSectionState(s);
+    setSearchParams(s === 'dashboard' ? {} : { section: s }, { replace: true });
+  };
 
   useEffect(() => {
     if (loading) return;
