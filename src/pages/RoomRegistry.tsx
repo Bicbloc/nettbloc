@@ -438,6 +438,12 @@ const RoomRegistry = () => {
         hotelId={activeHotelId}
       />
 
+      <BulkEquipmentDialog
+        open={isBulkEquipOpen}
+        onOpenChange={setIsBulkEquipOpen}
+        hotelId={activeHotelId}
+      />
+
       {selectedRoom && (
         <EditRoomRegistryDialog
           open={isEditDialogOpen}
