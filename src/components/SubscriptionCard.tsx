@@ -111,37 +111,15 @@ export function SubscriptionCard() {
 
   const handleManageSubscription = async () => {
     setIsLoading(true);
+    setShowDetails(true);
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal');
-      
       if (error) throw error;
-      
-      // Handle case where no subscription exists
-      if (data?.has_subscription === false) {
-        toast({
-          title: "Pas d'abonnement actif",
-          description: "Vous n'avez pas encore d'abonnement. Passez au plan Premium pour bénéficier de toutes les fonctionnalités."
-        });
-        return;
-      }
-      
       if (data?.subscription) {
         setSubscriptionDetails(data);
-        setShowDetails(true);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de récupérer les détails de l'abonnement"
-        });
       }
     } catch (error: any) {
       console.error('Erreur gestion abonnement:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible d'accéder à la gestion"
-      });
     } finally {
       setIsLoading(false);
     }
