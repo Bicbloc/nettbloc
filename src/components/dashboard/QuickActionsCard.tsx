@@ -30,6 +30,7 @@ export const QuickActionsCard = ({
   onHousekeeperNamesChange,
   onDistribute
 }: QuickActionsCardProps) => {
+  const [bulkOpen, setBulkOpen] = useState(false);
   return (
     <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
       <CardHeader className="pb-3">
