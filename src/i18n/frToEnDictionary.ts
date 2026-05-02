@@ -1377,7 +1377,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Erreur lors de la sauvegarde": "Error while saving",
   "Erreur lors de la suppression": "Error while deleting",
   "Existe déjà": "Already exists",
-  "Femme de chambre supprimée": "Housekeeper deleted",
   "Fichier chargé": "File loaded",
   "Génération avec erreurs": "Generation completed with errors",
   "Génération forcée terminée": "Forced generation completed",
