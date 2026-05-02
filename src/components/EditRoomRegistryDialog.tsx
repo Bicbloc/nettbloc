@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -12,11 +13,16 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { FLOOR_OPTIONS, SPACE_TYPES } from '@/utils/floorUtils';
+import { Wrench, Plus, Trash2, ExternalLink } from 'lucide-react';
 
 const formSchema = z.object({
   space_category: z.string().default('room'),
@@ -45,10 +51,33 @@ interface EditRoomRegistryDialogProps {
   room: RoomRegistry;
 }
 
+interface Characteristics {
+  bed_type: string;
+  bed_dimensions: string;
+  bed_count: string;
+  bathroom_type: string;
+  has_bathtub: boolean;
+  has_shower: boolean;
+  desk_dimensions: string;
+  room_area_sqm: string;
+  view_type: string;
+  amenities: string[];
+  notes: string;
+}
+
+const DEFAULT_CHAR: Characteristics = {
+  bed_type: '', bed_dimensions: '', bed_count: '', bathroom_type: '',
+  has_bathtub: false, has_shower: false, desk_dimensions: '',
+  room_area_sqm: '', view_type: '', amenities: [], notes: '',
+};
+
 export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomRegistryDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [customFloor, setCustomFloor] = useState(false);
+  const [characteristics, setCharacteristics] = useState<Characteristics>(DEFAULT_CHAR);
+  const [newAmenity, setNewAmenity] = useState('');
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -61,6 +90,54 @@ export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomReg
       zone: room.zone || '',
     },
   });
+
+  // Load characteristics
+  const { data: charData } = useQuery({
+    queryKey: ['room-characteristics', room.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('room_characteristics')
+        .select('*')
+        .eq('room_registry_id', room.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Load equipments for this room
+  const { data: equipments = [], refetch: refetchEquip } = useQuery({
+    queryKey: ['room-equipments', room.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('equipments')
+        .select('id, name, brand, model, condition, quantity')
+        .eq('room_registry_id', room.id)
+        .order('name');
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (charData) {
+      setCharacteristics({
+        bed_type: charData.bed_type || '',
+        bed_dimensions: charData.bed_dimensions || '',
+        bed_count: charData.bed_count?.toString() || '',
+        bathroom_type: charData.bathroom_type || '',
+        has_bathtub: !!charData.has_bathtub,
+        has_shower: !!charData.has_shower,
+        desk_dimensions: charData.desk_dimensions || '',
+        room_area_sqm: charData.room_area_sqm?.toString() || '',
+        view_type: charData.view_type || '',
+        amenities: (charData.amenities as string[]) || [],
+        notes: charData.notes || '',
+      });
+    } else {
+      setCharacteristics(DEFAULT_CHAR);
+    }
+  }, [charData, open]);
 
   useEffect(() => {
     const floorStr = room.floor?.toString() || '';
@@ -93,11 +170,41 @@ export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomReg
           updated_at: new Date().toISOString(),
         } as any)
         .eq('id', room.id);
-
       if (error) throw error;
+
+      // Save characteristics (only for rooms)
+      if (values.space_category === 'room') {
+        const { data: existing } = await supabase
+          .from('hotel_rooms_registry')
+          .select('hotel_id')
+          .eq('id', room.id)
+          .single();
+        if (existing?.hotel_id) {
+          const charPayload: any = {
+            hotel_id: existing.hotel_id,
+            room_registry_id: room.id,
+            bed_type: characteristics.bed_type || null,
+            bed_dimensions: characteristics.bed_dimensions || null,
+            bed_count: characteristics.bed_count ? Number(characteristics.bed_count) : null,
+            bathroom_type: characteristics.bathroom_type || null,
+            has_bathtub: characteristics.has_bathtub,
+            has_shower: characteristics.has_shower,
+            desk_dimensions: characteristics.desk_dimensions || null,
+            room_area_sqm: characteristics.room_area_sqm ? Number(characteristics.room_area_sqm) : null,
+            view_type: characteristics.view_type || null,
+            amenities: characteristics.amenities,
+            notes: characteristics.notes || null,
+          };
+          const { error: cErr } = await supabase
+            .from('room_characteristics')
+            .upsert(charPayload, { onConflict: 'room_registry_id' });
+          if (cErr) throw cErr;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
+      queryClient.invalidateQueries({ queryKey: ['room-characteristics', room.id] });
       toast({ title: "Espace modifié", description: "Les informations ont été mises à jour" });
       onOpenChange(false);
     },
@@ -106,9 +213,28 @@ export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomReg
     },
   });
 
+  const deleteEquipment = async (id: string) => {
+    if (!confirm('Supprimer cet équipement ?')) return;
+    const { error } = await supabase.from('equipments').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+      return;
+    }
+    refetchEquip();
+    toast({ title: 'Équipement supprimé' });
+  };
+
+  const addAmenity = () => {
+    const a = newAmenity.trim();
+    if (a && !characteristics.amenities.includes(a)) {
+      setCharacteristics({ ...characteristics, amenities: [...characteristics.amenities, a] });
+      setNewAmenity('');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Modifier l'espace</DialogTitle>
           <DialogDescription>
@@ -116,155 +242,241 @@ export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomReg
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => updateRoomMutation.mutate(v))} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="space_category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Catégorie</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="room">🛏️ Chambre</SelectItem>
-                      <SelectItem value="common">🏢 Espace commun</SelectItem>
-                      <SelectItem value="technical">⚙️ Espace technique</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+        <Tabs defaultValue="general">
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="general">Général</TabsTrigger>
+            <TabsTrigger value="characteristics" disabled={isSpace}>Caractéristiques</TabsTrigger>
+            <TabsTrigger value="equipments">Équipements ({equipments.length})</TabsTrigger>
+          </TabsList>
 
-            <FormField
-              control={form.control}
-              name="room_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{isSpace ? "Nom de l'espace *" : "Numéro de chambre *"}</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {isSpace ? (
-              <FormField
-                control={form.control}
-                name="room_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type d'espace</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SPACE_TYPES.map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-            ) : (
-              <FormField
-                control={form.control}
-                name="room_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type de chambre</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Standard, Suite, Deluxe..." {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="floor"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Étage</FormLabel>
-                  {customFloor ? (
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input type="number" placeholder="-2, 0, 5..." {...field} />
-                      </FormControl>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setCustomFloor(false)}>
-                        Liste
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner..." />
-                          </SelectTrigger>
-                        </FormControl>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((v) => updateRoomMutation.mutate(v))} className="space-y-4">
+              <TabsContent value="general" className="space-y-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="space_category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Catégorie</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {FLOOR_OPTIONS.map(o => (
-                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                          ))}
+                          <SelectItem value="room">🛏️ Chambre</SelectItem>
+                          <SelectItem value="common">🏢 Espace commun</SelectItem>
+                          <SelectItem value="technical">⚙️ Espace technique</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setCustomFloor(true)}>
-                        Autre
-                      </Button>
-                    </div>
+                    </FormItem>
                   )}
-                </FormItem>
-              )}
-            />
+                />
+                <FormField
+                  control={form.control}
+                  name="room_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isSpace ? "Nom de l'espace *" : "Numéro de chambre *"}</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {isSpace ? (
+                  <FormField
+                    control={form.control}
+                    name="room_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type d'espace</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {SPACE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="room_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type de chambre</FormLabel>
+                        <FormControl><Input placeholder="Standard, Suite, Deluxe..." {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <FormField
+                  control={form.control}
+                  name="floor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Étage</FormLabel>
+                      {customFloor ? (
+                        <div className="flex gap-2">
+                          <FormControl><Input type="number" placeholder="-2, 0, 5..." {...field} /></FormControl>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setCustomFloor(false)}>Liste</Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {FLOOR_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setCustomFloor(true)}>Autre</Button>
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="building"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bâtiment</FormLabel>
+                      <FormControl><Input placeholder="A, B, Principal..." {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zone</FormLabel>
+                      <FormControl><Input placeholder="Nord, Sud, Est, Ouest..." {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
 
-            <FormField
-              control={form.control}
-              name="building"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bâtiment</FormLabel>
-                  <FormControl>
-                    <Input placeholder="A, B, Principal..." {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+              <TabsContent value="characteristics" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FormLabel>Surface (m²)</FormLabel>
+                    <Input type="number" step="0.1" value={characteristics.room_area_sqm}
+                      onChange={(e) => setCharacteristics({ ...characteristics, room_area_sqm: e.target.value })} />
+                  </div>
+                  <div>
+                    <FormLabel>Vue</FormLabel>
+                    <Input placeholder="Mer, jardin, ville..." value={characteristics.view_type}
+                      onChange={(e) => setCharacteristics({ ...characteristics, view_type: e.target.value })} />
+                  </div>
+                  <div>
+                    <FormLabel>Type de lit</FormLabel>
+                    <Input placeholder="King, Queen, Twin..." value={characteristics.bed_type}
+                      onChange={(e) => setCharacteristics({ ...characteristics, bed_type: e.target.value })} />
+                  </div>
+                  <div>
+                    <FormLabel>Dimensions lit</FormLabel>
+                    <Input placeholder="180x200" value={characteristics.bed_dimensions}
+                      onChange={(e) => setCharacteristics({ ...characteristics, bed_dimensions: e.target.value })} />
+                  </div>
+                  <div>
+                    <FormLabel>Nombre de lits</FormLabel>
+                    <Input type="number" value={characteristics.bed_count}
+                      onChange={(e) => setCharacteristics({ ...characteristics, bed_count: e.target.value })} />
+                  </div>
+                  <div>
+                    <FormLabel>Type de SDB</FormLabel>
+                    <Input placeholder="Privative, partagée..." value={characteristics.bathroom_type}
+                      onChange={(e) => setCharacteristics({ ...characteristics, bathroom_type: e.target.value })} />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox checked={characteristics.has_bathtub}
+                      onCheckedChange={(c) => setCharacteristics({ ...characteristics, has_bathtub: !!c })} />
+                    <FormLabel className="!mt-0">Baignoire</FormLabel>
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox checked={characteristics.has_shower}
+                      onCheckedChange={(c) => setCharacteristics({ ...characteristics, has_shower: !!c })} />
+                    <FormLabel className="!mt-0">Douche</FormLabel>
+                  </div>
+                  <div className="col-span-2">
+                    <FormLabel>Dimensions bureau</FormLabel>
+                    <Input placeholder="120x60" value={characteristics.desk_dimensions}
+                      onChange={(e) => setCharacteristics({ ...characteristics, desk_dimensions: e.target.value })} />
+                  </div>
+                </div>
 
-            <FormField
-              control={form.control}
-              name="zone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Zone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nord, Sud, Est, Ouest..." {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                <div>
+                  <FormLabel>Amenities</FormLabel>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {characteristics.amenities.map(a => (
+                      <Badge key={a} variant="secondary" className="gap-1">
+                        {a}
+                        <button type="button" onClick={() => setCharacteristics({ ...characteristics, amenities: characteristics.amenities.filter(x => x !== a) })}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input placeholder="Wifi, climatisation, minibar..." value={newAmenity}
+                      onChange={(e) => setNewAmenity(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAmenity(); } }} />
+                    <Button type="button" variant="outline" size="sm" onClick={addAmenity}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Annuler
-              </Button>
-              <Button type="submit" disabled={updateRoomMutation.isPending}>
-                {updateRoomMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                <div>
+                  <FormLabel>Notes</FormLabel>
+                  <Textarea rows={2} value={characteristics.notes}
+                    onChange={(e) => setCharacteristics({ ...characteristics, notes: e.target.value })} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="equipments" className="space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Équipements liés à cet espace
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { onOpenChange(false); navigate('/equipment'); }}>
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Gérer dans Équipements
+                  </Button>
+                </div>
+                {equipments.length === 0 ? (
+                  <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
+                    <Wrench className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    Aucun équipement enregistré
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {equipments.map((it: any) => (
+                      <div key={it.id} className="flex items-center justify-between border rounded-md p-2">
+                        <div className="text-sm">
+                          <span className="font-medium">{it.name}</span>
+                          {it.brand && <span className="text-muted-foreground"> · {it.brand}</span>}
+                          {it.model && <span className="text-muted-foreground"> {it.model}</span>}
+                          {it.quantity > 1 && <Badge variant="outline" className="ml-2">×{it.quantity}</Badge>}
+                          <Badge variant="secondary" className="ml-2 text-xs">{it.condition}</Badge>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => deleteEquipment(it.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
+                <Button type="submit" disabled={updateRoomMutation.isPending}>
+                  {updateRoomMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
