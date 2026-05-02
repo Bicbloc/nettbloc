@@ -404,7 +404,7 @@ function BulkEquipmentDialog({ open, onClose, rooms, onSave }: any) {
     }
   }, [open]);
 
-  const floors = useMemo(() => Array.from(new Set(rooms.map((r: any) => String(r.floor ?? '')))).sort(), [rooms]);
+  const floors = useMemo(() => Array.from(new Set(rooms.map((r: any) => String(r.floor ?? '')))).sort() as string[], [rooms]);
   const types = useMemo(() => Array.from(new Set(rooms.map((r: any) => r.room_type).filter(Boolean))).sort() as string[], [rooms]);
 
   const targetRooms = useMemo(() => {
