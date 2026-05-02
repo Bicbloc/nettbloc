@@ -6133,6 +6133,7 @@ export type Database = {
           hotel_name: string
         }[]
       }
+      get_current_governess_profile_id: { Args: never; Returns: string }
       get_governess_profile_id: { Args: never; Returns: string }
       get_hotel_for_housekeeper: {
         Args: { p_hotel_id: string; p_housekeeper_profile_id: string }
@@ -6174,6 +6175,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      hotel_owner_can_see_governess: {
+        Args: { _governess_profile_id: string }
         Returns: boolean
       }
       is_hotel_owner: { Args: { _hotel_id: string }; Returns: boolean }
