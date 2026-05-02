@@ -24,12 +24,15 @@ interface CodeRow {
   used_at: string | null;
 }
 
+const PAGE_SIZE = 25;
+
 export function AccessCodesPanel() {
   const { toast } = useToast();
   const [codes, setCodes] = useState<CodeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'used' | 'unused'>('all');
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -82,6 +85,10 @@ export function AccessCodesPanel() {
     });
   }, [codes, search, filter]);
 
+  useEffect(() => { setPage(1); }, [search, filter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const copy = (code: string) => {
     navigator.clipboard.writeText(code);
     toast({ title: 'Code copié' });
@@ -129,34 +136,62 @@ export function AccessCodesPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(c => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono font-bold">{c.access_code}</TableCell>
-                  <TableCell>{c.housekeeper_name}</TableCell>
-                  <TableCell>
-                    <div className="font-medium">{c.hotel_name}</div>
-                    <div className="text-xs text-muted-foreground">{c.hotel_code}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={c.is_active ? 'default' : 'secondary'}>{c.is_active ? 'Actif' : 'Inactif'}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{format(new Date(c.created_at), 'dd/MM/yy HH:mm', { locale: fr })}</TableCell>
-                  <TableCell className="text-sm">
-                    {c.used_at
-                      ? format(new Date(c.used_at), 'dd/MM/yy HH:mm', { locale: fr })
-                      : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="ghost" onClick={() => copy(c.access_code)}><Copy className="h-4 w-4" /></Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && !loading && (
+              {loading
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 7 }).map((__, j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                : paginated.map(c => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-mono font-bold">{c.access_code}</TableCell>
+                      <TableCell>{c.housekeeper_name}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{c.hotel_name}</div>
+                        <div className="text-xs text-muted-foreground">{c.hotel_code}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={c.is_active ? 'default' : 'secondary'}>{c.is_active ? 'Actif' : 'Inactif'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{format(new Date(c.created_at), 'dd/MM/yy HH:mm', { locale: fr })}</TableCell>
+                      <TableCell className="text-sm">
+                        {c.used_at
+                          ? format(new Date(c.used_at), 'dd/MM/yy HH:mm', { locale: fr })
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => copy(c.access_code)}><Copy className="h-4 w-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              {!loading && paginated.length === 0 && (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Aucun code trouvé</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <Pagination className="mt-4">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              <PaginationItem><PaginationLink isActive>{page} / {totalPages}</PaginationLink></PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </CardContent>
     </Card>
   );
