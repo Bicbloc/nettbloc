@@ -35,16 +35,14 @@ export function HotelDetailDrawer({ hotelId, onClose }: Props) {
     if (!hotelId) { setData(null); return; }
     setLoading(true);
     (async () => {
-      const [hotelRes, roomsRes, hkRes, govRes, techRes, sessionsRes] = await Promise.all([
-        supabase.from('hotels').select('*').eq('id', hotelId).maybeSingle(),
-        supabase.from('rooms').select('id, room_number, status, floor').eq('hotel_id', hotelId).order('room_number'),
-        supabase.from('housekeepers').select('id, name, email, is_active, created_at').eq('hotel_id', hotelId),
-        supabase.from('governess_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId),
-        supabase.from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId),
-        supabase.from('user_sessions').select('id, user_name, user_type, login_time, last_activity, is_active').eq('hotel_id', hotelId).order('last_activity', { ascending: false }).limit(50),
-      ]);
+      const hotelRes = await supabase.from('hotels').select('*').eq('id', hotelId).maybeSingle();
+      const roomsRes = await supabase.from('rooms').select('id, room_number, status, floor').eq('hotel_id', hotelId).order('room_number');
+      const hkRes = await supabase.from('housekeepers').select('id, name, email, is_active, created_at').eq('hotel_id', hotelId);
+      const govRes = await supabase.from('governess_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
+      const techRes = await supabase.from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
+      const sessionsRes = await supabase.from('user_sessions').select('id, user_name, user_type, login_time, last_activity, is_active').eq('hotel_id', hotelId).order('last_activity', { ascending: false }).limit(50);
 
-      let owner = null;
+      let owner: any = null;
       if (hotelRes.data?.user_id) {
         const { data: o } = await supabase.from('profiles').select('email, company_name, subscription_type, trial_end_date').eq('id', hotelRes.data.user_id).maybeSingle();
         owner = o;
@@ -53,11 +51,11 @@ export function HotelDetailDrawer({ hotelId, onClose }: Props) {
       setData({
         hotel: hotelRes.data,
         owner,
-        rooms: roomsRes.data || [],
-        housekeepers: hkRes.data || [],
-        governesses: govRes.data || [],
-        technicians: techRes.data || [],
-        sessions: sessionsRes.data || [],
+        rooms: (roomsRes.data as any[]) || [],
+        housekeepers: (hkRes.data as any[]) || [],
+        governesses: (govRes.data as any[]) || [],
+        technicians: (techRes.data as any[]) || [],
+        sessions: (sessionsRes.data as any[]) || [],
       });
       setLoading(false);
     })();
