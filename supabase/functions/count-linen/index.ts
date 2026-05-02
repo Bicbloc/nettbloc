@@ -238,36 +238,58 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
     const modeLabel = quickDetect ? 'QUICK' : detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'VALIDATE';
     console.log(`[count-linen] Mode: ${modeLabel}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
-    // Call Lovable AI - Reasonable timeouts
-    const controller = new AbortController();
-    const timeout = quickDetect ? 8000 : (liveMode || detectMode) ? 10000 : 30000;
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    // Helper: single AI call returning parsed result
+    const callAI = async (prompt: string, temp: number, maxTokens: number, timeoutMs: number) => {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: { url: image } }
+                ]
+              }
+            ],
+            temperature: temp,
+            max_tokens: maxTokens
+          }),
+          signal: ctrl.signal
+        });
+        clearTimeout(tid);
+        return r;
+      } catch (e) {
+        clearTimeout(tid);
+        throw e;
+      }
+    };
+
+    const parseAIResult = (raw: string): any => {
+      try {
+        let jsonStr = raw.trim();
+        jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+        const jsonMatch = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+        if (jsonMatch) jsonStr = jsonMatch[0];
+        return JSON.parse(jsonStr);
+      } catch {
+        return null;
+      }
+    };
+
+    const timeout = quickDetect ? 8000 : (liveMode || detectMode) ? 10000 : 45000;
 
     try {
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: systemPrompt },
-                { type: 'image_url', image_url: { url: image } }
-              ]
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: quickDetect ? 120 : (liveMode || detectMode) ? 150 : 300
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
+      // ===== PASS 1 =====
+      const aiResponse = await callAI(systemPrompt, 0.1, quickDetect ? 120 : (liveMode || detectMode) ? 200 : 500, timeout);
 
       // Handle specific error codes
       if (aiResponse.status === 402) {
@@ -305,39 +327,70 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
 
       const aiData = await aiResponse.json();
       const aiContent = aiData.choices?.[0]?.message?.content || '';
-      
-      // Parse AI response - handle markdown blocks, incomplete JSON, text responses
-      let result;
-      try {
-        let jsonStr = aiContent.trim();
-        
-        // Remove markdown code blocks
-        jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-        
-        // Extract JSON object
-        const jsonMatch = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-        }
-        
-        // Try to parse
-        result = JSON.parse(jsonStr);
-      } catch (parseError) {
+      let result = parseAIResult(aiContent);
+      if (!result) {
         console.error('[count-linen] Parse failed, raw:', aiContent.substring(0, 100));
-        
-        // Fallback: return default detection result
         result = {
-          pile: false,
-          count: 0,
-          confidence: 0,
-          width_cm: 0,
-          position: 'center',
-          bounds: { x: 0, y: 0, w: 0, h: 0 },
+          pile: false, count: 0, confidence: 0, width_cm: 0,
+          position: 'center', bounds: { x: 0, y: 0, w: 0, h: 0 },
           notes: 'Detection failed - try repositioning'
         };
       }
 
-      console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
+      // ===== PASS 2 (CONSENSUS) — only in VALIDATE mode for max accuracy =====
+      // Trigger a second independent pass when:
+      //   - we are in full validation mode AND
+      //   - confidence < 0.92 OR count > 5 (higher counts = more error-prone)
+      const shouldConsensus = !liveMode && !quickDetect && !detectMode && !useRuler
+        && (result.count > 5 || (result.confidence ?? 0) < 0.92)
+        && (result.count > 0);
+
+      if (shouldConsensus) {
+        try {
+          const consensusPrompt = systemPrompt +
+            `\n\nUNE PREMIÈRE ANALYSE A DONNÉ: count=${result.count}, confidence=${result.confidence}, height=${result.pile_height_cm || '?'}cm.` +
+            `\nRECOMPTE INDÉPENDAMMENT (oublie cette première estimation).` +
+            `\nSi tu trouves le MÊME nombre, augmente "confidence" à 0.95+.` +
+            `\nSi tu trouves un nombre DIFFÉRENT, prends ton nouveau résultat (le plus précis).`;
+          const r2 = await callAI(consensusPrompt, 0.2, 500, 30000);
+          if (r2.ok) {
+            const d2 = await r2.json();
+            const c2 = d2.choices?.[0]?.message?.content || '';
+            const result2 = parseAIResult(c2);
+            if (result2 && typeof result2.count === 'number') {
+              console.log(`[count-linen] Consensus: pass1=${result.count} pass2=${result2.count}`);
+              if (result2.count === result.count) {
+                // Same count → boost confidence
+                result.confidence = Math.max(result.confidence || 0.8, 0.96);
+                result.notes = (result.notes || '') + ' [Consensus: 2 passes identiques]';
+              } else {
+                // Different counts → use pass 2 (independent recount) but note the disagreement
+                const diff = Math.abs(result2.count - result.count);
+                result = {
+                  ...result2,
+                  confidence: Math.min(result2.confidence || 0.7, 0.85),
+                  notes: (result2.notes || '') + ` [Désaccord: pass1=${result.count}, pass2=${result2.count}, écart=${diff}]`,
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[count-linen] Consensus pass failed:', (e as Error).message);
+        }
+      }
+
+      // ===== GEOMETRIC VALIDATION (cross-check via thickness) =====
+      if (!quickDetect && !liveMode && result.pile_height_cm && result.count > 0 && avgThickness > 0) {
+        const expectedCount = result.pile_height_cm / avgThickness;
+        const ratio = result.count / expectedCount;
+        if (ratio < 0.6 || ratio > 1.6) {
+          // Big mismatch → lower confidence and warn
+          result.confidence = Math.min(result.confidence || 0.5, 0.65);
+          result.notes = (result.notes || '') + ` [⚠️ Vérification géométrique: ${result.count} articles vs ${expectedCount.toFixed(1)} attendus (${result.pile_height_cm}cm / ${avgThickness}cm)]`;
+        }
+      }
+
+      console.log(`[count-linen] Final: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
 
       // Build response with detection-specific fields
       const response: any = {
@@ -352,7 +405,9 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
         ruler_detected: result.ruler_detected || false,
         pile_height_cm: result.pile_height_cm || null,
         measurement_method: result.measurement_method || 'visual_count',
-        item_thickness_cm: avgThickness
+        item_thickness_cm: avgThickness,
+        ascending_count: result.ascending_count ?? null,
+        descending_count: result.descending_count ?? null,
       };
 
       // Add detection-specific fields
@@ -362,13 +417,10 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
         response.dimensions = result.dimensions || { width_cm: result.width_cm || null, height_cm: null };
         response.pile_detected = result.pile_detected ?? result.pile ?? false;
         response.pile_type = result.pile_type || 'stacked_flat';
-        
-        // Pile position and bounds for UI display
         response.pile_position = result.position || 'center';
         response.pile_bounds = result.bounds || null;
       }
       
-      // Always include pile_type if available
       if (result.pile_type) {
         response.pile_type = result.pile_type;
       }
@@ -379,7 +431,6 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
       );
 
     } catch (fetchError: any) {
-      clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
         console.error('[count-linen] Request timeout');
         return new Response(
