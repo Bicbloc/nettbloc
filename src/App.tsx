@@ -28,6 +28,7 @@ const Profile = React.lazy(() => import("./pages/Profile"));
 const Reports = React.lazy(() => import("./pages/Reports"));
 const Admin = React.lazy(() => import("./pages/Admin"));
 const RoomRegistry = React.lazy(() => import("./pages/RoomRegistry"));
+const Equipment = React.lazy(() => import("./pages/Equipment"));
 const Order = React.lazy(() => import("./pages/Order"));
 const Invoices = React.lazy(() => import("./pages/Invoices"));
 const PlanSelection = React.lazy(() => import("./pages/PlanSelection"));
