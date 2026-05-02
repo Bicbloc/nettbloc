@@ -363,6 +363,121 @@ export type Database = {
           },
         ]
       }
+      buildings: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          hotel_id: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          hotel_id: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          hotel_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buildings_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buildings_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      common_spaces: {
+        Row: {
+          area_sqm: number | null
+          building_id: string | null
+          created_at: string
+          description: string | null
+          display_order: number
+          floor: number | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          name: string
+          photo_url: string | null
+          space_type: string
+          updated_at: string
+        }
+        Insert: {
+          area_sqm?: number | null
+          building_id?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          floor?: number | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          photo_url?: string | null
+          space_type?: string
+          updated_at?: string
+        }
+        Update: {
+          area_sqm?: number | null
+          building_id?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          floor?: number | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          photo_url?: string | null
+          space_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "common_spaces_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "common_spaces_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "common_spaces_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connected_room_rules: {
         Row: {
           created_at: string | null
@@ -658,6 +773,255 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_categories: {
+        Row: {
+          created_at: string
+          display_order: number
+          hotel_id: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          hotel_id: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          hotel_id?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_categories_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_categories_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_issues: {
+        Row: {
+          common_space_id: string | null
+          created_at: string
+          description: string | null
+          equipment_id: string | null
+          hotel_id: string
+          id: string
+          incident_id: string | null
+          issue_type: string
+          reported_at: string
+          reported_by_name: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          room_registry_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          common_space_id?: string | null
+          created_at?: string
+          description?: string | null
+          equipment_id?: string | null
+          hotel_id: string
+          id?: string
+          incident_id?: string | null
+          issue_type?: string
+          reported_at?: string
+          reported_by_name?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          room_registry_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          common_space_id?: string | null
+          created_at?: string
+          description?: string | null
+          equipment_id?: string | null
+          hotel_id?: string
+          id?: string
+          incident_id?: string | null
+          issue_type?: string
+          reported_at?: string
+          reported_by_name?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          room_registry_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_issues_common_space_id_fkey"
+            columns: ["common_space_id"]
+            isOneToOne: false
+            referencedRelation: "common_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_issues_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_issues_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_issues_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_issues_room_registry_id_fkey"
+            columns: ["room_registry_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_rooms_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipments: {
+        Row: {
+          brand: string | null
+          category_id: string | null
+          common_space_id: string | null
+          condition: string
+          created_at: string
+          hotel_id: string
+          id: string
+          model: string | null
+          name: string
+          notes: string | null
+          photo_url: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          quantity: number
+          reference: string | null
+          room_registry_id: string | null
+          serial_number: string | null
+          supplier: string | null
+          updated_at: string
+          warranty_end_date: string | null
+        }
+        Insert: {
+          brand?: string | null
+          category_id?: string | null
+          common_space_id?: string | null
+          condition?: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          model?: string | null
+          name: string
+          notes?: string | null
+          photo_url?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number
+          reference?: string | null
+          room_registry_id?: string | null
+          serial_number?: string | null
+          supplier?: string | null
+          updated_at?: string
+          warranty_end_date?: string | null
+        }
+        Update: {
+          brand?: string | null
+          category_id?: string | null
+          common_space_id?: string | null
+          condition?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          model?: string | null
+          name?: string
+          notes?: string | null
+          photo_url?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number
+          reference?: string | null
+          room_registry_id?: string | null
+          serial_number?: string | null
+          supplier?: string | null
+          updated_at?: string
+          warranty_end_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipments_common_space_id_fkey"
+            columns: ["common_space_id"]
+            isOneToOne: false
+            referencedRelation: "common_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipments_room_registry_id_fkey"
+            columns: ["room_registry_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_rooms_registry"
             referencedColumns: ["id"]
           },
         ]
@@ -4112,6 +4476,98 @@ export type Database = {
           },
         ]
       }
+      room_characteristics: {
+        Row: {
+          amenities: Json
+          bathroom_type: string | null
+          bed_count: number | null
+          bed_dimensions: string | null
+          bed_type: string | null
+          created_at: string
+          custom_fields: Json
+          desk_dimensions: string | null
+          has_bathtub: boolean | null
+          has_shower: boolean | null
+          hotel_id: string
+          id: string
+          notes: string | null
+          room_area_sqm: number | null
+          room_registry_id: string
+          template_id: string | null
+          updated_at: string
+          view_type: string | null
+        }
+        Insert: {
+          amenities?: Json
+          bathroom_type?: string | null
+          bed_count?: number | null
+          bed_dimensions?: string | null
+          bed_type?: string | null
+          created_at?: string
+          custom_fields?: Json
+          desk_dimensions?: string | null
+          has_bathtub?: boolean | null
+          has_shower?: boolean | null
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          room_area_sqm?: number | null
+          room_registry_id: string
+          template_id?: string | null
+          updated_at?: string
+          view_type?: string | null
+        }
+        Update: {
+          amenities?: Json
+          bathroom_type?: string | null
+          bed_count?: number | null
+          bed_dimensions?: string | null
+          bed_type?: string | null
+          created_at?: string
+          custom_fields?: Json
+          desk_dimensions?: string | null
+          has_bathtub?: boolean | null
+          has_shower?: boolean | null
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          room_area_sqm?: number | null
+          room_registry_id?: string
+          template_id?: string | null
+          updated_at?: string
+          view_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_characteristics_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_characteristics_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_characteristics_room_registry_id_fkey"
+            columns: ["room_registry_id"]
+            isOneToOne: true
+            referencedRelation: "hotel_rooms_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_characteristics_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "room_type_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_inspections: {
         Row: {
           cleanliness_score: number | null
@@ -4240,6 +4696,57 @@ export type Database = {
           },
         ]
       }
+      room_type_templates: {
+        Row: {
+          created_at: string
+          default_amenities: Json
+          default_characteristics: Json
+          default_equipments: Json
+          description: string | null
+          hotel_id: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_amenities?: Json
+          default_characteristics?: Json
+          default_equipments?: Json
+          description?: string | null
+          hotel_id: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_amenities?: Json
+          default_characteristics?: Json
+          default_equipments?: Json
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_type_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_type_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           cleaning_priority: number | null
@@ -4314,6 +4821,61 @@ export type Database = {
           },
           {
             foreignKeyName: "rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      space_characteristics: {
+        Row: {
+          amenities: Json
+          common_space_id: string
+          created_at: string
+          custom_fields: Json
+          hotel_id: string
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          amenities?: Json
+          common_space_id: string
+          created_at?: string
+          custom_fields?: Json
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amenities?: Json
+          common_space_id?: string
+          created_at?: string
+          custom_fields?: Json
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_characteristics_common_space_id_fkey"
+            columns: ["common_space_id"]
+            isOneToOne: true
+            referencedRelation: "common_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_characteristics_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_characteristics_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
