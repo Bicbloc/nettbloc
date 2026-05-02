@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit, AlertTriangle, ArrowLeft, Building2, Sofa, Package } from 'lucide-react';
+import { Plus, Trash2, Edit, AlertTriangle, ArrowLeft, Building2, Sofa, Package, Layers } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 import { RoomIssuesOverlay } from '@/components/equipment/RoomIssuesOverlay';
 
 const CONDITIONS: { value: EquipmentCondition; label: string; color: string }[] = [
@@ -30,18 +31,19 @@ export default function Equipment() {
   const { hotelId } = useHotel();
 
   const eq = useEquipment(hotelId);
-  const [rooms, setRooms] = useState<{ id: string; room_number: string; floor: number | null }[]>([]);
+  const [rooms, setRooms] = useState<{ id: string; room_number: string; floor: number | null; room_type: string | null }[]>([]);
 
   // dialog state
   const [equipDialog, setEquipDialog] = useState<{ open: boolean; data?: Partial<Equipment>; locationType?: 'room' | 'space'; locationId?: string }>({ open: false });
   const [issueDialog, setIssueDialog] = useState<{ open: boolean; equipmentId?: string; roomId?: string; spaceId?: string }>({ open: false });
   const [spaceDialog, setSpaceDialog] = useState<{ open: boolean; data?: any }>({ open: false });
   const [buildingDialog, setBuildingDialog] = useState<{ open: boolean; data?: any }>({ open: false });
+  const [bulkDialog, setBulkDialog] = useState(false);
 
   useEffect(() => {
     if (!hotelId) return;
     supabase.from('hotel_rooms_registry')
-      .select('id, room_number, floor')
+      .select('id, room_number, floor, room_type')
       .eq('hotel_id', hotelId)
       .eq('is_active', true)
       .order('room_number')
@@ -113,6 +115,38 @@ export default function Equipment() {
     }
   };
 
+  const saveBulkEquipment = async (form: any, targetRoomIds: string[]) => {
+    try {
+      if (targetRoomIds.length === 0) {
+        toast({ title: 'Aucune chambre sélectionnée', variant: 'destructive' });
+        return;
+      }
+      const payload = targetRoomIds.map(rid => ({
+        hotel_id: hotelId!,
+        room_registry_id: rid,
+        common_space_id: null,
+        name: form.name || 'Sans nom',
+        brand: form.brand || null,
+        model: form.model || null,
+        reference: form.reference || null,
+        purchase_date: form.purchase_date || null,
+        warranty_end_date: form.warranty_end_date || null,
+        purchase_price: form.purchase_price || null,
+        supplier: form.supplier || null,
+        condition: form.condition || 'good',
+        quantity: form.quantity || 1,
+        notes: form.notes || null,
+      }));
+      const { error } = await supabase.from('equipments').insert(payload);
+      if (error) throw error;
+      toast({ title: `${payload.length} équipement(s) ajouté(s)` });
+      setBulkDialog(false);
+      eq.refresh();
+    } catch (e: any) {
+      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+    }
+  };
+
   const saveSpace = async (form: any) => {
     try {
       const payload = { ...form, hotel_id: hotelId, floor: form.floor ? Number(form.floor) : null, area_sqm: form.area_sqm ? Number(form.area_sqm) : null };
@@ -145,6 +179,11 @@ export default function Equipment() {
 
         {/* ------------------------- ROOMS ------------------------- */}
         <TabsContent value="rooms" className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setBulkDialog(true)} disabled={rooms.length === 0}>
+              <Layers className="h-4 w-4 mr-1" />Ajouter en masse
+            </Button>
+          </div>
           {rooms.length === 0 && (
             <Card><CardContent className="p-4 text-sm text-muted-foreground">
               Aucune chambre dans le registre. Ajoutez-en depuis « Registre des chambres ».
@@ -336,7 +375,145 @@ export default function Equipment() {
         initial={buildingDialog.data}
         onSave={saveBuilding}
       />
+
+      {/* Bulk dialog */}
+      <BulkEquipmentDialog
+        open={bulkDialog}
+        onClose={() => setBulkDialog(false)}
+        rooms={rooms}
+        onSave={saveBulkEquipment}
+      />
     </div>
+  );
+}
+
+function BulkEquipmentDialog({ open, onClose, rooms, onSave }: any) {
+  const [form, setForm] = useState<any>({ condition: 'good', quantity: 1 });
+  const [filterMode, setFilterMode] = useState<'all' | 'floor' | 'type' | 'manual'>('all');
+  const [selectedFloors, setSelectedFloors] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (open) {
+      setForm({ condition: 'good', quantity: 1 });
+      setFilterMode('all');
+      setSelectedFloors(new Set());
+      setSelectedTypes(new Set());
+      setSelectedRooms(new Set());
+    }
+  }, [open]);
+
+  const floors = useMemo(() => Array.from(new Set(rooms.map((r: any) => String(r.floor ?? '')))).sort() as string[], [rooms]);
+  const types = useMemo(() => Array.from(new Set(rooms.map((r: any) => r.room_type).filter(Boolean))).sort() as string[], [rooms]);
+
+  const targetRooms = useMemo(() => {
+    if (filterMode === 'all') return rooms;
+    if (filterMode === 'floor') return rooms.filter((r: any) => selectedFloors.has(String(r.floor ?? '')));
+    if (filterMode === 'type') return rooms.filter((r: any) => r.room_type && selectedTypes.has(r.room_type));
+    return rooms.filter((r: any) => selectedRooms.has(r.id));
+  }, [rooms, filterMode, selectedFloors, selectedTypes, selectedRooms]);
+
+  const toggle = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    next.has(value) ? next.delete(value) : next.add(value);
+    setter(next);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Ajouter un équipement en masse</DialogTitle></DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-base font-semibold">1. Cibler les chambres</Label>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {[
+                { v: 'all', l: `Toutes (${rooms.length})` },
+                { v: 'floor', l: 'Par étage' },
+                { v: 'type', l: 'Par type' },
+                { v: 'manual', l: 'Sélection manuelle' },
+              ].map(m => (
+                <Button key={m.v} type="button" size="sm" variant={filterMode === m.v ? 'default' : 'outline'} onClick={() => setFilterMode(m.v as any)}>
+                  {m.l}
+                </Button>
+              ))}
+            </div>
+
+            {filterMode === 'floor' && (
+              <div className="flex flex-wrap gap-2 mt-2 p-2 border rounded">
+                {floors.length === 0 && <span className="text-xs text-muted-foreground">Aucun étage défini</span>}
+                {floors.map(f => (
+                  <label key={f} className="flex items-center gap-1 text-sm">
+                    <Checkbox checked={selectedFloors.has(f)} onCheckedChange={() => toggle(selectedFloors, f, setSelectedFloors)} />
+                    {f === '' ? 'Sans étage' : `Étage ${f}`}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {filterMode === 'type' && (
+              <div className="flex flex-wrap gap-2 mt-2 p-2 border rounded">
+                {types.length === 0 && <span className="text-xs text-muted-foreground">Aucun type défini sur les chambres</span>}
+                {types.map(t => (
+                  <label key={t} className="flex items-center gap-1 text-sm">
+                    <Checkbox checked={selectedTypes.has(t)} onCheckedChange={() => toggle(selectedTypes, t, setSelectedTypes)} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {filterMode === 'manual' && (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 mt-2 p-2 border rounded max-h-40 overflow-y-auto">
+                {rooms.map((r: any) => (
+                  <label key={r.id} className="flex items-center gap-1 text-xs">
+                    <Checkbox checked={selectedRooms.has(r.id)} onCheckedChange={() => toggle(selectedRooms, r.id, setSelectedRooms)} />
+                    {r.room_number}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-2">
+              {targetRooms.length} chambre(s) sélectionnée(s)
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-base font-semibold">2. Détails de l'équipement</Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="col-span-2"><Label>Nom *</Label><Input value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="TV, Lampe de chevet, Climatiseur..." /></div>
+              <div><Label>Marque</Label><Input value={form.brand || ''} onChange={e => setForm({ ...form, brand: e.target.value })} /></div>
+              <div><Label>Modèle</Label><Input value={form.model || ''} onChange={e => setForm({ ...form, model: e.target.value })} /></div>
+              <div><Label>Référence</Label><Input value={form.reference || ''} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
+              <div><Label>Fournisseur</Label><Input value={form.supplier || ''} onChange={e => setForm({ ...form, supplier: e.target.value })} /></div>
+              <div><Label>Date d'achat</Label><Input type="date" value={form.purchase_date || ''} onChange={e => setForm({ ...form, purchase_date: e.target.value || null })} /></div>
+              <div><Label>Fin de garantie</Label><Input type="date" value={form.warranty_end_date || ''} onChange={e => setForm({ ...form, warranty_end_date: e.target.value || null })} /></div>
+              <div><Label>Prix d'achat</Label><Input type="number" step="0.01" value={form.purchase_price ?? ''} onChange={e => setForm({ ...form, purchase_price: e.target.value ? Number(e.target.value) : null })} /></div>
+              <div><Label>Quantité par chambre</Label><Input type="number" min="1" value={form.quantity ?? 1} onChange={e => setForm({ ...form, quantity: Number(e.target.value) })} /></div>
+              <div><Label>État</Label>
+                <Select value={form.condition || 'good'} onValueChange={v => setForm({ ...form, condition: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDITIONS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2"><Label>Notes</Label><Textarea value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Annuler</Button>
+          <Button onClick={() => onSave(form, targetRooms.map((r: any) => r.id))} disabled={!form.name || targetRooms.length === 0}>
+            Ajouter à {targetRooms.length} chambre(s)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
