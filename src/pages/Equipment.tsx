@@ -27,8 +27,7 @@ const CONDITIONS: { value: EquipmentCondition; label: string; color: string }[] 
 
 export default function Equipment() {
   const navigate = useNavigate();
-  const { currentHotel } = useHotel();
-  const hotelId = currentHotel?.id || null;
+  const { hotelId } = useHotel();
 
   const eq = useEquipment(hotelId);
   const [rooms, setRooms] = useState<{ id: string; room_number: string; floor: number | null }[]>([]);
