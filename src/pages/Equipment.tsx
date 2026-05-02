@@ -375,7 +375,145 @@ export default function Equipment() {
         initial={buildingDialog.data}
         onSave={saveBuilding}
       />
+
+      {/* Bulk dialog */}
+      <BulkEquipmentDialog
+        open={bulkDialog}
+        onClose={() => setBulkDialog(false)}
+        rooms={rooms}
+        onSave={saveBulkEquipment}
+      />
     </div>
+  );
+}
+
+function BulkEquipmentDialog({ open, onClose, rooms, onSave }: any) {
+  const [form, setForm] = useState<any>({ condition: 'good', quantity: 1 });
+  const [filterMode, setFilterMode] = useState<'all' | 'floor' | 'type' | 'manual'>('all');
+  const [selectedFloors, setSelectedFloors] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (open) {
+      setForm({ condition: 'good', quantity: 1 });
+      setFilterMode('all');
+      setSelectedFloors(new Set());
+      setSelectedTypes(new Set());
+      setSelectedRooms(new Set());
+    }
+  }, [open]);
+
+  const floors = useMemo(() => Array.from(new Set(rooms.map((r: any) => String(r.floor ?? '')))).sort(), [rooms]);
+  const types = useMemo(() => Array.from(new Set(rooms.map((r: any) => r.room_type).filter(Boolean))).sort() as string[], [rooms]);
+
+  const targetRooms = useMemo(() => {
+    if (filterMode === 'all') return rooms;
+    if (filterMode === 'floor') return rooms.filter((r: any) => selectedFloors.has(String(r.floor ?? '')));
+    if (filterMode === 'type') return rooms.filter((r: any) => r.room_type && selectedTypes.has(r.room_type));
+    return rooms.filter((r: any) => selectedRooms.has(r.id));
+  }, [rooms, filterMode, selectedFloors, selectedTypes, selectedRooms]);
+
+  const toggle = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    next.has(value) ? next.delete(value) : next.add(value);
+    setter(next);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Ajouter un équipement en masse</DialogTitle></DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-base font-semibold">1. Cibler les chambres</Label>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {[
+                { v: 'all', l: `Toutes (${rooms.length})` },
+                { v: 'floor', l: 'Par étage' },
+                { v: 'type', l: 'Par type' },
+                { v: 'manual', l: 'Sélection manuelle' },
+              ].map(m => (
+                <Button key={m.v} type="button" size="sm" variant={filterMode === m.v ? 'default' : 'outline'} onClick={() => setFilterMode(m.v as any)}>
+                  {m.l}
+                </Button>
+              ))}
+            </div>
+
+            {filterMode === 'floor' && (
+              <div className="flex flex-wrap gap-2 mt-2 p-2 border rounded">
+                {floors.length === 0 && <span className="text-xs text-muted-foreground">Aucun étage défini</span>}
+                {floors.map(f => (
+                  <label key={f} className="flex items-center gap-1 text-sm">
+                    <Checkbox checked={selectedFloors.has(f)} onCheckedChange={() => toggle(selectedFloors, f, setSelectedFloors)} />
+                    {f === '' ? 'Sans étage' : `Étage ${f}`}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {filterMode === 'type' && (
+              <div className="flex flex-wrap gap-2 mt-2 p-2 border rounded">
+                {types.length === 0 && <span className="text-xs text-muted-foreground">Aucun type défini sur les chambres</span>}
+                {types.map(t => (
+                  <label key={t} className="flex items-center gap-1 text-sm">
+                    <Checkbox checked={selectedTypes.has(t)} onCheckedChange={() => toggle(selectedTypes, t, setSelectedTypes)} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {filterMode === 'manual' && (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 mt-2 p-2 border rounded max-h-40 overflow-y-auto">
+                {rooms.map((r: any) => (
+                  <label key={r.id} className="flex items-center gap-1 text-xs">
+                    <Checkbox checked={selectedRooms.has(r.id)} onCheckedChange={() => toggle(selectedRooms, r.id, setSelectedRooms)} />
+                    {r.room_number}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-2">
+              {targetRooms.length} chambre(s) sélectionnée(s)
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-base font-semibold">2. Détails de l'équipement</Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="col-span-2"><Label>Nom *</Label><Input value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="TV, Lampe de chevet, Climatiseur..." /></div>
+              <div><Label>Marque</Label><Input value={form.brand || ''} onChange={e => setForm({ ...form, brand: e.target.value })} /></div>
+              <div><Label>Modèle</Label><Input value={form.model || ''} onChange={e => setForm({ ...form, model: e.target.value })} /></div>
+              <div><Label>Référence</Label><Input value={form.reference || ''} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
+              <div><Label>Fournisseur</Label><Input value={form.supplier || ''} onChange={e => setForm({ ...form, supplier: e.target.value })} /></div>
+              <div><Label>Date d'achat</Label><Input type="date" value={form.purchase_date || ''} onChange={e => setForm({ ...form, purchase_date: e.target.value || null })} /></div>
+              <div><Label>Fin de garantie</Label><Input type="date" value={form.warranty_end_date || ''} onChange={e => setForm({ ...form, warranty_end_date: e.target.value || null })} /></div>
+              <div><Label>Prix d'achat</Label><Input type="number" step="0.01" value={form.purchase_price ?? ''} onChange={e => setForm({ ...form, purchase_price: e.target.value ? Number(e.target.value) : null })} /></div>
+              <div><Label>Quantité par chambre</Label><Input type="number" min="1" value={form.quantity ?? 1} onChange={e => setForm({ ...form, quantity: Number(e.target.value) })} /></div>
+              <div><Label>État</Label>
+                <Select value={form.condition || 'good'} onValueChange={v => setForm({ ...form, condition: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDITIONS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2"><Label>Notes</Label><Textarea value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Annuler</Button>
+          <Button onClick={() => onSave(form, targetRooms.map((r: any) => r.id))} disabled={!form.name || targetRooms.length === 0}>
+            Ajouter à {targetRooms.length} chambre(s)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
