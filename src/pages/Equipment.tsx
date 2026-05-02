@@ -147,6 +147,11 @@ export default function Equipment() {
 
         {/* ------------------------- ROOMS ------------------------- */}
         <TabsContent value="rooms" className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setBulkDialog(true)} disabled={rooms.length === 0}>
+              <Layers className="h-4 w-4 mr-1" />Ajouter en masse
+            </Button>
+          </div>
           {rooms.length === 0 && (
             <Card><CardContent className="p-4 text-sm text-muted-foreground">
               Aucune chambre dans le registre. Ajoutez-en depuis « Registre des chambres ».
