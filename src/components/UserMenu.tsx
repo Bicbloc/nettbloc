@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard, Globe, Users } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard, Globe, Users, Wrench } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { SupportTicketDialog } from './SupportTicketDialog';
