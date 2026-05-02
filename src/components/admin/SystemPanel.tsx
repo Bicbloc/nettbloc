@@ -30,14 +30,14 @@ export function SystemPanel() {
     setCleaning(true);
     try {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { error, count } = await supabase
+      const { data, error } = await supabase
         .from('user_sessions')
         .update({ is_active: false })
         .eq('is_active', true)
         .lt('last_activity', cutoff)
-        .select('id', { count: 'exact', head: true });
+        .select('id');
       if (error) throw error;
-      toast({ title: 'Nettoyage terminé', description: `${count ?? 0} session(s) inactive(s) fermée(s).` });
+      toast({ title: 'Nettoyage terminé', description: `${data?.length ?? 0} session(s) inactive(s) fermée(s).` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
