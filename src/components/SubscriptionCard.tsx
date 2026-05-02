@@ -1,12 +1,14 @@
-import { Crown, Zap, Settings, AlertCircle, CreditCard } from 'lucide-react';
+import { Crown, Zap, Settings, AlertCircle, CreditCard, ArrowUp, ArrowDown, Check, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { UpgradeButton } from './UpgradeButton';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, PLAN_CONFIGS, PlanType } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { extractErrorMessage } from '@/utils/checkoutErrors';
 import {
   Dialog,
   DialogContent,
@@ -64,40 +66,60 @@ export function SubscriptionCard() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [changingPlan, setChangingPlan] = useState<PlanType | null>(null);
+
+  const planOrder: PlanType[] = ['decouverte', 'essentiel', 'confort', 'business', 'entreprise'];
+  const currentPlanIndex = planOrder.indexOf(plan);
+
+  const handleChangePlan = async (targetPlan: PlanType) => {
+    if (targetPlan === plan) return;
+    setChangingPlan(targetPlan);
+    try {
+      if (targetPlan === 'decouverte') {
+        // Downgrade vers gratuit = annulation
+        setShowCancelDialog(true);
+        return;
+      }
+      const config = PLAN_CONFIGS[targetPlan];
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          planType: targetPlan,
+          priceAmount: config.price * 100,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast({
+          title: 'Plan modifié',
+          description: `Votre plan a été changé pour ${config.displayName}.`,
+        });
+        refreshSubscription();
+        setShowDetails(false);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: extractErrorMessage(error) || 'Impossible de changer de plan.',
+      });
+    } finally {
+      setChangingPlan(null);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setIsLoading(true);
+    setShowDetails(true);
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal');
-      
       if (error) throw error;
-      
-      // Handle case where no subscription exists
-      if (data?.has_subscription === false) {
-        toast({
-          title: "Pas d'abonnement actif",
-          description: "Vous n'avez pas encore d'abonnement. Passez au plan Premium pour bénéficier de toutes les fonctionnalités."
-        });
-        return;
-      }
-      
       if (data?.subscription) {
         setSubscriptionDetails(data);
-        setShowDetails(true);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de récupérer les détails de l'abonnement"
-        });
       }
     } catch (error: any) {
       console.error('Erreur gestion abonnement:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible d'accéder à la gestion"
-      });
     } finally {
       setIsLoading(false);
     }
@@ -265,93 +287,154 @@ export function SubscriptionCard() {
         </CardContent>
       </Card>
 
-      {/* Dialog de détails de l'abonnement GoCardless */}
+      {/* Dialog de gestion de l'abonnement */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Détails de l'abonnement
+              Gérer mon abonnement
             </DialogTitle>
             <DialogDescription>
-              Gérez votre abonnement et vos paiements
+              Consultez votre abonnement actuel et changez de plan à tout moment
             </DialogDescription>
           </DialogHeader>
 
-          {subscriptionDetails && (
-            <div className="space-y-4">
-              {/* Info abonnement */}
-              <div className="p-4 rounded-lg bg-muted/30">
-                <h4 className="font-medium mb-2">{subscriptionDetails.subscription.name}</h4>
-                <div className="text-2xl font-bold">
-                  {subscriptionDetails.subscription.amount}€
-                  <span className="text-sm font-normal text-muted-foreground">/mois</span>
+          <div className="space-y-6">
+            {/* Abonnement actuel */}
+            <div className="p-4 rounded-lg border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold text-base">Plan actuel : {PLAN_CONFIGS[plan]?.displayName || plan}</h4>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Statut: <span className="capitalize">{subscriptionDetails.subscription.status}</span>
-                </p>
+                <Badge variant="default">Actif</Badge>
               </div>
+              <div className="text-2xl font-bold">
+                {subscriptionDetails?.subscription.amount ?? PLAN_CONFIGS[plan]?.price ?? 0}€
+                <span className="text-sm font-normal text-muted-foreground">/mois</span>
+              </div>
+              {subscription_end && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Renouvellement le {new Date(subscription_end).toLocaleDateString('fr-FR')}
+                </p>
+              )}
+              {isLoading && (
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Chargement des détails...
+                </p>
+              )}
+            </div>
 
-              {/* Prochains paiements */}
-              {subscriptionDetails.subscription.upcoming_payments.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Prochains paiements</h4>
-                  <div className="space-y-2">
-                    {subscriptionDetails.subscription.upcoming_payments.map((payment, index) => (
-                      <div key={index} className="flex justify-between text-sm p-2 rounded bg-muted/20">
-                        <span>{new Date(payment.charge_date).toLocaleDateString('fr-FR')}</span>
-                        <span className="font-medium">{payment.amount / 100}€</span>
+            {/* Changer de plan */}
+            <div>
+              <h4 className="font-semibold mb-3">Changer de plan</h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {planOrder.map((p) => {
+                  const config = PLAN_CONFIGS[p];
+                  const targetIndex = planOrder.indexOf(p);
+                  const isCurrent = p === plan;
+                  const isUpgrade = targetIndex > currentPlanIndex;
+                  const isDowngrade = targetIndex < currentPlanIndex;
+
+                  return (
+                    <div
+                      key={p}
+                      className={`p-4 rounded-lg border transition-all ${
+                        isCurrent
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="font-medium">{config.displayName}</h5>
+                        {isCurrent && <Badge variant="secondary"><Check className="h-3 w-3 mr-1" />Actuel</Badge>}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Historique des paiements */}
-              {subscriptionDetails.recent_payments.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Paiements récents</h4>
-                  <div className="space-y-2">
-                    {subscriptionDetails.recent_payments.map((payment) => {
-                      const status = formatPaymentStatus(payment.status);
-                      return (
-                        <div key={payment.id} className="flex justify-between items-center text-sm p-2 rounded bg-muted/20">
-                          <span>{new Date(payment.charge_date).toLocaleDateString('fr-FR')}</span>
-                          <span className={status.className}>{status.label}</span>
-                          <span className="font-medium">{payment.amount}€</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Mandat */}
-              {subscriptionDetails.mandate && (
-                <div className="text-sm text-muted-foreground p-3 rounded bg-muted/10">
-                  <p>Mandat SEPA: {subscriptionDetails.mandate.reference}</p>
-                  <p>Schéma: {subscriptionDetails.mandate.scheme.toUpperCase()}</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowDetails(false)}
-                >
-                  Fermer
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowCancelDialog(true)}
-                >
-                  Annuler l'abonnement
-                </Button>
+                      <div className="text-xl font-bold mb-1">
+                        {config.price}€<span className="text-xs font-normal text-muted-foreground">/mois</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {config.maxRooms ? `Jusqu'à ${config.maxRooms} chambres` : 'Chambres illimitées'}
+                      </p>
+                      {!isCurrent && (
+                        <Button
+                          size="sm"
+                          variant={isUpgrade ? 'default' : 'outline'}
+                          className="w-full"
+                          disabled={changingPlan !== null}
+                          onClick={() => handleChangePlan(p)}
+                        >
+                          {changingPlan === p ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isUpgrade ? (
+                            <><ArrowUp className="h-3 w-3 mr-1" />Upgrade</>
+                          ) : (
+                            <><ArrowDown className="h-3 w-3 mr-1" />Downgrade</>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
+
+            {/* Détails GoCardless si disponibles */}
+            {subscriptionDetails && (
+              <>
+                {subscriptionDetails.subscription.upcoming_payments.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Prochains paiements</h4>
+                    <div className="space-y-2">
+                      {subscriptionDetails.subscription.upcoming_payments.map((payment, index) => (
+                        <div key={index} className="flex justify-between text-sm p-2 rounded bg-muted/20">
+                          <span>{new Date(payment.charge_date).toLocaleDateString('fr-FR')}</span>
+                          <span className="font-medium">{payment.amount / 100}€</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {subscriptionDetails.recent_payments.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Paiements récents</h4>
+                    <div className="space-y-2">
+                      {subscriptionDetails.recent_payments.map((payment) => {
+                        const status = formatPaymentStatus(payment.status);
+                        return (
+                          <div key={payment.id} className="flex justify-between items-center text-sm p-2 rounded bg-muted/20">
+                            <span>{new Date(payment.charge_date).toLocaleDateString('fr-FR')}</span>
+                            <span className={status.className}>{status.label}</span>
+                            <span className="font-medium">{payment.amount}€</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {subscriptionDetails.mandate && (
+                  <div className="text-sm text-muted-foreground p-3 rounded bg-muted/10">
+                    <p>Mandat SEPA: {subscriptionDetails.mandate.reference}</p>
+                    <p>Schéma: {subscriptionDetails.mandate.scheme.toUpperCase()}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2 border-t">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDetails(false)}>
+                Fermer
+              </Button>
+              {isPremium && (
+                <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
+                  Annuler l'abonnement
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
