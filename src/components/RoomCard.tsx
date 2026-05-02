@@ -13,6 +13,7 @@ import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { RoomIncidentsDialog } from "@/components/incident/RoomIncidentsDialog";
 import { EditRoomNoteDialog } from "@/components/EditRoomNoteDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { RoomCardIssuesOverlay } from "@/components/equipment/RoomCardIssuesOverlay";
 
 interface RoomCardProps {
   room: Room;
