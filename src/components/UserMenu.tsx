@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard, Globe, Users, Wrench } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard, Globe, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { SupportTicketDialog } from './SupportTicketDialog';
@@ -88,10 +88,6 @@ const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate('/room-registry')}>
           <Building2 className="mr-2 h-4 w-4" />
           <span>Registre des chambres</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate('/equipment')}>
-          <Wrench className="mr-2 h-4 w-4" />
-          <span>Équipements & caractéristiques</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate('/plans')}>
           <CreditCard className="mr-2 h-4 w-4" />

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { FLOOR_OPTIONS, SPACE_TYPES } from '@/utils/floorUtils';
-import { Wrench, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { Wrench, Plus, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
   space_category: z.string().default('room'),
@@ -74,10 +74,10 @@ const DEFAULT_CHAR: Characteristics = {
 export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomRegistryDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [customFloor, setCustomFloor] = useState(false);
   const [characteristics, setCharacteristics] = useState<Characteristics>(DEFAULT_CHAR);
   const [newAmenity, setNewAmenity] = useState('');
+  const [newEquip, setNewEquip] = useState({ name: '', brand: '', model: '', quantity: '1', condition: 'good' });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -434,14 +434,59 @@ export function EditRoomRegistryDialog({ open, onOpenChange, room }: EditRoomReg
               </TabsContent>
 
               <TabsContent value="equipments" className="space-y-3 mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Équipements liés à cet espace
-                  </p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { onOpenChange(false); navigate('/equipment'); }}>
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Gérer dans Équipements
-                  </Button>
+                <p className="text-sm text-muted-foreground">
+                  Équipements liés à cet espace (marque, modèle, état)
+                </p>
+                <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                  <p className="text-xs font-medium">Ajouter un équipement</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Nom *" value={newEquip.name}
+                      onChange={(e) => setNewEquip({ ...newEquip, name: e.target.value })} />
+                    <Input placeholder="Marque" value={newEquip.brand}
+                      onChange={(e) => setNewEquip({ ...newEquip, brand: e.target.value })} />
+                    <Input placeholder="Modèle / référence" value={newEquip.model}
+                      onChange={(e) => setNewEquip({ ...newEquip, model: e.target.value })} />
+                    <Input type="number" min="1" placeholder="Qté" value={newEquip.quantity}
+                      onChange={(e) => setNewEquip({ ...newEquip, quantity: e.target.value })} />
+                    <Select value={newEquip.condition} onValueChange={(v) => setNewEquip({ ...newEquip, condition: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">Neuf</SelectItem>
+                        <SelectItem value="good">Bon</SelectItem>
+                        <SelectItem value="worn">Usé</SelectItem>
+                        <SelectItem value="broken">HS</SelectItem>
+                        <SelectItem value="missing">Manquant</SelectItem>
+                        <SelectItem value="to_replace">À remplacer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" size="sm" onClick={async () => {
+                      if (!newEquip.name.trim()) {
+                        toast({ title: 'Nom requis', variant: 'destructive' });
+                        return;
+                      }
+                      const { data: reg } = await supabase
+                        .from('hotel_rooms_registry').select('hotel_id').eq('id', room.id).single();
+                      if (!reg?.hotel_id) return;
+                      const { error } = await supabase.from('equipments').insert({
+                        hotel_id: reg.hotel_id,
+                        room_registry_id: room.id,
+                        name: newEquip.name.trim(),
+                        brand: newEquip.brand || null,
+                        model: newEquip.model || null,
+                        quantity: Number(newEquip.quantity) || 1,
+                        condition: newEquip.condition,
+                      } as any);
+                      if (error) {
+                        toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+                        return;
+                      }
+                      setNewEquip({ name: '', brand: '', model: '', quantity: '1', condition: 'good' });
+                      refetchEquip();
+                      toast({ title: 'Équipement ajouté' });
+                    }}>
+                      <Plus className="h-4 w-4 mr-1" />Ajouter
+                    </Button>
+                  </div>
                 </div>
                 {equipments.length === 0 ? (
                   <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
