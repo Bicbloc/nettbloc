@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
+import { Calendar, Layers } from "lucide-react";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
+import { BulkEquipmentDialog } from "@/components/equipment/BulkEquipmentDialog";
 import { CleaningConfig, Room } from "@/services/pdfService";
 
 interface QuickActionsCardProps {
