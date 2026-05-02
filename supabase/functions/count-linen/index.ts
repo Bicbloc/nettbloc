@@ -68,13 +68,21 @@ serve(async (req) => {
     // Get average thickness (default 2cm if not configured)
     const avgThickness = linenType.average_thickness_cm || 2.0;
 
-    // Model selection - Use better model for counting accuracy
+    // Model selection - Optimized for accuracy:
+    // - Quick/Live: Flash-lite (fast preview)
+    // - Detect: Flash (balanced)
+    // - Ruler/Validate: Pro (highest accuracy for final count)
     let model = 'google/gemini-2.5-flash';
     if (quickDetect) {
+      model = 'google/gemini-2.5-flash-lite';
+    } else if (liveMode) {
       model = 'google/gemini-2.5-flash';
-    } else if (detectMode || liveMode) {
+    } else if (detectMode) {
       model = 'google/gemini-2.5-flash';
     } else if (useRuler) {
+      model = 'google/gemini-2.5-pro';
+    } else {
+      // Validation mode = highest precision
       model = 'google/gemini-2.5-pro';
     }
     
