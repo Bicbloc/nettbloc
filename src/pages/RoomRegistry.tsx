@@ -16,10 +16,11 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
+import { BulkEquipmentDialog } from '@/components/equipment/BulkEquipmentDialog';
 import { SpaceActivityLog } from '@/components/SpaceActivityLog';
 import { FloorPlanView } from '@/components/registry/FloorPlanView';
 import { FloorPlanGrid } from '@/components/registry/FloorPlanGrid';
@@ -54,6 +55,7 @@ const RoomRegistry = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoom, setSelectedRoom] = useState<RoomRegistryItem | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBulkEquipOpen, setIsBulkEquipOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -218,10 +220,16 @@ const RoomRegistry = () => {
               </p>
             </div>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter un espace
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
+              <Layers className="h-4 w-4 mr-2" />
+              Équipement en masse
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un espace
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -427,6 +435,12 @@ const RoomRegistry = () => {
       <AddRoomRegistryDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
+        hotelId={activeHotelId}
+      />
+
+      <BulkEquipmentDialog
+        open={isBulkEquipOpen}
+        onOpenChange={setIsBulkEquipOpen}
         hotelId={activeHotelId}
       />
 

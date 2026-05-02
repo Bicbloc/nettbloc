@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
+import { Calendar, Layers } from "lucide-react";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
+import { BulkEquipmentDialog } from "@/components/equipment/BulkEquipmentDialog";
 import { CleaningConfig, Room } from "@/services/pdfService";
 
 interface QuickActionsCardProps {
@@ -28,6 +30,7 @@ export const QuickActionsCard = ({
   onHousekeeperNamesChange,
   onDistribute
 }: QuickActionsCardProps) => {
+  const [bulkOpen, setBulkOpen] = useState(false);
   return (
     <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
       <CardHeader className="pb-3">
@@ -63,7 +66,21 @@ export const QuickActionsCard = ({
           <Calendar className="mr-2 h-4 w-4" />
           Distribuer automatiquement
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => setBulkOpen(true)}
+          className="w-full"
+          disabled={!currentHotelId}
+        >
+          <Layers className="mr-2 h-4 w-4" />
+          Équipement en masse
+        </Button>
       </CardContent>
+      <BulkEquipmentDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        hotelId={currentHotelId}
+      />
     </Card>
   );
 };
