@@ -66,7 +66,21 @@ export const QuickActionsCard = ({
           <Calendar className="mr-2 h-4 w-4" />
           Distribuer automatiquement
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => setBulkOpen(true)}
+          className="w-full"
+          disabled={!currentHotelId}
+        >
+          <Layers className="mr-2 h-4 w-4" />
+          Équipement en masse
+        </Button>
       </CardContent>
+      <BulkEquipmentDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        hotelId={currentHotelId}
+      />
     </Card>
   );
 };
