@@ -39,6 +39,36 @@ export interface ReportTranslations {
   reportDownloaded: string;
   errorGenerating: string;
   errorMessage: string;
+  // Daily closure report
+  closureReport: string;
+  totalRoomsLabel: string;
+  cleanRoomsLabel: string;
+  inProgressRoomsLabel: string;
+  toCleanLabel: string;
+  staffLabel: string;
+  dailyInstructionsTitle: string;
+  instructionsLabel: string;
+  toKnowLabel: string;
+  toDoLabel: string;
+  dailyTasksTitle: string;
+  taskLabel: string;
+  assignedToLabel: string;
+  statusLabel: string;
+  allStaffLabel: string;
+  doneLabel: string;
+  pendingLabel: string;
+  actionsLogTitle: string;
+  timeLabel: string;
+  actorLabel: string;
+  actionLabel: string;
+  roomsCountLabel: string;
+  statusCompleted: string;
+  statusInProgress: string;
+  statusPending: string;
+  startLabel: string;
+  endLabel: string;
+  generatedFooter: string;
+  locale: string;
 }
 
 export const reportTranslations: Record<ReportLanguage, ReportTranslations> = {
