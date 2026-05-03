@@ -53,7 +53,7 @@ export function ImpersonationBanner() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between shadow-lg">
+    <div className="sticky top-0 left-0 right-0 z-[10000] bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between shadow-lg">
       <div className="flex items-center gap-2 text-sm font-medium">
         <ShieldAlert className="h-4 w-4" />
         <span>Mode impersonation — connecté en tant que <strong>{state.targetEmail}</strong></span>
