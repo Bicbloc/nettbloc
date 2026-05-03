@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentReportLanguage, getReportTranslations } from './reportTranslations';
 
 interface HousekeeperReportData {
   housekeeperName: string;
