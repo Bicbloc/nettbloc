@@ -31,7 +31,7 @@ const LegalPage = () => {
     };
 
     loadPage();
-  }, [slug]);
+  }, [slug, language]);
 
   // Simple markdown to HTML converter
   const renderMarkdown = (md: string) => {
