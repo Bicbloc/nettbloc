@@ -16,21 +16,22 @@ const LegalPage = () => {
     const loadPage = async () => {
       if (!slug) return;
       
-      const { data, error } = await supabase
+      // Try requested language first, fallback to FR
+      const { data: rows } = await supabase
         .from('legal_pages')
-        .select('title, content')
-        .eq('slug', slug)
-        .single();
+        .select('title, content, language')
+        .eq('slug', slug);
 
-      if (!error && data) {
-        setTitle(data.title);
-        setContent(data.content);
+      if (rows && rows.length) {
+        const preferred = rows.find((r: any) => r.language === language) || rows.find((r: any) => r.language === 'fr') || rows[0];
+        setTitle(preferred.title);
+        setContent(preferred.content);
       }
       setLoading(false);
     };
 
     loadPage();
-  }, [slug]);
+  }, [slug, language]);
 
   // Simple markdown to HTML converter
   const renderMarkdown = (md: string) => {
