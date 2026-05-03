@@ -1,0 +1,2 @@
+ALTER TABLE public.incident_types DROP CONSTRAINT IF EXISTS incident_types_severity_check;
+ALTER TABLE public.incident_types ADD CONSTRAINT incident_types_severity_check CHECK (severity = ANY (ARRAY['low','medium','high','critical','urgent']));
