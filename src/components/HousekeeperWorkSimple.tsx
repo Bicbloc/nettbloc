@@ -822,7 +822,7 @@ const HousekeeperWorkContent: React.FC = () => {
       const assignment = assignments.find(a => a.room_id === roomId);
       if (assignment) {
         const newAssignmentStatus = newStatus === 'clean' ? 'completed' : 
-                                    newStatus === 'in-progress' ? 'in_progress' : 'assigned';
+                                    (newStatus === 'in-progress' || newStatus === 'in_progress') ? 'in_progress' : 'assigned';
         
         await supabase
           .from('assignments')
