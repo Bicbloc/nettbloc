@@ -829,7 +829,7 @@ const HousekeeperWorkContent: React.FC = () => {
           .update({ 
             status: newAssignmentStatus,
             completed_at: newStatus === 'clean' ? new Date().toISOString() : null,
-            started_at: newStatus === 'in_progress' ? new Date().toISOString() : assignment.started_at
+            started_at: (newStatus === 'in_progress' || newStatus === 'in-progress') ? new Date().toISOString() : assignment.started_at
           })
           .eq('id', assignment.id);
       }
