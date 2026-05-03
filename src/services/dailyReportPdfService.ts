@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentReportLanguage, getReportTranslations } from './reportTranslations';
 
 interface HousekeeperReportData {
   housekeeperName: string;
@@ -48,14 +49,18 @@ interface DailyReportPdfData {
  * Generate HTML content for the daily closure report
  */
 function generateReportHtml(data: DailyReportPdfData): string {
+  const lang = getCurrentReportLanguage();
+  const t = getReportTranslations(lang);
+  const locale = t.locale;
+
   const housekeeperSections = data.housekeepers.map(hk => {
     const roomRows = hk.roomsAssigned.map(room => `
       <tr>
         <td style="border:1px solid #ddd; padding:8px;">${room.room_number}</td>
-        <td style="border:1px solid #ddd; padding:8px;">${room.cleaning_type === 'a_blanc' ? 'À Blanc' : room.cleaning_type === 'recouche' ? 'Recouche' : '-'}</td>
-        <td style="border:1px solid #ddd; padding:8px;">${room.status === 'clean' ? '✓ Terminé' : room.status === 'in-progress' ? '⏳ En cours' : '⏸ En attente'}</td>
-        <td style="border:1px solid #ddd; padding:8px;">${room.started_at ? new Date(room.started_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-        <td style="border:1px solid #ddd; padding:8px;">${room.completed_at ? new Date(room.completed_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+        <td style="border:1px solid #ddd; padding:8px;">${room.cleaning_type === 'a_blanc' ? t.fullClean : room.cleaning_type === 'recouche' ? t.quickClean : '-'}</td>
+        <td style="border:1px solid #ddd; padding:8px;">${room.status === 'clean' ? '✓ ' + t.statusCompleted : room.status === 'in-progress' ? '⏳ ' + t.statusInProgress : '⏸ ' + t.statusPending}</td>
+        <td style="border:1px solid #ddd; padding:8px;">${room.started_at ? new Date(room.started_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+        <td style="border:1px solid #ddd; padding:8px;">${room.completed_at ? new Date(room.completed_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
       </tr>
     `).join('');
 
@@ -64,17 +69,17 @@ function generateReportHtml(data: DailyReportPdfData): string {
         <h2 style="background:#f5f5f5; padding:10px; border-left:4px solid #3b82f6;">
           ${hk.housekeeperName}
           <span style="float:right; font-size:14px; color:#666;">
-            ${hk.completedCount}/${hk.totalCount} chambres
+            ${hk.completedCount}/${hk.totalCount} ${t.roomsCountLabel}
           </span>
         </h2>
         <table style="width:100%; border-collapse:collapse; margin-top:10px;">
           <thead>
             <tr style="background:#e5e7eb;">
-              <th style="border:1px solid #ddd; padding:8px; text-align:left;">Chambre</th>
-              <th style="border:1px solid #ddd; padding:8px; text-align:left;">Type</th>
-              <th style="border:1px solid #ddd; padding:8px; text-align:left;">Statut</th>
-              <th style="border:1px solid #ddd; padding:8px; text-align:left;">Début</th>
-              <th style="border:1px solid #ddd; padding:8px; text-align:left;">Fin</th>
+              <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.room}</th>
+              <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.type}</th>
+              <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.statusLabel}</th>
+              <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.startLabel}</th>
+              <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.endLabel}</th>
             </tr>
           </thead>
           <tbody>
@@ -87,7 +92,7 @@ function generateReportHtml(data: DailyReportPdfData): string {
 
   const actionLogRows = data.actionLogs.slice(0, 50).map(log => `
     <tr>
-      <td style="border:1px solid #ddd; padding:6px; font-size:12px;">${new Date(log.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
+      <td style="border:1px solid #ddd; padding:6px; font-size:12px;">${new Date(log.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</td>
       <td style="border:1px solid #ddd; padding:6px; font-size:12px;">${log.actor_name || '-'}</td>
       <td style="border:1px solid #ddd; padding:6px; font-size:12px;">${log.room_number || '-'}</td>
       <td style="border:1px solid #ddd; padding:6px; font-size:12px;">${log.description}</td>
@@ -96,10 +101,10 @@ function generateReportHtml(data: DailyReportPdfData): string {
 
   return `
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang="${lang}">
     <head>
       <meta charset="UTF-8">
-      <title>Rapport de Clôture - ${data.reportDate}</title>
+      <title>${t.closureReport} - ${data.reportDate}</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
         h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
@@ -113,52 +118,52 @@ function generateReportHtml(data: DailyReportPdfData): string {
       </style>
     </head>
     <body>
-      <h1>📋 Rapport de Clôture</h1>
+      <h1>📋 ${t.closureReport}</h1>
       <p style="color:#666;">
         ${data.hotelName ? `<strong>${data.hotelName}</strong> - ` : ''}
-        ${new Date(data.reportDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        ${new Date(data.reportDate).toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
       </p>
 
       <div class="summary-grid">
         <div class="summary-card">
           <div class="value">${data.summary.totalRooms}</div>
-          <div class="label">Total chambres</div>
+          <div class="label">${t.totalRoomsLabel}</div>
         </div>
         <div class="summary-card">
           <div class="value" style="color:#22c55e;">${data.summary.cleanRooms}</div>
-          <div class="label">Propres</div>
+          <div class="label">${t.cleanRoomsLabel}</div>
         </div>
         <div class="summary-card">
           <div class="value" style="color:#eab308;">${data.summary.inProgressRooms}</div>
-          <div class="label">En cours</div>
+          <div class="label">${t.inProgressRoomsLabel}</div>
         </div>
         <div class="summary-card">
           <div class="value" style="color:#ef4444;">${data.summary.dirtyRooms}</div>
-          <div class="label">À nettoyer</div>
+          <div class="label">${t.toCleanLabel}</div>
         </div>
         <div class="summary-card">
           <div class="value">${data.housekeepers.length}</div>
-          <div class="label">Personnel</div>
+          <div class="label">${t.staffLabel}</div>
         </div>
       </div>
 
       ${data.dailyInstructions && (data.dailyInstructions.instructions || data.dailyInstructions.to_know || data.dailyInstructions.todo_list) ? `
         <div style="margin-top:30px; page-break-inside:avoid;">
-          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📋 Consignes du jour</h2>
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📋 ${t.dailyInstructionsTitle}</h2>
           ${data.dailyInstructions.instructions ? `
             <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; padding:12px; margin:10px 0;">
-              <strong>Instructions :</strong><br/>${data.dailyInstructions.instructions.replace(/\n/g, '<br/>')}
+              <strong>${t.instructionsLabel} :</strong><br/>${data.dailyInstructions.instructions.replace(/\n/g, '<br/>')}
             </div>
           ` : ''}
           ${data.dailyInstructions.to_know ? `
             <div style="background:#eff6ff; border:1px solid #3b82f6; border-radius:8px; padding:12px; margin:10px 0;">
-              <strong>À savoir :</strong>
+              <strong>${t.toKnowLabel} :</strong>
               <ul style="margin:5px 0;">${data.dailyInstructions.to_know.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
             </div>
           ` : ''}
           ${data.dailyInstructions.todo_list ? `
             <div style="background:#f0fdf4; border:1px solid #22c55e; border-radius:8px; padding:12px; margin:10px 0;">
-              <strong>À faire :</strong>
+              <strong>${t.toDoLabel} :</strong>
               <ul style="margin:5px 0;">${data.dailyInstructions.todo_list.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
             </div>
           ` : ''}
@@ -167,13 +172,13 @@ function generateReportHtml(data: DailyReportPdfData): string {
 
       ${data.tasks && data.tasks.length > 0 ? `
         <div style="margin-top:30px; page-break-inside:avoid;">
-          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">✅ Tâches du jour</h2>
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">✅ ${t.dailyTasksTitle}</h2>
           <table style="width:100%; border-collapse:collapse; margin-top:10px;">
             <thead>
               <tr style="background:#e5e7eb;">
-                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Tâche</th>
-                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Assignée à</th>
-                <th style="border:1px solid #ddd; padding:8px; text-align:center;">Statut</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.taskLabel}</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">${t.assignedToLabel}</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:center;">${t.statusLabel}</th>
               </tr>
             </thead>
             <tbody>
@@ -183,8 +188,8 @@ function generateReportHtml(data: DailyReportPdfData): string {
                     <strong>${task.title}</strong>
                     ${task.description ? `<br/><span style="font-size:12px; color:#666;">${task.description}</span>` : ''}
                   </td>
-                  <td style="border:1px solid #ddd; padding:8px;">${task.assigned_to_name || 'Tout le personnel'}</td>
-                  <td style="border:1px solid #ddd; padding:8px; text-align:center;">${task.is_completed ? '✅ Fait' : '⬜ En attente'}</td>
+                  <td style="border:1px solid #ddd; padding:8px;">${task.assigned_to_name || t.allStaffLabel}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center;">${task.is_completed ? '✅ ' + t.doneLabel : '⬜ ' + t.pendingLabel}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -196,14 +201,14 @@ function generateReportHtml(data: DailyReportPdfData): string {
 
       ${data.actionLogs.length > 0 ? `
         <div class="page-break" style="margin-top:40px;">
-          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📝 Journal des Actions</h2>
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📝 ${t.actionsLogTitle}</h2>
           <table style="width:100%; border-collapse:collapse; margin-top:10px;">
             <thead>
               <tr style="background:#e5e7eb;">
-                <th style="border:1px solid #ddd; padding:6px; text-align:left;">Heure</th>
-                <th style="border:1px solid #ddd; padding:6px; text-align:left;">Acteur</th>
-                <th style="border:1px solid #ddd; padding:6px; text-align:left;">Chambre</th>
-                <th style="border:1px solid #ddd; padding:6px; text-align:left;">Action</th>
+                <th style="border:1px solid #ddd; padding:6px; text-align:left;">${t.timeLabel}</th>
+                <th style="border:1px solid #ddd; padding:6px; text-align:left;">${t.actorLabel}</th>
+                <th style="border:1px solid #ddd; padding:6px; text-align:left;">${t.room}</th>
+                <th style="border:1px solid #ddd; padding:6px; text-align:left;">${t.actionLabel}</th>
               </tr>
             </thead>
             <tbody>
@@ -214,7 +219,7 @@ function generateReportHtml(data: DailyReportPdfData): string {
       ` : ''}
 
       <footer style="margin-top:40px; padding-top:20px; border-top:1px solid #ddd; font-size:11px; color:#999; text-align:center;">
-        Généré automatiquement lors de la clôture de journée - ${new Date().toLocaleString('fr-FR')}
+        ${t.generatedFooter} - ${new Date().toLocaleString(locale)}
       </footer>
     </body>
     </html>
