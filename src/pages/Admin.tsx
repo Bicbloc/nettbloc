@@ -28,6 +28,7 @@ import { AccessCodesPanel } from '@/components/admin/AccessCodesPanel';
 import { IncidentsPanel } from '@/components/admin/IncidentsPanel';
 import { TrainingPanel } from '@/components/admin/TrainingPanel';
 import { SystemPanel } from '@/components/admin/SystemPanel';
+import { EmailsPanel } from '@/components/admin/EmailsPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
@@ -47,6 +48,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   'legal': 'Pages légales',
   'banners': 'Bannières',
   'system': 'Système',
+  'emails': 'Emails & Invitations',
 };
 
 const Admin = () => {
@@ -124,6 +126,7 @@ const Admin = () => {
       case 'banners': return <AdminBannersPanel />;
       case 'legal': return <LegalPagesPanel />;
       case 'system': return <SystemPanel />;
+      case 'emails': return <EmailsPanel />;
       default: return null;
     }
   };

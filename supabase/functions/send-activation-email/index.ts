@@ -1,7 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+async function logEmail(entry: Record<string, unknown>) {
+  try {
+    await supabaseAdmin.from("email_logs").insert(entry);
+  } catch (e) {
+    console.error("Failed to log email:", e);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -166,6 +180,16 @@ serve(async (req) => {
     });
 
     console.log('✅ Email sent successfully:', emailResponse);
+
+    await logEmail({
+      email_type: type,
+      recipient_email: email,
+      subject,
+      status: emailResponse?.error ? 'failed' : 'sent',
+      provider_message_id: emailResponse?.data?.id ?? null,
+      error_message: emailResponse?.error ? JSON.stringify(emailResponse.error) : null,
+      metadata: { companyName, hotelName },
+    });
 
     return new Response(JSON.stringify(emailResponse), {
       status: 200,

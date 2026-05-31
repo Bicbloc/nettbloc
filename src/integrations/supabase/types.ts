@@ -777,6 +777,48 @@ export type Database = {
           },
         ]
       }
+      email_logs: {
+        Row: {
+          created_at: string
+          email_type: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          provider_message_id: string | null
+          recipient_email: string
+          related_entity_id: string | null
+          related_entity_type: string | null
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_type: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          provider_message_id?: string | null
+          recipient_email: string
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_type?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          provider_message_id?: string | null
+          recipient_email?: string
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
       equipment_categories: {
         Row: {
           created_at: string
