@@ -78,10 +78,13 @@ const handler = async (req: Request): Promise<Response> => {
     const activationUrl = `${PRODUCTION_DOMAIN}/activate-account?code=${encodeURIComponent(invitationCode)}`;
 
     // Send invitation email
-    const emailResponse = await resend.emails.send({
+    const emailSubject = `Invitation à rejoindre ${hotelName || 'NettBloc'}`;
+    let emailResponse: any;
+    try {
+      emailResponse = await resend.emails.send({
       from: "NettBloc <support@bicbloc.eu>",
       to: [email],
-      subject: `Invitation à rejoindre ${hotelName || 'NettBloc'}`,
+      subject: emailSubject,
       html: `
         <!DOCTYPE html>
         <html>
