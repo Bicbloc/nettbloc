@@ -126,6 +126,7 @@ const Admin = () => {
       case 'banners': return <AdminBannersPanel />;
       case 'legal': return <LegalPagesPanel />;
       case 'system': return <SystemPanel />;
+      case 'emails': return <EmailsPanel />;
       default: return null;
     }
   };
