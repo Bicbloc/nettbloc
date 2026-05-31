@@ -126,9 +126,49 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
-    });
+      });
+    } catch (sendErr: any) {
+      // Log failed email
+      await supabase.from('email_logs').insert({
+        email_type: 'subaccount_invitation',
+        recipient_email: email,
+        subject: emailSubject,
+        status: 'failed',
+        error_message: sendErr?.message || String(sendErr),
+        related_entity_type: 'sub_account',
+        related_entity_id: subAccountId,
+        metadata: { invitationCode, firstName, lastName, roleName, hotelName },
+      });
+      throw new Error(`Failed to send invitation email: ${sendErr?.message || sendErr}`);
+    }
+
+    if (emailResponse?.error) {
+      await supabase.from('email_logs').insert({
+        email_type: 'subaccount_invitation',
+        recipient_email: email,
+        subject: emailSubject,
+        status: 'failed',
+        error_message: JSON.stringify(emailResponse.error),
+        related_entity_type: 'sub_account',
+        related_entity_id: subAccountId,
+        metadata: { invitationCode, firstName, lastName, roleName, hotelName },
+      });
+      throw new Error(`Email provider error: ${JSON.stringify(emailResponse.error)}`);
+    }
 
     console.log("Invitation email sent:", emailResponse);
+
+    // Log successful email
+    await supabase.from('email_logs').insert({
+      email_type: 'subaccount_invitation',
+      recipient_email: email,
+      subject: emailSubject,
+      status: 'sent',
+      provider_message_id: emailResponse?.data?.id ?? null,
+      related_entity_type: 'sub_account',
+      related_entity_id: subAccountId,
+      metadata: { invitationCode, firstName, lastName, roleName, hotelName },
+    });
 
     return new Response(
       JSON.stringify({ 
