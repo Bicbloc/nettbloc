@@ -48,6 +48,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   'legal': 'Pages légales',
   'banners': 'Bannières',
   'system': 'Système',
+  'emails': 'Emails & Invitations',
 };
 
 const Admin = () => {
