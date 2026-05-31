@@ -28,6 +28,7 @@ import { AccessCodesPanel } from '@/components/admin/AccessCodesPanel';
 import { IncidentsPanel } from '@/components/admin/IncidentsPanel';
 import { TrainingPanel } from '@/components/admin/TrainingPanel';
 import { SystemPanel } from '@/components/admin/SystemPanel';
+import { EmailsPanel } from '@/components/admin/EmailsPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
