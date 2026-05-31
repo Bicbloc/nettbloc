@@ -181,6 +181,16 @@ serve(async (req) => {
 
     console.log('✅ Email sent successfully:', emailResponse);
 
+    await logEmail({
+      email_type: type,
+      recipient_email: email,
+      subject,
+      status: emailResponse?.error ? 'failed' : 'sent',
+      provider_message_id: emailResponse?.data?.id ?? null,
+      error_message: emailResponse?.error ? JSON.stringify(emailResponse.error) : null,
+      metadata: { companyName, hotelName },
+    });
+
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
       headers: {
