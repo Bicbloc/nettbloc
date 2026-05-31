@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Hotel, Monitor, Key, UserPlus, AlertTriangle,
   Database, CreditCard, Gift, Smartphone, FileText, Bell, Activity,
-  Megaphone, Settings,
+  Megaphone, Settings, Mail,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -13,7 +13,7 @@ export type AdminSection =
   | 'dashboard' | 'users' | 'sessions' | 'access-codes' | 'housekeeper-requests'
   | 'hotels' | 'incidents' | 'training'
   | 'plans' | 'promos' | 'phone-orders' | 'invoices'
-  | 'tickets' | 'audit' | 'legal' | 'banners' | 'system';
+  | 'tickets' | 'audit' | 'legal' | 'banners' | 'system' | 'emails';
 
 interface Item { id: AdminSection; label: string; icon: any; badge?: string; }
 
