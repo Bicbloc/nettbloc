@@ -54,6 +54,7 @@ const groups: { label: string; items: Item[] }[] = [
     label: 'Support & Système',
     items: [
       { id: 'tickets', label: 'Tickets', icon: Bell },
+      { id: 'emails', label: 'Emails', icon: Mail },
       { id: 'audit', label: 'Journal d\'audit', icon: Activity },
       { id: 'banners', label: 'Bannières', icon: Megaphone },
       { id: 'legal', label: 'Pages légales', icon: FileText },
