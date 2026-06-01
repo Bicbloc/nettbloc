@@ -31,8 +31,7 @@ interface RoomContext {
   rawLine: string;
 }
 
-// Initialiser le worker PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Le worker PDF.js est configuré dynamiquement dans extractPdfText
 
 // Store for last extracted text (for debugging/mismatch detection)
 let lastExtractedText: string = '';
