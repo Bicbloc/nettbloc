@@ -52,13 +52,16 @@ export function ApiClientsPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: clientsData, error: e1 }, { data: dailyData, error: e2 }] = await Promise.all([
+      const [{ data: clientsData, error: e1 }, { data: dailyData, error: e2 }, { data: fnData, error: e3 }] = await Promise.all([
         supabase.rpc('admin_get_api_clients', { p_days: Number(days) }),
         supabase.rpc('admin_get_ai_usage_daily', { p_days: Number(days) }),
+        supabase.rpc('admin_get_ai_usage_by_function', { p_days: Number(days) }),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if (e3) throw e3;
       setClients((clientsData as ApiClient[]) || []);
+      setByFunction((fnData as FunctionUsage[]) || []);
       setDaily(((dailyData as DailyUsage[]) || []).map(d => ({
         ...d,
         day: format(new Date(d.day), 'dd/MM', { locale: fr }),
