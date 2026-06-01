@@ -66,7 +66,22 @@ const PageLoader = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 2,
+    },
+  },
+});
+
+// Quand la session est rafraîchie (retour au premier plan), recharger les données
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:session_refreshed', () => {
+    queryClient.invalidateQueries();
+  });
+}
 
 const App = () => (
   <AppBoot>
