@@ -543,6 +543,28 @@ export function SubscriptionCard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de confirmation de suspension */}
+      <AlertDialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Suspendre temporairement ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Votre abonnement sera mis en pause et les prélèvements seront temporairement suspendus. Vous pourrez le réactiver à tout moment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPausing}>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePauseSubscription} disabled={isPausing}>
+              {isPausing ? 'Suspension...' : 'Confirmer la suspension'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </>
   );
 }
