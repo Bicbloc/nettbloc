@@ -122,6 +122,18 @@ Deno.serve(async (req) => {
 
     if (!createRes.ok) {
       const txt = await createRes.text();
+      // Apaleo returns 422 when a subscription already exists for the same
+      // endpoint + events. Treat this as success (real-time already active).
+      if (
+        createRes.status === 422 &&
+        /already a subscription/i.test(txt)
+      ) {
+        console.log('Webhook Apaleo déjà enregistré (422 ignoré)');
+        return new Response(
+          JSON.stringify({ ok: true, status: 'already_registered' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+        );
+      }
       throw new Error(`Création abonnement échouée [${createRes.status}]: ${txt}`);
     }
 
