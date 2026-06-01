@@ -53,6 +53,7 @@ export function InstructionTemplateSelector({
   onInstructionsChange,
   onToKnowChange,
   onTodoListChange,
+  hideTemplateManager = false,
 }: InstructionTemplateSelectorProps) {
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
