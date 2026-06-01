@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,14 +8,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useHotel } from '@/contexts/HotelContext';
 import { FeatureGuard } from '@/components/FeatureGuard';
 import { 
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
-  Eye, EyeOff, Trash2, Loader2, Wifi
+  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks
 } from 'lucide-react';
+
+interface PreviewRoom {
+  roomNumber: string;
+  floor: number | null;
+  roomType: string | null;
+  cleaningType: string;
+  guestName: string | null;
+  arrivalDate: string | null;
+  departureDate: string | null;
+}
+
+const cleaningLabel = (t: string): { label: string; className: string } => {
+  const v = (t || '').toLowerCase();
+  if (v === 'depart' || v === 'a_blanc' || v === 'full') return { label: 'À blanc', className: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
+  if (v === 'arrivee') return { label: 'Arrivée', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
+  if (v === 'recouche' || v === 'quick' || v === 'occupied') return { label: 'Recouche', className: 'bg-blue-500/15 text-blue-600 border-blue-500/30' };
+  return { label: 'Aucun', className: 'bg-muted text-muted-foreground' };
+};
 
 interface PmsConfig {
   id?: string;
