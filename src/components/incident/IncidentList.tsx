@@ -35,6 +35,10 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
   const [filterStatus, setFilterStatus] = useState<string>(defaultFilterStatus);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [editingIncident, setEditingIncident] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string>("");
 
   const { data: incidents, isLoading } = useQuery({
     queryKey: ["incidents", hotelId, filterStatus, filterPriority, sortByPriority],
