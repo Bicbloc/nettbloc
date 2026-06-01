@@ -74,6 +74,12 @@ export function ConfigDialog({
     });
   };
 
+  const handleTrainPdf = () => {
+    setOpen(false);
+    // Naviguer vers l'onglet d'entraînement de l'import PDF
+    window.dispatchEvent(new CustomEvent('navigate-to-training'));
+  };
+
   const handleAddName = () => {
     if (newName.trim()) {
       setNames([...names, newName.trim()]);
