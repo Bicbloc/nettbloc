@@ -215,7 +215,7 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
 
   // 2. Fetch units (rooms)
   const unitsData = await getJson(
-    `https://api.apaleo.com/inventory/v1/units?propertyId=${propertyId}&pageSize=200`,
+    `https://api.apaleo.com/inventory/v1/units?propertyId=${propertyId}&expand=unitGroup&pageSize=200`,
     access_token,
     'Récupération des chambres Apaleo'
   );
