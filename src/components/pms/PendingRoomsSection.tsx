@@ -127,9 +127,17 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     <>
       <Separator />
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
-          <DoorClosed className="h-4 w-4" />
-          Nouvelles chambres détectées ({rooms.length})
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+            <DoorClosed className="h-4 w-4" />
+            Nouvelles chambres détectées ({rooms.length})
+          </div>
+          {rooms.length > 0 && (
+            <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
+              {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+              Tout valider
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Ces chambres ont été synchronisées pour les opérations du jour mais ne sont pas encore dans le registre permanent. Validez leur ajout ou ignorez-les.
