@@ -556,7 +556,6 @@ const IndexDashboard = () => {
       } catch (error) {
         console.error('Error loading rooms:', error);
       }
-    }
     // IMPORTANT: ne PAS inclure `isAssigning` dans les dépendances.
     // Sinon, 2s après chaque affectation (quand isAssigning repasse à false),
     // un rechargement complet se déclenche et peut désassigner les chambres
