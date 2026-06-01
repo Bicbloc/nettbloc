@@ -238,6 +238,7 @@ export async function generateReport(
     };
     
     // Convert HTML to PDF and download
+    const html2pdf = (await import("html2pdf.js")).default;
     await html2pdf().from(html).set(pdfOptions).save();
     
     toast({
@@ -982,6 +983,7 @@ export async function generateCombinedReport(
     };
     
     // Convert HTML to PDF and download as a single file
+    const html2pdf = (await import("html2pdf.js")).default;
     await html2pdf().from(combinedHTML).set(pdfOptions).save();
     
     toast({
