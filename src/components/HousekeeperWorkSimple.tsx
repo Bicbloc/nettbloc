@@ -23,6 +23,7 @@ import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
 import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
 import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
+import { HousekeeperIncidentsList } from './housekeeper/HousekeeperIncidentsList';
 
 interface Room {
   id: string;
