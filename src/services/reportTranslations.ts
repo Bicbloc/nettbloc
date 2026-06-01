@@ -75,9 +75,9 @@ export const reportTranslations: Record<ReportLanguage, ReportTranslations> = {
   fr: {
     cleaningType: "Type de nettoyage",
     fullClean: "À Blanc",
-    fullCleanShort: "CO",
+    fullCleanShort: "B",
     quickClean: "Recouche",
-    quickCleanShort: "SO",
+    quickCleanShort: "R",
     numberOfRooms: "Nombre de chambres",
     total: "Total",
     estimatedTime: "Temps estimé",
