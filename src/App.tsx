@@ -77,8 +77,8 @@ const App = () => (
             <HotelProvider>
               <HousekeeperAuthProvider>
                 <TechnicianAuthProvider>
-                  <HousekeepingProvider>
-                    <NotificationProvider>
+                  <NotificationProvider>
+                    <HousekeepingProvider>
                       <TooltipProvider>
                         <Toaster />
                         <Sonner />
@@ -146,8 +146,8 @@ const App = () => (
                         </div>
                       </div>
                       </TooltipProvider>
-                    </NotificationProvider>
-                  </HousekeepingProvider>
+                    </HousekeepingProvider>
+                  </NotificationProvider>
                 </TechnicianAuthProvider>
               </HousekeeperAuthProvider>
             </HotelProvider>
