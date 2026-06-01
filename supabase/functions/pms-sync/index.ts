@@ -157,6 +157,29 @@ async function safeJson(res: Response, label: string): Promise<any> {
   }
 }
 
+// GET JSON robuste : en-tête Accept (pas Content-Type sur un GET), retry si corps vide
+async function getJson(url: string, token: string, label: string): Promise<any> {
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`${label} échouée [${res.status}]: ${errBody || 'vérifiez le Property ID'}`);
+    }
+    const text = await res.text();
+    if (text && text.trim()) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`${label}: réponse invalide (HTTP ${res.status}): ${text.slice(0, 200)}`);
+      }
+    }
+    console.warn(`${label}: corps vide (HTTP ${res.status}), tentative ${attempt}/2`);
+  }
+  throw new Error(`${label}: réponse vide du serveur après 2 tentatives.`);
+}
+
+
 // ─── Apaleo Connector ─────────────────────────────────────────────
 async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
   const propertyId = credentials.propertyId;
@@ -188,34 +211,29 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
   if (!access_token) {
     throw new Error('Token Apaleo non reçu — vérifiez Client ID / Client Secret et les scopes du compte.');
   }
-  const headers = { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' };
 
   // 2. Fetch units (rooms)
-  const unitsRes = await fetch(
+  const unitsData = await getJson(
     `https://api.apaleo.com/inventory/v1/units?propertyId=${propertyId}&pageSize=200`,
-    { headers }
+    access_token,
+    'Récupération des chambres Apaleo'
   );
-
-  if (!unitsRes.ok) {
-    const errBody = await unitsRes.text();
-    throw new Error(`Récupération des chambres Apaleo échouée [${unitsRes.status}]: ${errBody || 'vérifiez le Property ID'}`);
-  }
-
-  const unitsData = await safeJson(unitsRes, 'Chambres Apaleo');
   const units = unitsData.units || [];
 
   // 3. Fetch reservations for today
   const today = new Date().toISOString().split('T')[0];
-  const reservationsRes = await fetch(
-    `https://api.apaleo.com/booking/v1/reservations?propertyIds=${propertyId}&dateFilter=Stay&from=${today}&to=${today}&status=Confirmed,InHouse&pageSize=200`,
-    { headers }
-  );
-
   let reservations: any[] = [];
-  if (reservationsRes.ok) {
-    const resData = await safeJson(reservationsRes, 'Réservations Apaleo');
+  try {
+    const resData = await getJson(
+      `https://api.apaleo.com/booking/v1/reservations?propertyIds=${propertyId}&dateFilter=Stay&from=${today}&to=${today}&status=Confirmed,InHouse&pageSize=200`,
+      access_token,
+      'Réservations Apaleo'
+    );
     reservations = resData.reservations || [];
+  } catch (e) {
+    console.warn('Réservations Apaleo non récupérées:', e instanceof Error ? e.message : e);
   }
+
 
   // Build reservation map by unit
   const reservationByUnit: Record<string, any> = {};
