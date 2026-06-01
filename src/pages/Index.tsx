@@ -493,8 +493,7 @@ const IndexDashboard = () => {
     // Ne pas recharger si une opération est en cours
     if (!currentHotelId || isImporting || isAssigning) return;
 
-    {
-      try {
+    try {
         const { data: roomsData, error } = await supabase
           .from('rooms')
           .select('*')
