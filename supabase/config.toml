@@ -82,3 +82,6 @@ verify_jwt = false
 
 [functions.auto-close-day]
 verify_jwt = false
+
+[functions.apaleo-webhook]
+verify_jwt = false
