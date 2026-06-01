@@ -506,6 +506,66 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Incident Dialog */}
+      <Dialog open={!!editingIncident} onOpenChange={(open) => !open && setEditingIncident(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Modifier l'incident</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nom</label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Nom de l'incident"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Description"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Catégorie</label>
+              <Select value={editCategoryId || "none"} onValueChange={(v) => setEditCategoryId(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir une catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {categories?.map((cat: any) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                if (editingIncident && editTitle.trim()) {
+                  updateIncidentMutation.mutate({
+                    incidentId: editingIncident.id,
+                    title: editTitle.trim(),
+                    description: editDescription.trim(),
+                    categoryId: editCategoryId || null,
+                  });
+                }
+              }}
+              disabled={!editTitle.trim() || updateIncidentMutation.isPending}
+              className="w-full"
+            >
+              {updateIncidentMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
