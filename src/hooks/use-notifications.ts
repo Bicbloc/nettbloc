@@ -164,38 +164,6 @@ export const useNotifications = (hotelId?: string) => {
           retryCount = 0;
           return;
         }
-
-
-        // S'abonner aux changements
-        subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
-          realtimeConnected = true;
-
-          // Invalider le cache
-          notificationCache.delete(effectiveHotelId);
-          loadNotifications();
-
-          // Notification pour les nouvelles entrées
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newNotif = payload.new as Notification;
-            
-            // Dispatch staff notification banner (lightweight, dismissible)
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(
-                new CustomEvent('staff-notification', {
-                  detail: { title: newNotif.title, description: newNotif.description }
-                })
-              );
-            }
-            
-            // Notification native APK (son + vibration)
-            nativeNotificationService.sendNotification({
-              title: newNotif.title,
-              body: newNotif.description,
-            });
-          }
-        });
-
-        retryCount = 0; // Reset retry count on success
       } catch (error) {
         console.error('❌ Failed to setup realtime:', error);
         realtimeConnected = false;
