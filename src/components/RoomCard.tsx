@@ -118,9 +118,19 @@ export function RoomCard({
     setDragging(false);
   };
 
+  const isDeparture =
+    room.cleaningType === 'a_blanc' ||
+    room.cleaningType === 'full' ||
+    room.status === 'checkout' ||
+    room.status === 'ready-to-clean';
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'needs-cleaning':
+        // Une chambre "à blanc" est un départ (client sorti), même si elle est encore à nettoyer
+        if (isDeparture) {
+          return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">{t.rooms.departure}</Badge>;
+        }
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">{t.rooms.dirty}</Badge>;
       case 'ready-to-clean':
       case 'checkout':
@@ -135,6 +145,7 @@ export function RoomCard({
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
   
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
