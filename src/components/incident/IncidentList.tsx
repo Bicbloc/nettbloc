@@ -172,6 +172,22 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
         .eq("id", incidentId);
       
       if (error) throw error;
+
+      // Notifier la personne assignée (femme de chambre, technicien, etc.)
+      const staff = staffMembers?.find((s: any) => s.id === staffId);
+      const incident = incidents?.find((i: any) => i.id === incidentId);
+      if (staff && incident) {
+        await supabase.from("notifications").insert({
+          hotel_id: hotelId,
+          title: "Nouvel incident attribué",
+          description: `${incident.title}${incident.location_reference ? ` — ${incident.location_reference}` : ""}`,
+          type: "incident_assigned",
+          user_type: "housekeeper",
+          housekeeper_name: staff.name,
+          room_number: incident.location_reference || null,
+          is_read: false,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
