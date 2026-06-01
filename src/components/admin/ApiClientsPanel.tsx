@@ -30,6 +30,7 @@ interface ApiClient {
 }
 
 interface DailyUsage { day: string; calls: number; tokens: number; }
+interface FunctionUsage { function_name: string; calls: number; tokens: number; last_at: string | null; }
 
 const RANGES = [
   { value: '7', label: '7 jours' },
