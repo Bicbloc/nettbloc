@@ -363,14 +363,29 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
       .eq('is_active', true);
     const registrySet = new Set((registryRooms || []).map((r: any) => String(r.room_number)));
 
+    const { data: existingRooms } = await adminClient
+      .from('rooms')
+      .select('room_number, status')
+      .eq('hotel_id', hotel_id);
+    const existingRoomStatusMap = new Map(
+      (existingRooms || []).map((room: any) => [String(room.room_number), String(room.status || '')])
+    );
+
     for (const room of rooms) {
+      const existingStatus = existingRoomStatusMap.get(String(room.roomNumber));
+      const nextStatus = toDbStatus(room);
+      const preservedStatus =
+        existingStatus === 'checkout' || existingStatus === 'ready-to-clean'
+          ? existingStatus
+          : nextStatus;
+
       // Opérations du jour : on (re)crée la chambre dans rooms.
       await adminClient
         .from('rooms')
         .upsert({
           hotel_id,
           room_number: room.roomNumber,
-          status: toDbStatus(room),
+          status: preservedStatus,
           cleaning_type: toDbCleaningType(room.cleaningType),
           floor: room.floor ?? null,
           room_type: room.roomType ?? null,
