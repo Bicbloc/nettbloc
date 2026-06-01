@@ -405,6 +405,16 @@ export function LostItemReportWizard({
         actor_type: reporterType,
       }).then(() => {});
 
+      // Notification à l'établissement
+      createNotification({
+        hotelId,
+        title: "🧳 Objet trouvé signalé",
+        description: `${objectDescription}${locationType === 'room' && roomNumber ? ` — Chambre ${roomNumber}` : ''} (par ${reporterName})`,
+        type: "lost_item",
+        roomNumber: locationType === 'room' ? roomNumber : undefined,
+        housekeeperName: reporterName,
+      });
+
       toast({
         title: "✅ Objet signalé",
         description: "L'objet trouvé a été enregistré avec succès.",
