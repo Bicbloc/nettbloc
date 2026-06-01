@@ -110,10 +110,11 @@ const Profile = () => {
 
     setIsSaving(true);
     try {
+      const newName = editedCompanyName.trim() || null;
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          company_name: editedCompanyName.trim() || null 
+          company_name: newName 
         })
         .eq('id', user.id);
 
@@ -125,6 +126,14 @@ const Profile = () => {
           description: "Impossible de mettre à jour le profil"
         });
         return;
+      }
+
+      // Garder le nom de l'hôtel synchronisé avec le nom de l'établissement
+      if (newName) {
+        await supabase
+          .from('hotels')
+          .update({ name: newName })
+          .eq('user_id', user.id);
       }
 
       setProfile(prev => prev ? {
