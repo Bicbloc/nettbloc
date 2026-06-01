@@ -112,7 +112,15 @@ export function UnassignedRoomsColumn({
   };
   
   return (
-    <Card className="border-red-200">
+    <Card
+      className={cn(
+        "border-red-200 transition-colors",
+        isDragOver && "border-primary border-2 bg-primary/5 ring-2 ring-primary/30"
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-red-600">
