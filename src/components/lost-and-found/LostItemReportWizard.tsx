@@ -306,7 +306,7 @@ export function LostItemReportWizard({
 
       const { data, error } = aiEnabled
         ? await supabase.functions.invoke('recognize-lost-item', {
-            body: { imageBase64: base64.split(',')[1] }
+            body: { imageBase64: base64.split(',')[1], context: { hotelId } }
           })
         : { data: null, error: null };
 
