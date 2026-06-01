@@ -228,6 +228,16 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               </CardContent>
             </Card>
 
+            <Card className="bg-muted/50">
+              <CardContent className="p-4 space-y-1 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Prochaines étapes (quand vous voulez)</p>
+                <p>
+                  Depuis votre tableau de bord : ajoutez vos chambres, invitez votre équipe et
+                  définissez vos consignes. Vous pouvez aussi le faire plus tard.
+                </p>
+              </CardContent>
+            </Card>
+
             <p className="text-xs text-center text-muted-foreground">
               À la fin de l'essai, vous pourrez choisir un plan et fournir vos informations de facturation.
             </p>
