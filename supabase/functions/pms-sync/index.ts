@@ -603,6 +603,45 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Bulk import: add ALL fetched rooms to the permanent registry at once
+    if (action === 'import') {
+      try {
+        const rooms = await extractRoomsForConfig(pmsConfig);
+        let count = 0;
+        for (const room of rooms) {
+          await adminClient
+            .from('hotel_rooms_registry')
+            .upsert({
+              hotel_id,
+              room_number: room.roomNumber,
+              floor: room.floor ?? null,
+              room_type: room.roomType ?? null,
+              source: 'pms_api',
+              imported_from: pmsConfig.pms_type,
+              last_seen_at: new Date().toISOString(),
+              is_active: true,
+            }, { onConflict: 'hotel_id,room_number' });
+          count++;
+        }
+        // Mark any pending proposals for these rooms as added
+        await adminClient
+          .from('pms_pending_rooms')
+          .update({ status: 'added', resolved_at: new Date().toISOString() })
+          .eq('hotel_id', hotel_id)
+          .eq('status', 'pending');
+
+        return new Response(JSON.stringify({
+          success: true,
+          rooms_synced: count,
+          message: `${count} chambres ajoutées au registre`,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Import failed';
+        return new Response(JSON.stringify({ success: false, error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+
     // Full sync (manual or 'sync' action) — uses the shared helper
     try {
       const count = await performSync(adminClient, pmsConfig);

@@ -62,6 +62,7 @@ export function RoomManagementTab({
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [importMode, setImportMode] = useState<'auto' | 'manual'>('auto');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pmsActive, setPmsActive] = useState(false);
 
   // Load hotel's import mode preference
   useEffect(() => {
@@ -123,14 +124,16 @@ export function RoomManagementTab({
   return (
     <div className="space-y-6">
       {/* PMS API Config Panel (Entreprise only) */}
-      <PmsApiConfigPanel />
+      <PmsApiConfigPanel onActiveChange={setPmsActive} />
 
-      {/* Import Mode Switch */}
-      <ImportModeSwitch 
-        hotelId={currentHotelId}
-        currentMode={importMode}
-        onModeChange={setImportMode}
-      />
+      {/* Import Mode Switch — masqué lorsqu'une connexion API PMS est active */}
+      {!pmsActive && (
+        <ImportModeSwitch 
+          hotelId={currentHotelId}
+          currentMode={importMode}
+          onModeChange={setImportMode}
+        />
+      )}
 
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">{t.rooms.roomManagement}</h2>
@@ -139,7 +142,7 @@ export function RoomManagementTab({
             onAddRoom={onAddRoom} 
             existingRooms={rooms} 
           />
-          {importMode === 'auto' ? (
+          {!pmsActive && (importMode === 'auto' ? (
             <PdfWorkflowDialog 
               hotelId={currentHotelId}
               onWorkflowComplete={onPdfProcessed}
@@ -150,7 +153,7 @@ export function RoomManagementTab({
               onRoomsAdded={handleManualRoomsAdded}
               existingRoomNumbers={existingRoomNumbers}
             />
-          )}
+          ))}
           <Button
             onClick={onOpenManualAssignment}
             variant="outline"
@@ -165,7 +168,15 @@ export function RoomManagementTab({
       {rooms.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            {importMode === 'auto' ? (
+            {pmsActive ? (
+              <>
+                <Sparkles className="h-12 w-12 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Synchronisation PMS active</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  Les chambres sont récupérées automatiquement depuis votre PMS. Utilisez « Tester la connexion » puis enregistrez-les dans le registre depuis le panneau ci-dessus.
+                </p>
+              </>
+            ) : importMode === 'auto' ? (
               <>
                 <Sparkles className="h-12 w-12 text-primary mb-4" />
                 <h3 className="text-lg font-semibold mb-2">{t.importMode.importYourRooms}</h3>

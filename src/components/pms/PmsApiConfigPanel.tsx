@@ -15,7 +15,7 @@ import { useHotel } from '@/contexts/HotelContext';
 import { FeatureGuard } from '@/components/FeatureGuard';
 import { 
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
-  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks
+  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks, ChevronDown
 } from 'lucide-react';
 import { PendingRoomsSection } from './PendingRoomsSection';
 
@@ -83,7 +83,7 @@ const SYNC_FREQUENCIES = [
   { value: 120, label: 'Toutes les 2 heures' },
 ];
 
-export function PmsApiConfigPanel() {
+export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active: boolean) => void } = {}) {
   const { hotelId } = useHotel();
   const navigate = useNavigate();
   const [config, setConfig] = useState<PmsConfig>({
@@ -109,10 +109,19 @@ export function PmsApiConfigPanel() {
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+
+  // Once the connection is configured (saved + active), collapse the section
+  // and let the parent hide the manual import controls.
+  const isConfigured = !!config.id && config.is_active;
+  useEffect(() => {
+    onActiveChange?.(isConfigured);
+  }, [isConfigured, onActiveChange]);
 
   useEffect(() => {
     if (hotelId) loadConfig();
   }, [hotelId]);
+
 
   const loadConfig = async () => {
     if (!hotelId) return;
@@ -313,6 +322,8 @@ export function PmsApiConfigPanel() {
     );
   }
 
+  const collapsed = isConfigured && !expanded;
+
   return (
     <FeatureGuard feature="api_access">
       <Card data-pms-config>
@@ -322,18 +333,36 @@ export function PmsApiConfigPanel() {
               <Plug className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Connexion API PMS</CardTitle>
             </div>
-            {config.is_active && (
-              <Badge variant="default" className="bg-primary">
-                <Wifi className="h-3 w-3 mr-1" />
-                Actif
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {config.is_active && (
+                <Badge variant="default" className="bg-primary">
+                  <Wifi className="h-3 w-3 mr-1" />
+                  Actif
+                </Badge>
+              )}
+              {isConfigured && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExpanded(e => !e)}
+                  className="gap-1"
+                >
+                  {expanded ? 'Réduire' : 'Configurer'}
+                  <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </Button>
+              )}
+            </div>
           </div>
           <CardDescription>
-            Connectez votre PMS pour synchroniser automatiquement les chambres
+            {collapsed
+              ? `${selectedPms?.label || config.pms_type} connecté — synchronisation en temps réel active`
+              : 'Connectez votre PMS pour synchroniser automatiquement les chambres'}
           </CardDescription>
         </CardHeader>
 
+
+
+        {!collapsed && (
         <CardContent className="space-y-6">
           {/* PMS Type Selection */}
           <div className="space-y-2">
@@ -595,6 +624,7 @@ export function PmsApiConfigPanel() {
             )}
           </div>
         </CardContent>
+        )}
       </Card>
     </FeatureGuard>
   );
