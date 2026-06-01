@@ -373,6 +373,29 @@ const IndexDashboard = () => {
   const handleSetupComplete = (newConfig: CleaningConfig) => {
     setCleaningConfig(newConfig);
     setShowSetupWizard(false);
+    // Lancer le tutoriel guidé juste après la configuration initiale
+    if (!isFeatureTourDone(currentHotelId)) {
+      setShowFeatureTour(true);
+    }
+  };
+
+  // Démarrer le tutoriel à la première connexion (si pas de wizard en cours)
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      currentHotelId &&
+      !showSetupWizard &&
+      !setupCheckLoading &&
+      !needsSetup &&
+      !isFeatureTourDone(currentHotelId)
+    ) {
+      setShowFeatureTour(true);
+    }
+  }, [isAuthenticated, currentHotelId, showSetupWizard, setupCheckLoading, needsSetup]);
+
+  const handleFeatureTourClose = () => {
+    setShowFeatureTour(false);
+    markFeatureTourDone(currentHotelId);
   };
 
   // Update config based on premium status
