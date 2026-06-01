@@ -118,6 +118,11 @@ const Admin = () => {
     switch (section) {
       case 'dashboard': return <AdminDashboard onNavigate={(s) => setSection(s as AdminSection)} />;
       case 'users': return <UsersManagementPanel />;
+      case 'connections': return <ConnectionsPanel />;
+      case 'api-usage': return <ApiClientsPanel />;
+      case 'establishments': return <UsersManagementPanel defaultUserType="establishment" lockUserType title="Établissements" />;
+      case 'housekeepers': return <UsersManagementPanel defaultUserType="housekeeper" lockUserType title="Femmes de chambre" />;
+      case 'governesses': return <UsersManagementPanel defaultUserType="governess" lockUserType title="Gouvernantes" />;
       case 'sessions': return <SessionsManagementPanel />;
       case 'access-codes': return <AccessCodesPanel />;
       case 'housekeeper-requests': return <HousekeeperAccessRequests />;
