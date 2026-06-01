@@ -146,7 +146,14 @@ export function PmsApiConfigPanel() {
         body: { hotel_id: hotelId, action: 'test' },
       });
 
-      if (error) throw error;
+      if (error) {
+        toast({
+          title: '❌ Échec de connexion',
+          description: "Le serveur n'a pas répondu correctement. Vérifiez vos identifiants et réessayez.",
+          variant: 'destructive',
+        });
+        return;
+      }
 
       if (data?.success) {
         toast({ title: '✅ Connexion réussie', description: data.message });
