@@ -23,6 +23,7 @@ interface PreviewRoom {
   floor: number | null;
   roomType: string | null;
   cleaningType: string;
+  condition?: string | null;
   guestName: string | null;
   arrivalDate: string | null;
   departureDate: string | null;
