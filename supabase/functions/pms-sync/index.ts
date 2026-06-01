@@ -220,6 +220,23 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
   );
   const units = unitsData.units || [];
 
+  // 2b. Fetch housekeeping conditions (Clean/Dirty/...) from Operations API
+  const conditionByUnit: Record<string, string> = {};
+  try {
+    const opsData = await getJson(
+      `https://api.apaleo.com/operations/v1/units?propertyId=${propertyId}&pageSize=200`,
+      access_token,
+      'États de ménage Apaleo'
+    );
+    const opsUnits = opsData?.units || [];
+    for (const ou of opsUnits) {
+      const cond = ou?.status?.condition || ou?.condition;
+      if (ou?.id && cond) conditionByUnit[ou.id] = cond;
+    }
+  } catch (e) {
+    console.warn('Conditions de ménage Apaleo non récupérées:', e instanceof Error ? e.message : e);
+  }
+
   // 3. Fetch reservations for today
   const today = new Date().toISOString().split('T')[0];
   let reservations: any[] = [];
