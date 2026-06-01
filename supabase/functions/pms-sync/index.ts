@@ -579,119 +579,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Full sync
-    // Create sync log
-    const { data: syncLog } = await adminClient
-      .from('pms_sync_logs')
-      .insert({
-        hotel_id,
-        pms_type: pmsConfig.pms_type,
-        status: 'running',
-      })
-      .select('id')
-      .single();
-
+    // Full sync (manual or 'sync' action) — uses the shared helper
     try {
-      const credentials = pmsConfig.credentials as PmsCredentials;
-      let rooms: ExtractedRoom[] = [];
-
-      switch (pmsConfig.pms_type) {
-        case 'mews':
-          rooms = await fetchMewsRooms(credentials);
-          break;
-        case 'apaleo':
-          rooms = await fetchApaleoRooms(credentials);
-          break;
-        default:
-          throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
-      }
-
-      // Map cleaningType (depart/arrivee/recouche/none/hors_service) -> cleaning_type stocké en base
-      const toDbCleaningType = (t?: string): string => {
-        switch ((t || '').toLowerCase()) {
-          case 'depart':
-          case 'arrivee':
-          case 'full':
-          case 'a_blanc':
-            return 'a_blanc';
-          case 'recouche':
-          case 'quick':
-          case 'occupied':
-            return 'recouche';
-          default:
-            return 'none';
-        }
-      };
-
-      // Statut chambre : propre / hors service -> pas besoin de ménage
-      const toDbStatus = (room: ExtractedRoom): string => {
-        if (room.cleaningType === 'hors_service' || room.status === 'out-of-service') return 'out-of-service';
-        if (room.status === 'clean' && room.cleaningType === 'none') return 'clean';
-        return 'needs-cleaning';
-      };
-
-      // Upsert rooms into the rooms table (colonnes existantes uniquement)
-      for (const room of rooms) {
-        await adminClient
-          .from('rooms')
-          .upsert({
-            hotel_id,
-            room_number: room.roomNumber,
-            status: toDbStatus(room),
-            cleaning_type: toDbCleaningType(room.cleaningType),
-            floor: room.floor ?? null,
-            room_type: room.roomType ?? null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'hotel_id,room_number' });
-      }
-
-      // Update sync status
-      await adminClient
-        .from('pms_sync_logs')
-        .update({
-          status: 'success',
-          sync_ended_at: new Date().toISOString(),
-          rooms_synced: rooms.length,
-        })
-        .eq('id', syncLog?.id);
-
-      await adminClient
-        .from('hotel_pms_configs')
-        .update({
-          last_sync_at: new Date().toISOString(),
-          last_sync_status: 'success',
-          last_sync_error: null,
-        })
-        .eq('id', pmsConfig.id);
-
+      const count = await performSync(adminClient, pmsConfig);
       return new Response(JSON.stringify({
         success: true,
-        rooms_synced: rooms.length,
-        message: `${rooms.length} chambres synchronisées avec succès`,
+        rooms_synced: count,
+        message: `${count} chambres synchronisées avec succès`,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Sync failed';
-
-      await adminClient
-        .from('pms_sync_logs')
-        .update({
-          status: 'error',
-          sync_ended_at: new Date().toISOString(),
-          error_message: msg,
-        })
-        .eq('id', syncLog?.id);
-
-      await adminClient
-        .from('hotel_pms_configs')
-        .update({
-          last_sync_status: 'error',
-          last_sync_error: msg,
-        })
-        .eq('id', pmsConfig.id);
-
       return new Response(JSON.stringify({ success: false, error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
 
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error';
