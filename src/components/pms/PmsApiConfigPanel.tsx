@@ -110,6 +110,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
   const [imported, setImported] = useState(false);
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [registeringWebhook, setRegisteringWebhook] = useState(false);
 
   // Once the connection is configured (saved + active), collapse the section
   // and let the parent hide the manual import controls.
