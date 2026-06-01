@@ -6144,6 +6144,15 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_get_ai_usage_by_function: {
+        Args: { p_days?: number }
+        Returns: {
+          calls: number
+          function_name: string
+          last_at: string
+          tokens: number
+        }[]
+      }
       admin_get_ai_usage_daily: {
         Args: { p_days?: number }
         Returns: {

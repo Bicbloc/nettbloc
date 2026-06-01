@@ -30,6 +30,7 @@ interface ApiClient {
 }
 
 interface DailyUsage { day: string; calls: number; tokens: number; }
+interface FunctionUsage { function_name: string; calls: number; tokens: number; last_at: string | null; }
 
 const RANGES = [
   { value: '7', label: '7 jours' },
@@ -41,6 +42,7 @@ const RANGES = [
 export function ApiClientsPanel() {
   const [clients, setClients] = useState<ApiClient[]>([]);
   const [daily, setDaily] = useState<DailyUsage[]>([]);
+  const [byFunction, setByFunction] = useState<FunctionUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState('30');
   const [search, setSearch] = useState('');
@@ -50,13 +52,16 @@ export function ApiClientsPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: clientsData, error: e1 }, { data: dailyData, error: e2 }] = await Promise.all([
+      const [{ data: clientsData, error: e1 }, { data: dailyData, error: e2 }, { data: fnData, error: e3 }] = await Promise.all([
         supabase.rpc('admin_get_api_clients', { p_days: Number(days) }),
         supabase.rpc('admin_get_ai_usage_daily', { p_days: Number(days) }),
+        supabase.rpc('admin_get_ai_usage_by_function', { p_days: Number(days) }),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if (e3) throw e3;
       setClients((clientsData as ApiClient[]) || []);
+      setByFunction((fnData as FunctionUsage[]) || []);
       setDaily(((dailyData as DailyUsage[]) || []).map(d => ({
         ...d,
         day: format(new Date(d.day), 'dd/MM', { locale: fr }),
@@ -83,9 +88,9 @@ export function ApiClientsPanel() {
   const totals = useMemo(() => ({
     pmsClients: clients.filter(c => c.pms_type).length,
     aiClients: clients.filter(c => Number(c.ai_calls) > 0).length,
-    tokens: clients.reduce((s, c) => s + Number(c.ai_tokens || 0), 0),
-    calls: clients.reduce((s, c) => s + Number(c.ai_calls || 0), 0),
-  }), [clients]);
+    tokens: byFunction.reduce((s, f) => s + Number(f.tokens || 0), 0),
+    calls: byFunction.reduce((s, f) => s + Number(f.calls || 0), 0),
+  }), [clients, byFunction]);
 
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
 
@@ -145,6 +150,52 @@ export function ApiClientsPanel() {
               </BarChart>
             </ResponsiveContainer>
           )}
+        </CardContent>
+      </Card>
+
+      {/* AI usage by function */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Cpu className="h-4 w-4" /> Consommation IA par fonction
+          </CardTitle>
+          <CardDescription>Détail des appels et tokens par fonctionnalité IA sur la période</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fonction</TableHead>
+                  <TableHead className="text-right">Appels</TableHead>
+                  <TableHead className="text-right">Tokens</TableHead>
+                  <TableHead>Dernier appel</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 4 }).map((__, j) => (
+                        <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : byFunction.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune consommation IA sur la période</TableCell></TableRow>
+                ) : byFunction.map(f => (
+                  <TableRow key={f.function_name}>
+                    <TableCell className="font-medium">{f.function_name}</TableCell>
+                    <TableCell className="text-right">{fmt(Number(f.calls))}</TableCell>
+                    <TableCell className="text-right font-medium">{fmt(Number(f.tokens))}</TableCell>
+                    <TableCell className="text-xs">
+                      {f.last_at ? format(new Date(f.last_at), 'dd/MM/yy HH:mm', { locale: fr }) : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
