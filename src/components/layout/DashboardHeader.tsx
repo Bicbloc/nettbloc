@@ -128,6 +128,7 @@ export function DashboardHeader({
                   <span className="xl:hidden">Staff</span>
                 </a>
               </Button>
+              <AutoCloseSettingsDialog hotelId={currentHotelId || ''} />
               <DailyReportCloseButton 
                 hotelId={currentHotelId || ''} 
                 onReportClosed={() => window.location.reload()} 
