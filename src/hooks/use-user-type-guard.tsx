@@ -230,18 +230,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
     void checkUserType();
   }, [authLoading, expectedType, isInitialized, session, user]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user && isInitialized) {
-        hasCheckedRef.current = false;
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isInitialized, user]);
+  // Note: pas de re-vérification au retour d'onglet (visibilitychange).
+  // Cela relançait l'écran "Vérification des accès..." et donnait l'impression
+  // d'un rechargement complet à chaque changement d'onglet.
 
   return {
     userType,
