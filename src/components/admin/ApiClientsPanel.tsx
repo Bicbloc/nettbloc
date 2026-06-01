@@ -153,6 +153,52 @@ export function ApiClientsPanel() {
         </CardContent>
       </Card>
 
+      {/* AI usage by function */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Cpu className="h-4 w-4" /> Consommation IA par fonction
+          </CardTitle>
+          <CardDescription>Détail des appels et tokens par fonctionnalité IA sur la période</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fonction</TableHead>
+                  <TableHead className="text-right">Appels</TableHead>
+                  <TableHead className="text-right">Tokens</TableHead>
+                  <TableHead>Dernier appel</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 4 }).map((__, j) => (
+                        <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : byFunction.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune consommation IA sur la période</TableCell></TableRow>
+                ) : byFunction.map(f => (
+                  <TableRow key={f.function_name}>
+                    <TableCell className="font-medium">{f.function_name}</TableCell>
+                    <TableCell className="text-right">{fmt(Number(f.calls))}</TableCell>
+                    <TableCell className="text-right font-medium">{fmt(Number(f.tokens))}</TableCell>
+                    <TableCell className="text-xs">
+                      {f.last_at ? format(new Date(f.last_at), 'dd/MM/yy HH:mm', { locale: fr }) : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Clients table */}
       <Card>
         <CardHeader>
