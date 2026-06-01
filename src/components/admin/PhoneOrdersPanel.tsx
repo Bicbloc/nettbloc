@@ -133,7 +133,7 @@ export function PhoneOrdersPanel() {
                   <OrderRow
                     key={order.id}
                     order={order}
-                    onUpdate={(data) => updateMutation.mutate({ id: order.id, ...data })}
+                    onUpdate={(data) => updateMutation.mutate({ id: order.id, hotelId: order.hotel_id, ...data })}
                   />
                 ))}
               </TableBody>
