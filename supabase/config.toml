@@ -85,3 +85,6 @@ verify_jwt = false
 
 [functions.apaleo-webhook]
 verify_jwt = false
+
+[functions.apaleo-register-webhook]
+verify_jwt = false

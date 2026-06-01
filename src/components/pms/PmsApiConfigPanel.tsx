@@ -110,6 +110,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
   const [imported, setImported] = useState(false);
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [registeringWebhook, setRegisteringWebhook] = useState(false);
 
   // Once the connection is configured (saved + active), collapse the section
   // and let the parent hide the manual import controls.
@@ -283,6 +284,33 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       toast({ title: 'Erreur', description: err.message || 'Sync échouée', variant: 'destructive' });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const registerWebhook = async () => {
+    if (!hotelId) return;
+    setRegisteringWebhook(true);
+    try {
+      await saveConfig();
+      const { data, error } = await supabase.functions.invoke('apaleo-register-webhook', {
+        body: { hotel_id: hotelId },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast({
+          title: '✅ Temps réel activé',
+          description:
+            data.status === 'already_registered'
+              ? 'Les notifications check-in / check-out étaient déjà activées dans Apaleo.'
+              : 'Apaleo enverra désormais les check-in / check-out instantanément à Nettobloc.',
+        });
+      } else {
+        toast({ title: '❌ Activation impossible', description: data?.error || 'Erreur inconnue', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Activation échouée', variant: 'destructive' });
+    } finally {
+      setRegisteringWebhook(false);
     }
   };
 
@@ -616,6 +644,13 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Synchroniser maintenant
             </Button>
+
+            {config.pms_type === 'apaleo' && (
+              <Button variant="outline" onClick={registerWebhook} disabled={registeringWebhook || !config.id}>
+                {registeringWebhook ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
+                Activer le temps réel (check-in / check-out)
+              </Button>
+            )}
 
             {config.id && (
               <Button variant="ghost" size="icon" className="text-destructive" onClick={deleteConfig}>

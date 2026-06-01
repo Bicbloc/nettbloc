@@ -193,6 +193,19 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create a notification so the event appears in the notification bell (établissement)
+    await admin.from('notifications').insert({
+      hotel_id: hotelId,
+      title: isCheckout ? 'Client sorti' : 'Client arrivé',
+      description: isCheckout
+        ? `Chambre ${roomNumber} : check-out déclaré sur Apaleo — à blanc.`
+        : `Chambre ${roomNumber} : check-in déclaré sur Apaleo — occupée (recouche).`,
+      type: isCheckout ? 'pms_checkout' : 'pms_checkin',
+      room_number: roomNumber,
+      user_type: 'establishment',
+      is_read: false,
+    });
+
     console.log(
       `Webhook traité: hôtel=${hotelId} chambre=${roomNumber} -> ${status}/${cleaning_type}`,
     );
