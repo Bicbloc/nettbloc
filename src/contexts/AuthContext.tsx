@@ -270,18 +270,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [stopTokenRefresh]);
 
+  const value = useMemo(() => ({
+    user,
+    session,
+    loading,
+    isInitialized,
+    signUp,
+    signIn,
+    signOut,
+    isAuthenticated: !!user && !!session,
+    refreshSession
+  }), [user, session, loading, isInitialized, signUp, signIn, signOut, refreshSession]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      loading,
-      isInitialized,
-      signUp,
-      signIn,
-      signOut,
-      isAuthenticated: !!user && !!session,
-      refreshSession
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
