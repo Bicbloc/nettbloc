@@ -157,6 +157,29 @@ async function safeJson(res: Response, label: string): Promise<any> {
   }
 }
 
+// GET JSON robuste : en-tête Accept (pas Content-Type sur un GET), retry si corps vide
+async function getJson(url: string, token: string, label: string): Promise<any> {
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`${label} échouée [${res.status}]: ${errBody || 'vérifiez le Property ID'}`);
+    }
+    const text = await res.text();
+    if (text && text.trim()) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`${label}: réponse invalide (HTTP ${res.status}): ${text.slice(0, 200)}`);
+      }
+    }
+    console.warn(`${label}: corps vide (HTTP ${res.status}), tentative ${attempt}/2`);
+  }
+  throw new Error(`${label}: réponse vide du serveur après 2 tentatives.`);
+}
+
+
 // ─── Apaleo Connector ─────────────────────────────────────────────
 async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
   const propertyId = credentials.propertyId;
