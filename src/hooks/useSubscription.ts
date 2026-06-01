@@ -113,7 +113,9 @@ export function useSubscription() {
     maxRooms: 15,
     featuresEnabled: DEFAULT_FEATURES,
     planConfig: PLAN_CONFIGS.decouverte,
-    subscriptionStatus: 'none'
+    subscriptionStatus: 'none',
+    isPaused: false
+
   });
 
   const checkSubscription = async () => {
