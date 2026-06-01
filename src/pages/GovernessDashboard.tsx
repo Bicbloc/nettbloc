@@ -420,9 +420,10 @@ function GovernessDashboardContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-20">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-muted/30">
       {/* App Header */}
-      <div className="sticky top-0 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+      <div className="flex-none z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
