@@ -210,6 +210,42 @@ Deno.serve(async (req) => {
       console.error('Erreur insertion notification:', notificationError.message);
     }
 
+    const actionType = isCheckout ? 'pms_checkout' : 'pms_checkin';
+    const actionDescription = isCheckout
+      ? `Apaleo: client sorti en chambre ${roomNumber}`
+      : `Apaleo: client arrivé en chambre ${roomNumber}`;
+
+    const { error: actionLogError } = await admin.from('daily_action_logs').insert({
+      hotel_id: hotelId,
+      log_date: new Date().toISOString().split('T')[0],
+      action_type: actionType,
+      actor_name: 'Apaleo',
+      actor_type: 'system',
+      room_number: roomNumber,
+      description: actionDescription,
+      details: {
+        source: 'apaleo',
+        event_type: type,
+        room_status: status,
+        cleaning_type,
+      },
+    });
+
+    if (actionLogError) {
+      console.error('Erreur insertion daily_action_logs:', actionLogError.message);
+    }
+
+    const { error: roomStatusUpdateError } = await admin.from('room_status_updates').insert({
+      hotel_id: hotelId,
+      room_number: roomNumber,
+      status,
+      message: actionDescription,
+    });
+
+    if (roomStatusUpdateError) {
+      console.error('Erreur insertion room_status_updates:', roomStatusUpdateError.message);
+    }
+
     console.log(
       `Webhook traité: hôtel=${hotelId} chambre=${roomNumber} -> ${status}/${cleaning_type}`,
     );
