@@ -61,6 +61,8 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
   const handleTouchStart = (e: React.TouchEvent) => {
     if (room.status === 'in_progress' || isActionable) {
       touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      swipeLock.current = null;
       setSwipeStartTime(Date.now());
       setIsSwiping(true);
     }
@@ -68,12 +70,27 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isSwiping) return;
-    
+
     touchCurrentX.current = e.touches[0].clientX;
-    const diff = touchCurrentX.current - touchStartX.current;
-    
-    if (diff > 0) {
-      setSwipeOffset(Math.min(diff, 200));
+    const diffX = touchCurrentX.current - touchStartX.current;
+    const diffY = e.touches[0].clientY - touchStartY.current;
+
+    // Déterminer la direction du geste une seule fois pour éviter
+    // que la page ne bouge verticalement pendant un glissement horizontal
+    if (swipeLock.current === null) {
+      if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+        swipeLock.current = Math.abs(diffX) > Math.abs(diffY) ? 'horizontal' : 'vertical';
+      }
+    }
+
+    // Si l'utilisateur scrolle verticalement, on annule le glissement
+    if (swipeLock.current === 'vertical') {
+      if (swipeOffset !== 0) setSwipeOffset(0);
+      return;
+    }
+
+    if (diffX > 0) {
+      setSwipeOffset(Math.min(diffX, 200));
     }
   };
 
