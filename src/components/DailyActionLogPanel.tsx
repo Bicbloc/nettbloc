@@ -262,6 +262,8 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
                 <SelectItem value="assignment">Assignation</SelectItem>
                 <SelectItem value="unassignment">Désassignation</SelectItem>
                 <SelectItem value="incident">⚠️ Incident</SelectItem>
+                <SelectItem value="pms_checkout">PMS · Client sorti</SelectItem>
+                <SelectItem value="pms_checkin">PMS · Client arrivé</SelectItem>
                 <SelectItem value="comment">Commentaire</SelectItem>
                 <SelectItem value="room_remark">💬 Remarque</SelectItem>
               </SelectContent>
