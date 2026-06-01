@@ -645,6 +645,13 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               Synchroniser maintenant
             </Button>
 
+            {config.pms_type === 'apaleo' && (
+              <Button variant="outline" onClick={registerWebhook} disabled={registeringWebhook || !config.id}>
+                {registeringWebhook ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
+                Activer le temps réel (check-in / check-out)
+              </Button>
+            )}
+
             {config.id && (
               <Button variant="ghost" size="icon" className="text-destructive" onClick={deleteConfig}>
                 <Trash2 className="h-4 w-4" />
