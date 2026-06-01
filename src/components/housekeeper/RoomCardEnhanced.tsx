@@ -41,7 +41,9 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
   const [swipeStartTime, setSwipeStartTime] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   const touchCurrentX = useRef(0);
+  const swipeLock = useRef<null | 'horizontal' | 'vertical'>(null);
 
   // Statuts réellement utilisés côté PMS/DB : checkout, stayover, etc.
   // On considère actionnable tout ce qui n'est pas déjà terminé.
