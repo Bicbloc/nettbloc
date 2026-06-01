@@ -747,8 +747,15 @@ const IndexDashboard = () => {
           isPremium={isPremium}
         />
       )}
+
+      <FeatureTour
+        isOpen={showFeatureTour && !showOnboardingWizard && !showSetupWizard}
+        onTabChange={setActiveTab}
+        onClose={handleFeatureTourClose}
+      />
       
       <NotificationSound />
+
       
       <MainLayout
         activeTab={activeTab}
