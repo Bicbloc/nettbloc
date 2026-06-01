@@ -463,15 +463,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate auth
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Parse request body early to detect the scheduled (cron) action.
+    const body = await req.json().catch(() => ({}));
+    const { hotel_id, action } = body as { hotel_id?: string; action?: string };
+
+    // ── Scheduled morning sync (called by cron, no user auth) ──
+    if (action === 'scheduled') {
+      const results = await runScheduledSync(adminClient);
+      return new Response(JSON.stringify({ processed: results.length, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    // Validate auth (all other actions require a logged-in user)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
 
     // Verify user
     const userClient = createClient(supabaseUrl, supabaseAnon, {
@@ -483,11 +498,10 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    // Parse request
-    const { hotel_id, action } = await req.json();
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: corsHeaders });
     }
+
 
     // Use service role for DB operations
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
