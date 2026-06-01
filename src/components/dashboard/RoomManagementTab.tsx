@@ -62,6 +62,7 @@ export function RoomManagementTab({
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [importMode, setImportMode] = useState<'auto' | 'manual'>('auto');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pmsActive, setPmsActive] = useState(false);
 
   // Load hotel's import mode preference
   useEffect(() => {
