@@ -219,6 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       stopTokenRefresh();
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleResume);
