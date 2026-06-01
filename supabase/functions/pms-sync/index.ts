@@ -175,7 +175,6 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
       grant_type: 'client_credentials',
       client_id: credentials.clientId,
       client_secret: credentials.clientSecret,
-      scope: 'reservation.read inventory.read',
     }),
   });
 
