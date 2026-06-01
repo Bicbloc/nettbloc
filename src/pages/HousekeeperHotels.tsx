@@ -25,6 +25,21 @@ function HousekeeperHotelsContent() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // 🔍 DIAGNOSTIC boucle de rechargement femme de chambre
+    try {
+      const navType = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type;
+      const count = Number(sessionStorage.getItem('hk_hotels_loadcount') || '0') + 1;
+      sessionStorage.setItem('hk_hotels_loadcount', String(count));
+      console.log('🔍 [HK-HOTELS] mount', {
+        navType,
+        loadCount: count,
+        url: window.location.href,
+        ts: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.log('🔍 [HK-HOTELS] diag error', e);
+    }
+
     // Handle email confirmation token exchange before checking user
     const handleTokenExchange = async () => {
       const params = new URLSearchParams(window.location.search);
