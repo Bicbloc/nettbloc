@@ -60,12 +60,15 @@ interface SubscriptionDetails {
 }
 
 export function SubscriptionCard() {
-  const { plan, subscribed, subscription_end, isPremium, isFree, isInTrial, trialDaysRemaining, loading, refreshSubscription } = useSubscription();
+  const { plan, subscribed, subscription_end, isPremium, isFree, isInTrial, isPaused, trialDaysRemaining, loading, refreshSubscription } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const [changingPlan, setChangingPlan] = useState<PlanType | null>(null);
 
   const planOrder: PlanType[] = ['decouverte', 'essentiel', 'confort', 'business', 'entreprise'];
