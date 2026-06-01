@@ -266,7 +266,7 @@ const RoomRegistry = () => {
 
         {/* Filters & View Toggle */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <Tabs value={categoryFilter} onValueChange={setCategoryFilter} className="w-full sm:w-auto">
+          <Tabs data-tour="reg-filter" value={categoryFilter} onValueChange={setCategoryFilter} className="w-full sm:w-auto">
             <TabsList className="w-full sm:w-auto grid grid-cols-4">
               <TabsTrigger value="all">Tout</TabsTrigger>
               <TabsTrigger value="room">Chambres</TabsTrigger>
@@ -283,7 +283,7 @@ const RoomRegistry = () => {
               className="pl-10"
             />
           </div>
-          <div className="flex border rounded-lg overflow-hidden shrink-0">
+          <div data-tour="reg-view" className="flex border rounded-lg overflow-hidden shrink-0">
             <Button
               variant={viewMode === 'plan' ? 'default' : 'ghost'}
               size="sm"
