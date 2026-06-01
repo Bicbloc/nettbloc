@@ -26,7 +26,10 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   const [realTaskId, setRealTaskId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const isTemporaryTask = initialTaskId.startsWith('temp-');
+  // Considérer comme temporaire tout id qui n'est pas un UUID réel
+  // (temp_, temp-, manual_, etc.) afin de créer une vraie tâche en base
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isTemporaryTask = !UUID_REGEX.test(initialTaskId);
 
   // Create real task if temporary
   useEffect(() => {
