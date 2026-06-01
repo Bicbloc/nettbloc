@@ -73,7 +73,7 @@ export function MainLayout({
 
           {/* Main Content */}
           <main className={cn(
-            "flex-1 min-w-0 pb-20 md:pb-0",
+            "flex-1 min-w-0 max-w-full overflow-x-hidden pb-20 md:pb-0",
             // Add padding for mobile bottom nav
           )}>
             {children}
