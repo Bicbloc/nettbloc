@@ -185,7 +185,7 @@ const IndexDashboard = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
   const { hotelId, hotelName, hotelCode: contextHotelCode } = useHotel();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
 
