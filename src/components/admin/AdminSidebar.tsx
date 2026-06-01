@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Hotel, Monitor, Key, UserPlus, AlertTriangle,
   Database, CreditCard, Gift, Smartphone, FileText, Bell, Activity,
-  Megaphone, Settings, Mail,
+  Megaphone, Settings, Mail, User, UserCheck, Cpu, LogIn,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/sidebar';
 
 export type AdminSection =
-  | 'dashboard' | 'users' | 'sessions' | 'access-codes' | 'housekeeper-requests'
+  | 'dashboard' | 'users' | 'establishments' | 'housekeepers' | 'governesses'
+  | 'sessions' | 'connections' | 'api-usage' | 'access-codes' | 'housekeeper-requests'
   | 'hotels' | 'incidents' | 'training'
   | 'plans' | 'promos' | 'phone-orders' | 'invoices'
   | 'tickets' | 'audit' | 'legal' | 'banners' | 'system' | 'emails';
@@ -22,12 +23,22 @@ const groups: { label: string; items: Item[] }[] = [
     label: 'Vue d\'ensemble',
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+      { id: 'connections', label: 'Connexions', icon: LogIn },
+      { id: 'api-usage', label: 'Clients API & IA', icon: Cpu },
     ],
   },
   {
-    label: 'Utilisateurs & Accès',
+    label: 'Comptes par rôle',
     items: [
-      { id: 'users', label: 'Utilisateurs', icon: Users },
+      { id: 'establishments', label: 'Établissements', icon: Hotel },
+      { id: 'housekeepers', label: 'Femmes de chambre', icon: User },
+      { id: 'governesses', label: 'Gouvernantes', icon: UserCheck },
+      { id: 'users', label: 'Tous les utilisateurs', icon: Users },
+    ],
+  },
+  {
+    label: 'Accès & Sessions',
+    items: [
       { id: 'sessions', label: 'Sessions', icon: Monitor },
       { id: 'access-codes', label: 'Codes d\'accès', icon: Key },
       { id: 'housekeeper-requests', label: 'Demandes FdC', icon: UserPlus, badge: '!' },
