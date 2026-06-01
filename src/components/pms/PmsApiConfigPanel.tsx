@@ -422,7 +422,41 @@ export function PmsApiConfigPanel() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="border-t pt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Synchro automatique chaque matin</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Recrée les chambres du jour (départs, recouches…) prêtes pour l'affectation
+                      </p>
+                    </div>
+                    <Switch
+                      checked={config.auto_sync_enabled}
+                      onCheckedChange={(v) => setConfig(prev => ({ ...prev, auto_sync_enabled: v }))}
+                    />
+                  </div>
+
+                  {config.auto_sync_enabled && (
+                    <div className="space-y-2">
+                      <Label>Heure de synchro</Label>
+                      <Input
+                        type="time"
+                        value={config.auto_sync_time}
+                        onChange={(e) => setConfig(prev => ({ ...prev, auto_sync_time: e.target.value }))}
+                        className="w-40"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Heure locale de l'établissement. Par défaut 06:00.
+                        {config.last_auto_sync_date && (
+                          <> Dernière synchro auto : {config.last_auto_sync_date}.</>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
+
             </>
           )}
 
