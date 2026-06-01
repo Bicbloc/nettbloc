@@ -144,26 +144,51 @@ async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoo
     });
 }
 
+// Parse une réponse JSON en évitant l'erreur "unexpected end of JSON input"
+async function safeJson(res: Response, label: string): Promise<any> {
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    throw new Error(`${label}: réponse vide du serveur (HTTP ${res.status})`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${label}: réponse invalide (HTTP ${res.status}): ${text.slice(0, 200)}`);
+  }
+}
+
 // ─── Apaleo Connector ─────────────────────────────────────────────
 async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
-  // 1. Get OAuth token
+  const propertyId = credentials.propertyId;
+  if (!credentials.clientId || !credentials.clientSecret) {
+    throw new Error('Client ID et Client Secret Apaleo requis.');
+  }
+  if (!propertyId) {
+    throw new Error('Property ID Apaleo manquant.');
+  }
+
+  // 1. Get OAuth token (scope requis pour accéder aux unités et réservations)
   const tokenRes = await fetch('https://identity.apaleo.com/connect/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
-      client_id: credentials.clientId || '',
-      client_secret: credentials.clientSecret || '',
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+      scope: 'reservation.read inventory.read',
     }),
   });
 
   if (!tokenRes.ok) {
     const errBody = await tokenRes.text();
-    throw new Error(`Apaleo auth failed [${tokenRes.status}]: ${errBody}`);
+    throw new Error(`Authentification Apaleo échouée [${tokenRes.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`);
   }
 
-  const { access_token } = await tokenRes.json();
-  const propertyId = credentials.propertyId;
+  const tokenData = await safeJson(tokenRes, 'Authentification Apaleo');
+  const access_token = tokenData.access_token;
+  if (!access_token) {
+    throw new Error('Token Apaleo non reçu — vérifiez Client ID / Client Secret et les scopes du compte.');
+  }
   const headers = { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' };
 
   // 2. Fetch units (rooms)
@@ -174,10 +199,10 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
 
   if (!unitsRes.ok) {
     const errBody = await unitsRes.text();
-    throw new Error(`Apaleo units fetch failed [${unitsRes.status}]: ${errBody}`);
+    throw new Error(`Récupération des chambres Apaleo échouée [${unitsRes.status}]: ${errBody || 'vérifiez le Property ID'}`);
   }
 
-  const unitsData = await unitsRes.json();
+  const unitsData = await safeJson(unitsRes, 'Chambres Apaleo');
   const units = unitsData.units || [];
 
   // 3. Fetch reservations for today
@@ -189,7 +214,7 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
 
   let reservations: any[] = [];
   if (reservationsRes.ok) {
-    const resData = await reservationsRes.json();
+    const resData = await safeJson(reservationsRes, 'Réservations Apaleo');
     reservations = resData.reservations || [];
   }
 

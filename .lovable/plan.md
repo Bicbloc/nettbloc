@@ -1,62 +1,29 @@
+# Fiabiliser la connexion API Apaleo
 
+## Objectif
+Supprimer l'erreur « unexpected end of JSON input » lors du test de connexion Apaleo et renvoyer des messages d'erreur clairs.
 
-## Plan: Aligner le parsing Mews sur les règles métier réelles
+## Cause identifiée
+L'edge function `pms-sync` plante silencieusement pendant les appels Apaleo (scope OAuth manquant et parsing JSON non protégé), ce qui fait que le frontend reçoit une réponse vide qu'il n'arrive pas à parser → « unexpected end of JSON input ».
 
-### Probleme identifié
+## Modifications
 
-Le code actuel traite **PRO (propre)** comme "aucun nettoyage" systématiquement (ligne 534 de MewsAdapter). Or, selon vos règles métier : **PRO avec un client parti = À blanc** car la chambre a été libérée et doit être nettoyée à fond. Seule une chambre PRO **vide** (sans client associé) est vraiment "propre".
+### 1. `supabase/functions/pms-sync/index.ts` — fonction `fetchApaleoRooms`
+- **Ajouter le scope OAuth** dans la requête `connect/token` : ajouter `scope: 'reservation.read inventory.read'` aux `URLSearchParams`. C'est requis par Apaleo pour autoriser l'accès aux unités et réservations.
+- **Sécuriser tous les `.json()`** : créer un petit helper `safeJson(res)` qui lit d'abord `res.text()` puis tente `JSON.parse`, et jette une erreur explicite (`"Réponse Apaleo invalide [status]: corps vide/non-JSON"`) au lieu de « unexpected end of JSON input ». L'appliquer au token, aux units et aux réservations.
+- **Vérifier la présence du token** : si `access_token` est absent après parsing, jeter une erreur claire (« Token Apaleo non reçu — vérifiez Client ID / Client Secret »).
+- **Valider `propertyId`** en amont : si vide, renvoyer « Property ID manquant ».
 
-De même, la logique de dates (date départ vs date rapport) n'est pas exploitée.
+### 2. Robustesse générale du handler
+- Envelopper le mapping final dans le try/catch existant (déjà le cas) — vérifier qu'aucune exception ne sort de la réponse JSON.
 
-### Règles métier à implémenter
+### 3. Frontend `src/components/pms/PmsApiConfigPanel.tsx`
+- Dans `testConnection`, si `error` remonte de `invoke`, afficher un message générique plus utile (« Le serveur n'a pas répondu correctement, réessayez ») plutôt que de propager l'erreur brute de parsing.
 
-```text
-PRIORITÉ 1: Nombre de noms clients (s'applique à SAL, PRO, DIR)
-  - 2+ noms distincts → À blanc (checkout + checkin)
-  - 1 nom + date départ == date rapport → À blanc (client part aujourd'hui)
-  - 1 nom + date départ > date rapport → Recouche (client reste)
-  - 1 nom + Nuit X/Y où X == Y → À blanc (dernière nuit)
-  - 1 nom + Nuit X/Y où X < Y → Recouche (séjour en cours)
-  - 1 nom sans info date → Recouche (par défaut)
+## Validation
+- Déployer la fonction puis la tester via l'outil de test edge function avec `action: 'test'` sur le hôtel Apaleo configuré.
+- Vérifier les logs de l'edge function pour confirmer qu'une erreur lisible est renvoyée (et non un crash) en cas de mauvais identifiants.
 
-PRIORITÉ 2: 0 noms
-  - PRO/INS sans client → Propre (none)
-  - SAL/DIR sans client → À blanc (chambre vide sale)
-```
-
-### Fichiers à modifier
-
-**1. `src/services/pms/adapters/MewsAdapter.ts`**
-- Refactorer `analyzeLineWithDate` : supprimer le court-circuit PRO→none. Appliquer la logique unifiée basée sur les noms + dates pour PRO aussi.
-- Dans `extractRooms` (règle prioritaire #1, lignes 286-313) : ajouter la comparaison date départ vs date rapport quand 1 seul nom est détecté. Actuellement 1 nom = recouche toujours, mais si la date de départ == date rapport → à blanc.
-
-**2. `src/services/training/UniversalParser.ts`**
-- Modifier la section guest-name (lignes 544-553) : quand 1 nom est détecté, vérifier les dates de départ sur la ligne (extraction regex DD/MM/YYYY). Si date départ <= date rapport → full. Ajouter extraction de la date du rapport depuis le header.
-- PRO dans `STATUS_DICTIONARY` : le garder comme 'none' par défaut mais l'overrider quand des noms clients sont présents.
-
-**3. `supabase/functions/parse-report/index.ts`**
-- Mettre à jour le prompt IA pour refléter les nouvelles règles : PRO avec client parti = à blanc, logique noms clients, Nuit X/Y.
-
-### Détails techniques
-
-**MewsAdapter - Nouvelle logique unifiée** :
-- Extraire `reportDate` et les dates de départ de la ligne
-- Pour chaque chambre avec statut PRO/SAL/DIR :
-  - 2+ noms → à blanc
-  - 1 nom + date départ ≤ reportDate → à blanc  
-  - 1 nom + Nuit X/Y où X==Y → à blanc
-  - 1 nom + date départ > reportDate → recouche
-  - 1 nom + Nuit X/Y où X<Y → recouche
-  - 1 nom sans info → recouche (défaut)
-  - 0 noms + PRO/INS → none (propre)
-  - 0 noms + SAL/DIR → à blanc
-
-**UniversalParser** :
-- Ajouter `extractReportDateFromText(text)` qui cherche une date dans le header
-- Dans la section guest-name (ligne 547+), appliquer la même logique date départ vs date rapport
-- Quand statut=PRO et noms≥1, overrider le type 'none' vers la logique noms/dates
-
-**Edge function parse-report** :
-- Ajouter dans le prompt : "PRO avec nom client dont date départ ≤ date rapport → a_blanc"
-- Reformuler la règle Nuit X/Y pour inclure X==Y → a_blanc
-
+## Détails techniques
+- Endpoint token : `https://identity.apaleo.com/connect/token` (grant_type=client_credentials).
+- Scopes Apaleo minimaux pour la lecture : `reservation.read`, `inventory.read`. Si le compte Apaleo n'a pas ces scopes activés, le test renverra désormais un message clair à la place de l'erreur JSON.
