@@ -186,6 +186,7 @@ export const LinenDailyReport = ({
         {/* Tableau détaillé */}
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-3">Détail par type de linge</h2>
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-100">
@@ -254,7 +255,9 @@ export const LinenDailyReport = ({
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
+
 
         {/* Pied de page */}
         <div className="text-center text-xs text-gray-400 pt-4 border-t border-gray-200">
