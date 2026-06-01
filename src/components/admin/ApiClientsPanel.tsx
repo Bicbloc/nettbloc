@@ -42,6 +42,7 @@ const RANGES = [
 export function ApiClientsPanel() {
   const [clients, setClients] = useState<ApiClient[]>([]);
   const [daily, setDaily] = useState<DailyUsage[]>([]);
+  const [byFunction, setByFunction] = useState<FunctionUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState('30');
   const [search, setSearch] = useState('');
