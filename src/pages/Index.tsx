@@ -402,8 +402,8 @@ const IndexDashboard = () => {
     markFeatureTourDone(currentHotelId);
   };
 
-  const handleStartTour = () => {
-    setActiveTab('overview');
+  const handleStartTour = (stepIndex: number = 0) => {
+    setTourStartStep(stepIndex);
     setShowFeatureTour(true);
   };
 
