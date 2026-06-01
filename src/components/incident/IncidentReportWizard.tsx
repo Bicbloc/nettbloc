@@ -335,7 +335,7 @@ export function IncidentReportWizard({
       });
 
       const { data, error } = await supabase.functions.invoke('recognize-incident-item', {
-        body: { imageBase64: base64.split(',')[1] }
+        body: { imageBase64: base64.split(',')[1], context: { hotelId } }
       });
 
       if (error) throw error;
