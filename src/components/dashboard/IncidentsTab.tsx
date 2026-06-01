@@ -30,10 +30,10 @@ export function IncidentsTab({ currentHotelId }: IncidentsTabProps) {
         )}
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs defaultValue="incidents" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
           <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
+          <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
           <TabsTrigger value="staff">Personnel</TabsTrigger>
           <TabsTrigger value="inventory">Inventaire</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
