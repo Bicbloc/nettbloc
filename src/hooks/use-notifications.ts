@@ -122,44 +122,48 @@ export const useNotifications = (hotelId?: string) => {
 
     const setupRealtime = async () => {
       try {
-        // Connexion au manager centralisé
-        const ok = await realtimeManager.connect(effectiveHotelId);
-        if (!ok) {
-          console.warn('⚠️ Realtime non connecté, fallback sur polling');
-          startPolling();
-          return;
+        // Toujours s'abonner au manager: les callbacks sont enregistrés indépendamment
+        // de l'état du canal et seront déclenchés dès que la connexion est établie
+        // (y compris après l'authentification via l'événement SIGNED_IN).
+        if (!subscriptionId) {
+          subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
+            realtimeConnected = true;
+
+            // Invalider le cache
+            notificationCache.delete(effectiveHotelId);
+            loadNotifications();
+
+            // Notification pour les nouvelles entrées
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const newNotif = payload.new as Notification;
+
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('staff-notification', {
+                    detail: { title: newNotif.title, description: newNotif.description }
+                  })
+                );
+              }
+
+              nativeNotificationService.sendNotification({
+                title: newNotif.title,
+                body: newNotif.description,
+              });
+            }
+          });
         }
 
-        // S'abonner aux changements
-        subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
-          realtimeConnected = true;
+        // Connexion au manager centralisé (réessaie tout seul en interne)
+        const ok = await realtimeManager.connect(effectiveHotelId);
 
-          // Invalider le cache
-          notificationCache.delete(effectiveHotelId);
-          loadNotifications();
+        // Polling de secours léger tant que le realtime n'a pas confirmé une connexion.
+        // Il s'arrête automatiquement dès qu'un événement realtime arrive (realtimeConnected = true).
+        startPolling();
 
-          // Notification pour les nouvelles entrées
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newNotif = payload.new as Notification;
-            
-            // Dispatch staff notification banner (lightweight, dismissible)
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(
-                new CustomEvent('staff-notification', {
-                  detail: { title: newNotif.title, description: newNotif.description }
-                })
-              );
-            }
-            
-            // Notification native APK (son + vibration)
-            nativeNotificationService.sendNotification({
-              title: newNotif.title,
-              body: newNotif.description,
-            });
-          }
-        });
-
-        retryCount = 0; // Reset retry count on success
+        if (ok) {
+          retryCount = 0;
+          return;
+        }
       } catch (error) {
         console.error('❌ Failed to setup realtime:', error);
         realtimeConnected = false;

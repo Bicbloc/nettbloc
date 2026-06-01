@@ -1,5 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
-import * as pdfjs from 'pdfjs-dist';
+// pdfjs-dist is imported dynamically inside extractPdfText to keep it out of the initial bundle
 import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
 import { parseRoomLines, RoomLine } from "@/services/pms/RoomLineParser";
 import { detectReportFormat, ParsedRow, type FormatDetection } from "@/services/training/ReportFormatDetector";
@@ -31,8 +31,7 @@ interface RoomContext {
   rawLine: string;
 }
 
-// Initialiser le worker PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Le worker PDF.js est configuré dynamiquement dans extractPdfText
 
 // Store for last extracted text (for debugging/mismatch detection)
 let lastExtractedText: string = '';
@@ -649,6 +648,8 @@ function detectColumnBoundaries(items: { x: number }[]): number[] {
  */
 export async function extractPdfText(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   
   let fullText = '';
