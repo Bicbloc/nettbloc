@@ -210,7 +210,6 @@ export function RoomCard({
           isInProgress ? 'border-blue-500 border-2 bg-blue-50/50 animate-pulse-cleaning' :
           isSelected ? 'bg-gradient-primary text-primary-foreground border-2' :
           room.isUrgent ? 'border-destructive border-2 bg-destructive/5' : 
-          room.notUrgent ? 'border-green-500 bg-green-50' : 
           room.status === 'clean' ? 'border-green-400 bg-green-50/50' : 'border-border hover:shadow-modern-md'
         } ${
           selectable ? 'cursor-pointer hover:scale-[1.02]' : ''
@@ -548,7 +547,7 @@ export function RoomCard({
       } ${
         isSelected ? 'bg-blue-100 border-blue-500 border-2' :
         room.isUrgent ? 'border-red-500 border-2 shadow-md' : 
-        room.notUrgent ? 'border-green-500 border-2' : 'border-gray-200 shadow-sm'
+        room.status === 'clean' ? 'border-green-400 border-2' : 'border-gray-200 shadow-sm'
       } ${
         selectable ? 'cursor-pointer' : ''
       }`}
