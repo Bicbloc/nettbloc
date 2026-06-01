@@ -376,6 +376,7 @@ const IndexDashboard = () => {
     // Lancer le tutoriel guidé juste après la configuration initiale
     if (!isFeatureTourDone(currentHotelId)) {
       setShowFeatureTour(true);
+      markFeatureTourDone(currentHotelId);
     }
   };
 
