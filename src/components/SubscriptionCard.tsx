@@ -155,6 +155,55 @@ export function SubscriptionCard() {
     }
   };
 
+  const handlePauseSubscription = async () => {
+    setIsPausing(true);
+    try {
+      const { error } = await supabase.functions.invoke('pause-subscription');
+      if (error) throw error;
+      toast({
+        title: 'Abonnement suspendu',
+        description: 'Votre abonnement est temporairement suspendu. Les prélèvements sont mis en pause.',
+      });
+      setShowPauseDialog(false);
+      setShowDetails(false);
+      refreshSubscription();
+    } catch (error: any) {
+      console.error('Erreur suspension:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: error.message || "Impossible de suspendre l'abonnement",
+      });
+    } finally {
+      setIsPausing(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setIsResuming(true);
+    try {
+      const { error } = await supabase.functions.invoke('resume-subscription');
+      if (error) throw error;
+      toast({
+        title: 'Abonnement réactivé',
+        description: 'Votre abonnement a été réactivé. Les prélèvements reprennent.',
+      });
+      setShowDetails(false);
+      refreshSubscription();
+    } catch (error: any) {
+      console.error('Erreur réactivation:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: error.message || "Impossible de réactiver l'abonnement",
+      });
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+
+
   const formatPaymentStatus = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
       'confirmed': { label: 'Confirmé', className: 'text-green-600' },
