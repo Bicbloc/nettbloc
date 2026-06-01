@@ -105,7 +105,46 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
     },
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ["incident-categories", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("incident_categories")
+        .select("id, name, icon")
+        .eq("hotel_id", hotelId)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const updateIncidentMutation = useMutation({
+    mutationFn: async ({ incidentId, title, description, categoryId }: { incidentId: string; title: string; description: string; categoryId: string | null }) => {
+      const { error } = await supabase
+        .from("incidents")
+        .update({ title, description, category_id: categoryId })
+        .eq("id", incidentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      setEditingIncident(null);
+      toast({ title: "Incident modifié" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (incident: any) => {
+    setEditingIncident(incident);
+    setEditTitle(incident.title || "");
+    setEditDescription(incident.description || "");
+    setEditCategoryId(incident.category_id || "");
+  };
+
   const updateStatusMutation = useMutation({
+
     mutationFn: async ({ incidentId, status }: { incidentId: string; status: string }) => {
       const userResp = await supabase.auth.getUser();
       const userId = userResp.data.user?.id;
