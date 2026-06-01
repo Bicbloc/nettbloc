@@ -123,6 +123,7 @@ export function RoomCard({
       case 'needs-cleaning':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">{t.rooms.dirty}</Badge>;
       case 'ready-to-clean':
+      case 'checkout':
         return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">{t.rooms.departure}</Badge>;
       case 'clean':
         return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">{t.rooms.clean}</Badge>;
@@ -268,7 +269,7 @@ export function RoomCard({
               <AlertCircle className="h-2 w-2" /> {t.rooms.remark}
             </span>
           )}
-          {room.status === 'ready-to-clean' && (
+          {(room.status === 'ready-to-clean' || room.status === 'checkout') && (
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
               🚪
             </span>
