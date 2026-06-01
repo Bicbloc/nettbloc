@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
             rooms = await fetchApaleoRooms(credentials);
             break;
           default:
-            return new Response(JSON.stringify({ error: `PMS type '${pmsConfig.pms_type}' not yet supported for API sync` }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ success: false, error: `Le PMS '${pmsConfig.pms_type}' n'est pas encore supporté pour la synchro API directe.` }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         return new Response(JSON.stringify({ 
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
-        return new Response(JSON.stringify({ success: false, error: msg }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ success: false, error: msg }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
