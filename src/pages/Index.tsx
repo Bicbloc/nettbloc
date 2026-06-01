@@ -27,6 +27,7 @@ import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { realtimeManager } from "@/services/RealtimeManager";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
 import { FeatureTour, isFeatureTourDone, markFeatureTourDone } from "@/components/FeatureTour";
 import { useRoomManagement } from "@/hooks/use-room-management";
