@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Settings, MinusSquare, PlusSquare, Edit, Save, X } from "lucide-react";
+import { Settings, MinusSquare, PlusSquare, Edit, Save, X, Sparkles } from "lucide-react";
 import { CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
