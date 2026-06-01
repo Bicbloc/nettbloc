@@ -420,9 +420,10 @@ function GovernessDashboardContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-20">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-muted/30">
       {/* App Header */}
-      <div className="sticky top-0 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+      <div className="flex-none z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -473,9 +474,11 @@ function GovernessDashboardContent() {
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
       <StaffNotificationBanner hotelId={selectedHotel?.id} />
 
       <main className="px-4 py-4 space-y-4">
+
         {/* Demandes en attente */}
         {pendingRequests.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50 rounded-2xl">
@@ -751,9 +754,11 @@ function GovernessDashboardContent() {
           </>
         )}
       </main>
+      </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
+      <div className="flex-none z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
+
         <div className="grid grid-cols-5 px-2 py-1">
           {bottomTabs.map(({ key, label, icon: Icon, badge }) => {
             const isActive = activeTab === key;

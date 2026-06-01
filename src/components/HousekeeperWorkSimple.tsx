@@ -979,7 +979,7 @@ const HousekeeperWorkContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-20">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-muted/30">
       <HousekeeperHeader
         hotelName={hotel?.name || 'Mon Hôtel'}
         housekeeperName={housekeeperName}
@@ -989,8 +989,10 @@ const HousekeeperWorkContent: React.FC = () => {
         onLogout={handleLogout}
       />
 
+      <div className="flex-1 overflow-y-auto overscroll-contain">
       {/* Notification banner compacte et glissable */}
       <StaffNotificationBanner hotelId={hotelId || undefined} />
+
 
       {showActivityLog && (
         <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
@@ -1227,7 +1229,9 @@ const HousekeeperWorkContent: React.FC = () => {
           </Card>
         )}
       </div>
+      </div>
     </div>
+
   );
 };
 
