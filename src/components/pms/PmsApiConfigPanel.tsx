@@ -158,6 +158,9 @@ export function PmsApiConfigPanel() {
         property_id: config.property_id || null,
         is_active: config.is_active,
         sync_frequency: config.sync_frequency,
+        auto_sync_enabled: config.auto_sync_enabled,
+        auto_sync_time: config.auto_sync_time,
+
       };
 
       if (config.id) {
