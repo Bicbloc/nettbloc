@@ -182,6 +182,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } finally {
         if (mounted) {
+          clearTimeout(safetyTimeout);
           setLoading(false);
           setIsInitialized(true);
         }
@@ -189,6 +190,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
     
     initSession();
+
 
     // Récupération automatique de la session quand l'app revient au premier plan
     // (ex: l'utilisateur quitte Chrome puis revient). Sans cela, le token peut
