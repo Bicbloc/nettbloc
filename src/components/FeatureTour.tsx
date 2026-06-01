@@ -170,7 +170,24 @@ const STEPS: TourStep[] = [
     },
   },
   {
-    icon: <Check className="h-6 w-6" />,
+    target: '[data-tour="user-menu"]',
+    icon: <Settings className="h-6 w-6" />,
+    title: { fr: "Où trouver les Paramètres", en: "Where to find Settings" },
+    desc: {
+      fr: "Cliquez sur votre avatar en haut à droite : le menu s'ouvre. « Paramètres » vous permet de modifier le nom de l'établissement, la langue, les options du compte et les préférences de l'hôtel.",
+      en: "Click your avatar at the top right: the menu opens. \"Settings\" lets you change the establishment name, language, account options and hotel preferences.",
+    },
+  },
+  {
+    target: '[data-tour="user-menu"]',
+    icon: <Building2 className="h-6 w-6" />,
+    title: { fr: "Le Registre des chambres", en: "The Room registry" },
+    desc: {
+      fr: "Toujours depuis votre avatar en haut à droite › « Registre des chambres ». C'est la liste permanente de toutes vos chambres. Pour le remplir : cliquez sur « Ajouter », saisissez le numéro, l'étage et le type (lit simple/double, twin, RDC…), puis enregistrez. Vous pouvez aussi modifier, désactiver ou importer en masse. Ce registre sert de référence à toutes les affectations et imports PDF.",
+      en: "Also from your avatar top right › \"Room registry\". It's the permanent list of all your rooms. To fill it: click \"Add\", enter the number, floor and type (single/double, twin, ground floor…), then save. You can also edit, disable or bulk import. This registry is the reference for all assignments and PDF imports.",
+    },
+  },
+  {
     title: { fr: "Vous êtes prêt ! 🎉", en: "You're all set! 🎉" },
     desc: {
       fr: "Récapitulatif : 1) invitez vos employés, 2) entraînez le PDF, 3) importez et affectez les chambres. Le reste se gère au quotidien. Bon travail avec Nettobloc !",
