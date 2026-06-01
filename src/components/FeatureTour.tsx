@@ -197,16 +197,30 @@ export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) 
   const content = useMemo(() => {
     if (!isOpen || !step) return null;
     return (
-      <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-background/60 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-[200] flex justify-center sm:justify-end pointer-events-none">
+        <div className="w-full max-w-sm rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200 pointer-events-auto">
+          {/* Barre de progression en haut de la carte */}
+          <div className="h-1.5 w-full overflow-hidden rounded-t-2xl bg-muted">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${((index + 1) / total) * 100}%` }}
+            />
+          </div>
+
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 {step.icon}
               </div>
-              <h3 className="text-base font-semibold">{step.title[lang]}</h3>
+              <div>
+                <h3 className="text-base font-semibold leading-tight">{step.title[lang]}</h3>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {lang === "fr" ? "Étape" : "Step"} {index + 1} / {total} ·{" "}
+                  {Math.round(((index + 1) / total) * 100)}%
+                </span>
+              </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={finish}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={finish}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -214,26 +228,22 @@ export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) 
           <div className="p-4">
             <p className="text-sm text-muted-foreground leading-relaxed">{step.desc[lang]}</p>
 
-            <div className="mt-4 flex items-center justify-between text-xs font-medium text-muted-foreground">
-              <span>
-                {lang === "fr" ? "Étape" : "Step"} {index + 1} / {total}
-              </span>
-              <span>{Math.round(((index + 1) / total) * 100)}%</span>
-            </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${((index + 1) / total) * 100}%` }}
-              />
-            </div>
-
-            <div className="mt-3 flex items-center gap-1.5">
-              {STEPS.map((_, i) => (
-                <span
+            {/* Indicateurs étape par étape */}
+            <div className="mt-4 flex flex-wrap items-center gap-1.5">
+              {STEPS.map((s, i) => (
+                <button
                   key={i}
+                  type="button"
+                  onClick={() => setIndex(i)}
+                  title={s.title[lang]}
+                  aria-label={s.title[lang]}
                   className={
-                    "h-1.5 rounded-full transition-all " +
-                    (i === index ? "w-6 bg-primary" : "w-1.5 bg-muted")
+                    "h-2 rounded-full transition-all " +
+                    (i === index
+                      ? "w-6 bg-primary"
+                      : i < index
+                        ? "w-2 bg-primary/50"
+                        : "w-2 bg-muted hover:bg-muted-foreground/40")
                   }
                 />
               ))}
