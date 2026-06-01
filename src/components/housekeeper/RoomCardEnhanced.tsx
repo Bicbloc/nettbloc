@@ -122,6 +122,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
       }
     }
     
+    swipeLock.current = null;
     setSwipeOffset(0);
   };
 
