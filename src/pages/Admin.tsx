@@ -32,7 +32,12 @@ import { EmailsPanel } from '@/components/admin/EmailsPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
-  'users': 'Gestion des utilisateurs',
+  'connections': 'Connexions',
+  'api-usage': 'Clients API & IA',
+  'users': 'Tous les utilisateurs',
+  'establishments': 'Établissements',
+  'housekeepers': 'Femmes de chambre',
+  'governesses': 'Gouvernantes',
   'sessions': 'Sessions actives',
   'access-codes': 'Codes d\'accès',
   'housekeeper-requests': 'Demandes femmes de chambre',
