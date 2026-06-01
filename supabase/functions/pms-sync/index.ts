@@ -501,10 +501,8 @@ Deno.serve(async (req) => {
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: corsHeaders });
     }
+    // adminClient already created above (service role for DB operations)
 
-
-    // Use service role for DB operations
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify hotel ownership
     const { data: hotel } = await adminClient
