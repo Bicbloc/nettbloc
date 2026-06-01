@@ -13,6 +13,7 @@ import {
   Sparkles, ArrowRight, ArrowLeft, X, Check, Settings, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TabValue } from "@/components/layout";
 
