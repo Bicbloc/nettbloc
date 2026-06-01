@@ -83,7 +83,7 @@ const SYNC_FREQUENCIES = [
   { value: 120, label: 'Toutes les 2 heures' },
 ];
 
-export function PmsApiConfigPanel() {
+export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active: boolean) => void } = {}) {
   const { hotelId } = useHotel();
   const navigate = useNavigate();
   const [config, setConfig] = useState<PmsConfig>({
@@ -109,10 +109,19 @@ export function PmsApiConfigPanel() {
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+
+  // Once the connection is configured (saved + active), collapse the section
+  // and let the parent hide the manual import controls.
+  const isConfigured = !!config.id && config.is_active;
+  useEffect(() => {
+    onActiveChange?.(isConfigured);
+  }, [isConfigured, onActiveChange]);
 
   useEffect(() => {
     if (hotelId) loadConfig();
   }, [hotelId]);
+
 
   const loadConfig = async () => {
     if (!hotelId) return;
