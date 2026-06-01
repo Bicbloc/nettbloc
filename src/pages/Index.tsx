@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
-import { AlertCircle, RefreshCw, LogOut } from "lucide-react";
+import { AlertCircle, RefreshCw, LogOut, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
