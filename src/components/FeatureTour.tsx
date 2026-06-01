@@ -185,8 +185,12 @@ const STEPS: TourStep[] = [
     icon: <Building2 className="h-6 w-6" />,
     title: { fr: "Le Registre des chambres", en: "The Room registry" },
     desc: {
-      fr: "Toujours depuis votre avatar en haut à droite › « Registre des chambres ». C'est la liste permanente de toutes vos chambres. Pour le remplir : cliquez sur « Ajouter », saisissez le numéro, l'étage et le type (lit simple/double, twin, RDC…), puis enregistrez. Vous pouvez aussi modifier, désactiver ou importer en masse. Ce registre sert de référence à toutes les affectations et imports PDF.",
-      en: "Also from your avatar top right › \"Room registry\". It's the permanent list of all your rooms. To fill it: click \"Add\", enter the number, floor and type (single/double, twin, ground floor…), then save. You can also edit, disable or bulk import. This registry is the reference for all assignments and PDF imports.",
+      fr: "Toujours depuis votre avatar en haut à droite › « Registre des chambres ». C'est la liste permanente de toutes vos chambres. Ouvrez-le pour voir, pas à pas, comment ajouter les chambres/espaces, les organiser et créer un plan.",
+      en: "Also from your avatar top right › \"Room registry\". It's the permanent list of all your rooms. Open it to see, step by step, how to add rooms/spaces, organize them and build a floor plan.",
+    },
+    action: {
+      label: { fr: "Ouvrir le registre & voir comment faire", en: "Open registry & show me how" },
+      to: "/room-registry?tour=1",
     },
   },
   {
