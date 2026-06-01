@@ -499,6 +499,8 @@ const RoomRegistry = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RegistryTour isOpen={showTour} onClose={closeTour} />
     </div>
   );
 };
