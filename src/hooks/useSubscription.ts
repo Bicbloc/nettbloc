@@ -70,7 +70,8 @@ export interface SubscriptionState {
   maxRooms: number;
   featuresEnabled: Record<string, boolean>;
   planConfig: PlanConfig;
-  subscriptionStatus: 'none' | 'trial' | 'active' | 'expired' | 'cancelled';
+  subscriptionStatus: 'none' | 'trial' | 'active' | 'expired' | 'cancelled' | 'paused';
+  isPaused: boolean;
 }
 
 const DEFAULT_FEATURES = {
