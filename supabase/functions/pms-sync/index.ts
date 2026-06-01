@@ -281,16 +281,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Not authorized for this hotel' }), { status: 403, headers: corsHeaders });
     }
 
-    // Get PMS config
-    const { data: pmsConfig } = await adminClient
+    // Get PMS config.
+    // For a connection test, we don't require is_active=true (the user is
+    // typically testing before enabling automatic sync). For real syncs, only
+    // active configs are synced.
+    let configQuery = adminClient
       .from('hotel_pms_configs')
       .select('*')
-      .eq('hotel_id', hotel_id)
-      .eq('is_active', true)
-      .single();
+      .eq('hotel_id', hotel_id);
+
+    if (action !== 'test') {
+      configQuery = configQuery.eq('is_active', true);
+    }
+
+    const { data: pmsConfig } = await configQuery.maybeSingle();
 
     if (!pmsConfig) {
-      return new Response(JSON.stringify({ error: 'No active PMS config found' }), { status: 404, headers: corsHeaders });
+      return new Response(JSON.stringify({
+        success: false,
+        error: action === 'test'
+          ? 'Aucune configuration PMS trouvée. Sauvegardez d\'abord vos identifiants.'
+          : 'Aucune configuration PMS active trouvée.',
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Test connection only
@@ -307,7 +319,7 @@ Deno.serve(async (req) => {
             rooms = await fetchApaleoRooms(credentials);
             break;
           default:
-            return new Response(JSON.stringify({ error: `PMS type '${pmsConfig.pms_type}' not yet supported for API sync` }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ success: false, error: `Le PMS '${pmsConfig.pms_type}' n'est pas encore supporté pour la synchro API directe.` }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         return new Response(JSON.stringify({ 
@@ -317,7 +329,7 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
-        return new Response(JSON.stringify({ success: false, error: msg }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ success: false, error: msg }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
