@@ -176,14 +176,25 @@ export function HousekeeperCard({
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
   };
-  
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear when leaving the card itself, not its children
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver(false);
     try {
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
+        // Already in this column → nothing to do
+        if (room.assignedTo === name) return;
+
         // Check if room limit is reached
         if (rooms.length >= effectiveMaxRooms) {
           toast({
