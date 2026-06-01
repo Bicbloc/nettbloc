@@ -52,6 +52,24 @@ export function PhoneOrderSection() {
     enabled: !!hotelId,
   });
 
+  // Mise à jour temps réel: refléter immédiatement les changements de statut faits par l'admin
+  useEffect(() => {
+    if (!hotelId) return;
+    const channel = supabase
+      .channel(`phone-orders-${hotelId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "phone_orders", filter: `hotel_id=eq.${hotelId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["phone-orders", hotelId] });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hotelId, queryClient]);
+
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       if (!hotelId || !user) throw new Error("Non authentifié");
