@@ -240,10 +240,12 @@ export function InstructionTemplateSelector({
             Réutiliser les dernières
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={() => setShowTemplateManager(true)}>
-          <FileText className="h-4 w-4 mr-1" />
-          Gérer les templates
-        </Button>
+        {!hideTemplateManager && (
+          <Button variant="outline" size="sm" onClick={() => setShowTemplateManager(true)}>
+            <FileText className="h-4 w-4 mr-1" />
+            Gérer les templates
+          </Button>
+        )}
       </div>
 
       {/* Instructions Fields with Template Quick Select */}
