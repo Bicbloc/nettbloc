@@ -214,6 +214,7 @@ interface Rect { top: number; left: number; width: number; height: number; }
 
 export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const lang = language === "fr" ? "fr" : "en";
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
