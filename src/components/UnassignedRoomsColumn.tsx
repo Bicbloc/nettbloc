@@ -31,6 +31,32 @@ export function UnassignedRoomsColumn({
   onDirectAssign, // Callback pour assignation directe
   hotelId
 }: UnassignedRoomsColumnProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    try {
+      const roomData = e.dataTransfer.getData('application/json');
+      if (!roomData) return;
+      const room = JSON.parse(roomData) as Room;
+      if (!room.assignedTo) return; // Already unassigned
+      onRoomUpdate({ ...room, assignedTo: undefined });
+    } catch (error) {
+      console.error("Erreur lors du retrait d'affectation:", error);
+    }
+  };
+  
   
   // Récupérer le nombre d'incidents actifs par chambre
   const { data: incidentCounts } = useQuery({
