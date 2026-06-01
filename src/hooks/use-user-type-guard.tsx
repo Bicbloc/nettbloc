@@ -66,9 +66,21 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
       return;
     }
 
+    // Fast-path: si l'utilisateur a déjà choisi ce portail lors d'une session
+    // précédente, on le débloque immédiatement et on valide en arrière-plan.
+    const remembered = storageService.getActivePortal();
+    if (remembered === expectedType && !hasCheckedRef.current) {
+      setUserType(expectedType);
+      setIsVerified(true);
+      setRequiresPortalChoice(false);
+      setIsLoading(false);
+    }
+
     const checkUserType = async () => {
       isCheckingRef.current = true;
-      setIsLoading(true);
+      if (remembered !== expectedType) {
+        setIsLoading(true);
+      }
 
       try {
         const email = user.email?.trim().toLowerCase();
@@ -80,9 +92,19 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
           return;
         }
 
-        const { data: roleRows, error: roleError } = await supabase.rpc('check_email_exists_for_role', {
+        // Timeout pour éviter que l'écran "Vérification des accès" ne tourne
+        // indéfiniment si le RPC est lent (WebView, réseau instable...).
+        const rpcPromise = supabase.rpc('check_email_exists_for_role', {
           p_email: email,
         });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('role-check-timeout')), 6000)
+        );
+
+        const { data: roleRows, error: roleError } = (await Promise.race([
+          rpcPromise,
+          timeoutPromise,
+        ])) as Awaited<typeof rpcPromise>;
 
         if (roleError) {
           throw roleError;
