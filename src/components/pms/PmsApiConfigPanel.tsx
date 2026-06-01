@@ -58,6 +58,9 @@ interface PmsConfig {
   property_id: string;
   is_active: boolean;
   sync_frequency: number;
+  auto_sync_enabled: boolean;
+  auto_sync_time: string;
+  last_auto_sync_date: string | null;
   last_sync_at: string | null;
   last_sync_status: string | null;
   last_sync_error: string | null;
