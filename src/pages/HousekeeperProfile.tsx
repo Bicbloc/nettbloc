@@ -383,9 +383,6 @@ function HousekeeperProfileContent() {
                   <span>{userProfile.phone}</span>
                 </div>
               )}
-              {housekeeperData?.accessCode && (
-                
-              )}
               {levelData && (
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-yellow-500 text-white border-none">
