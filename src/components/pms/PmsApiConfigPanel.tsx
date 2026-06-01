@@ -17,6 +17,7 @@ import {
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
   Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks
 } from 'lucide-react';
+import { PendingRoomsSection } from './PendingRoomsSection';
 
 interface PreviewRoom {
   roomNumber: string;
