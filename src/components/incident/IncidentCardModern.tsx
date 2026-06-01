@@ -43,6 +43,7 @@ interface IncidentCardModernProps {
   onAddComment: () => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onDeleteComment?: (commentId: string) => void;
+  onEdit?: () => void;
 }
 
 const PRIORITY_CONFIG = {
