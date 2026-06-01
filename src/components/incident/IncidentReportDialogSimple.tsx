@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
