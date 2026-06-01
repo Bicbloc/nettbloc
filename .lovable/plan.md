@@ -1,44 +1,47 @@
-# Synchro automatique du matin (6h) + fonctionnement de la clôture
+# Problème
 
-## Ce qui existe déjà
+L'interface femme de chambre perd parfois la connexion temps réel, et l'établissement met du temps à voir qu'une chambre a été commencée ou nettoyée. Aujourd'hui les données ne se chargent **qu'au montage** de la page (`loadRoomsFromDatabase` dans `Index.tsx`). Tout le reste passe par le temps réel Supabase (`RealtimeManager`). Donc dès qu'un événement temps réel est manqué (déconnexion Wi‑Fi, mise en veille du téléphone, canal `CLOSED`/`TIMED_OUT`), la mise à jour n'arrive jamais — il faut rafraîchir la page manuellement.
 
-**La clôture fonctionne** (fonction `auto-close-day`, cron toutes les 15 min) :
-- Chaque hôtel a ses réglages : `auto_close_enabled`, `auto_close_time`, `auto_close_days`, `auto_close_timezone`.
-- Quand l'heure configurée est atteinte (dans le fuseau de l'hôtel), la journée se clôture : archivage du rapport quotidien + logs, puis **suppression des chambres, des affectations et des inventaires linge du jour**, et désactivation des sessions.
-- Conséquence importante : après la clôture, la table des chambres est **vide** jusqu'à la prochaine synchro/import.
+Il n'existe aucun **filet de sécurité (fallback)** qui recharge les chambres quand le temps réel est indisponible ou après une reconnexion.
 
-**Ce qui manque :** il n'y a **aucune synchro PMS automatique le matin**. Aujourd'hui il faut relancer manuellement « Tester la connexion » puis « Enregistrer les chambres » chaque jour. Le réglage « fréquence de synchro » est stocké mais n'est branché sur aucune tâche planifiée.
+# Solution
 
-## Objectif
-Chaque matin à 6h (heure locale de l'hôtel), synchroniser automatiquement Apaleo/Mews pour recréer les chambres du jour avec leur type (À blanc / Recouche / Arrivée / Hors service), prêtes pour l'affectation.
+Ajouter un mécanisme de rechargement de secours côté établissement **et** côté femme de chambre, sans toucher à la logique métier :
 
-## Plan
+```text
+Temps réel OK ──────────────► mises à jour instantanées (inchangé)
+       │
+       │  perte de connexion / événement manqué
+       ▼
+Polling de secours (toutes ~20s) ─► recharge les chambres depuis la base
+       │
+Reconnexion détectée ───────────► rechargement immédiat (rattrapage)
+```
 
-### 1. Réglages de synchro auto (base de données)
-Ajouter sur `hotel_pms_configs` :
-- `auto_sync_enabled` (booléen, défaut `true`)
-- `auto_sync_time` (heure, défaut `06:00`)
-- `last_auto_sync_date` (date, pour éviter de synchroniser deux fois le même jour)
+## 1. Rendre le chargement réutilisable (établissement)
+Dans `src/pages/Index.tsx`, extraire le contenu de `loadRoomsFromDatabase` (lignes ~491‑561) dans une fonction `refetchRooms` mémoïsée (`useCallback`) afin de pouvoir l'appeler à la demande, pas seulement au montage.
 
-Le fuseau horaire réutilise celui de la clôture (`hotels.auto_close_timezone`, défaut `Europe/Paris`).
+## 2. Polling de secours + rattrapage à la reconnexion
+Ajouter un `useEffect` qui :
+- déclenche `refetchRooms()` à intervalle régulier (~20 s) **uniquement** quand `isImporting`/`isAssigning` sont à `false` (pour ne pas écraser une opération en cours, comme déjà prévu dans le code).
+- s'abonne à `realtimeManager.onConnectionStatusChange` : lorsqu'on repasse en `SUBSCRIBED` ou `ONLINE` après une coupure, appeler immédiatement `refetchRooms()` pour rattraper les événements manqués.
+- se met en pause quand l'onglet est caché et relance un refetch au retour (`visibilitychange`), pour les téléphones mis en veille.
 
-### 2. Action planifiée dans `pms-sync`
-Ajouter une action `scheduled` à la fonction `pms-sync`, protégée par un secret (`CRON_SECRET`) au lieu de l'authentification utilisateur :
-- Parcourt toutes les configs `is_active = true` et `auto_sync_enabled = true`.
-- Pour chaque hôtel, calcule l'heure locale ; si l'heure de synchro est atteinte et que la synchro du jour n'a pas encore eu lieu, lance l'extraction des chambres (logique Apaleo/Mews déjà en place) et fait l'upsert dans `rooms`.
-- Met à jour `last_auto_sync_date`, `last_sync_at`, `last_sync_status` et écrit un `pms_sync_logs`.
+## 3. Même filet côté femme de chambre
+Appliquer le même principe dans le composant de travail de la femme de chambre (`HousekeeperWorkSimple.tsx` / hook associé) : un refetch périodique léger de ses chambres + un refetch au retour de connexion, pour que son interface ne reste pas bloquée sur un état périmé quand elle perd le réseau.
 
-### 3. Tâche planifiée (cron)
-Créer un cron Supabase qui appelle `pms-sync` (action `scheduled`) **toutes les 15 minutes** avec le `CRON_SECRET`. Le déclenchement réel au bon moment est géré dans la fonction selon le fuseau de chaque hôtel (même principe que `auto-close-day`).
+## 4. Indicateur de connexion (léger)
+Réutiliser l'état déjà exposé par `useRealtimeSync` (`isConnected`, `consecutiveFailures`) pour afficher un petit badge « Reconnexion… » lorsque le temps réel est coupé, afin que l'utilisateur sache que l'app rattrape les données. (Optionnel mais recommandé.)
 
-### 4. Interface (PmsApiConfigPanel)
-- Ajouter un interrupteur « Synchro automatique chaque matin » + un champ heure (défaut 06:00).
-- Afficher la date/heure de dernière synchro auto.
+# Détails techniques
 
-## Points techniques
-- Le secret `CRON_SECRET` sera ajouté via l'outil de secrets avant de brancher le cron.
-- La synchro du matin a lieu après la clôture de la veille (chambres vides) → recréation propre, sans écraser le travail en cours.
-- Repli : si un hôtel n'a pas de fuseau défini, on utilise `Europe/Paris`.
+- Aucune migration base de données nécessaire ; on réutilise les requêtes existantes sur `rooms` et `assignments`.
+- Le polling utilise un intervalle de secours (≈20 s) volontairement plus lent que le temps réel pour limiter la charge ; le temps réel reste la voie principale et instantanée.
+- Garde-fous conservés : pas de refetch pendant `isImporting`/`isAssigning` pour éviter les courses d'écriture (déjà documenté lignes 562‑565 d'`Index.tsx`).
+- Le refetch fusionne `rooms` + `assignments` exactement comme `loadRoomsFromDatabase` actuel, en préservant `lastCleanedAt` et le tri « plus récente d'abord » déjà en place.
+- Nettoyage systématique des `setInterval` et des abonnements `onConnectionStatusChange` au démontage.
 
-## Question
-Veux-tu que l'heure de 6h soit **configurable par hôtel** (recommandé, comme la clôture) ou **fixe à 6h** pour tout le monde ?
+# Fichiers concernés
+- `src/pages/Index.tsx` — extraction `refetchRooms`, polling de secours, rattrapage à la reconnexion.
+- `src/components/HousekeeperWorkSimple.tsx` (et/ou son hook) — même filet côté femme de chambre.
+- (Optionnel) petit badge de statut de connexion réutilisant `useRealtimeSync`.
