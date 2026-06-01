@@ -1,0 +1,1 @@
+UPDATE public.hotel_pms_configs SET last_auto_sync_date = NULL WHERE hotel_id = '4c79c65f-b439-472b-aa55-be10726516da';
