@@ -241,7 +241,8 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
       onTouchEnd={handleTouchEnd}
       style={{
         transform: (room.status === 'in_progress' || isActionable) ? `translateX(${swipeOffset}px)` : 'none',
-        transition: isSwiping ? 'none' : 'transform 0.3s ease-out, background 0.3s ease'
+        transition: isSwiping ? 'none' : 'transform 0.3s ease-out, background 0.3s ease',
+        touchAction: 'pan-y'
       }}
     >
       {/* Success animation overlay */}
