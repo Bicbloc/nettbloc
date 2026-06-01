@@ -535,7 +535,8 @@ const IndexDashboard = () => {
             isUrgent: r.cleaning_priority === 10,
             notUrgent: r.cleaning_priority === 1,
             isTwin: false,
-            priority: r.cleaning_priority === 10 ? 'high' as const : undefined
+            priority: r.cleaning_priority === 10 ? 'high' as const : undefined,
+            lastCleanedAt: r.last_cleaned_at || r.updated_at || undefined
           };
         });
 

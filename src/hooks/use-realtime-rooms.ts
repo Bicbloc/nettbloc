@@ -61,7 +61,10 @@ export function useRealtimeRooms({
               status: newRecord.status,
               cleaningType: normalizedCleaningType,
               cleaning_type: newRecord.cleaning_type, // Keep raw value for filtering
-              notes: newRecord.notes || r.notes
+              notes: newRecord.notes || r.notes,
+              lastCleanedAt: newRecord.status === 'clean'
+                ? (newRecord.last_cleaned_at || new Date().toISOString())
+                : (newRecord.last_cleaned_at || r.lastCleanedAt)
             };
           });
           

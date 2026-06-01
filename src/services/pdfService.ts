@@ -87,6 +87,7 @@ export interface Room {
   inspectedBy?: string;
   cleaningStartedAt?: string; // Timestamp when cleaning started
   cleaningFinishedAt?: string; // Timestamp when cleaning finished
+  lastCleanedAt?: string; // Timestamp when the room was last marked clean
   // Extended IA data
   guestName?: string;
   arrivalDate?: string;

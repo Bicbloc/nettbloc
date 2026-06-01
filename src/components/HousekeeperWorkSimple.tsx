@@ -809,11 +809,13 @@ const HousekeeperWorkContent: React.FC = () => {
       const room = rooms.find(r => r.id === roomId);
       if (!room) return;
 
+      const nowIso = new Date().toISOString();
       const { error: roomError } = await supabase
         .from('rooms')
         .update({ 
           status: newStatus,
-          notes: notes || room.notes
+          notes: notes || room.notes,
+          last_cleaned_at: newStatus === 'clean' ? nowIso : undefined
         })
         .eq('id', roomId);
 
