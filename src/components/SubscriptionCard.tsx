@@ -317,6 +317,14 @@ export function SubscriptionCard() {
             </div>
           </div>
 
+          {/* Bandeau suspension */}
+          {isPaused && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Votre abonnement est suspendu temporairement. Réactivez-le pour reprendre les prélèvements.</span>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-2 pt-2">
             {isFree || isInTrial ? (
@@ -324,6 +332,15 @@ export function SubscriptionCard() {
                 variant="default" 
                 className="flex-1 bg-gradient-premium hover:bg-gradient-premium/90" 
               />
+            ) : isPaused ? (
+              <Button
+                onClick={handleResumeSubscription}
+                disabled={isResuming}
+                className="flex-1"
+              >
+                {isResuming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crown className="mr-2 h-4 w-4" />}
+                {isResuming ? 'Réactivation...' : "Réactiver l'abonnement"}
+              </Button>
             ) : isPremium ? (
               <Button 
                 onClick={handleManageSubscription}
@@ -338,6 +355,7 @@ export function SubscriptionCard() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Dialog de gestion de l'abonnement */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
