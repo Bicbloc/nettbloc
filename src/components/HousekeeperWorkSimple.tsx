@@ -14,6 +14,7 @@ import { HousekeeperActivityLog } from './housekeeper/HousekeeperActivityLog';
 import { HousekeeperStatsBar } from './housekeeper/HousekeeperStatsBar';
 import { HousekeeperTabNav } from './housekeeper/HousekeeperTabNav';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
+import { realtimeManager } from '@/services/RealtimeManager';
 import { storageService } from '@/services/storageService';
 import { LostItemReportWizard } from './lost-and-found/LostItemReportWizard';
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
