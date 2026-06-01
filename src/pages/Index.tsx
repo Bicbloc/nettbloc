@@ -390,6 +390,8 @@ const IndexDashboard = () => {
       !isFeatureTourDone(currentHotelId)
     ) {
       setShowFeatureTour(true);
+      // Marquer comme vu dès l'ouverture auto pour ne plus l'afficher aux connexions suivantes
+      markFeatureTourDone(currentHotelId);
     }
   }, [isAuthenticated, currentHotelId, showSetupWizard, setupCheckLoading, needsSetup]);
 
