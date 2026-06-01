@@ -110,12 +110,33 @@ export function useSessionTracking() {
       // First, deactivate ALL old sessions for this user
       await deactivateOldSessions(user.id);
 
+      // Resolve the establishment this owner belongs to so the session can be
+      // attributed to a hotel (used by the admin "Connexions" panel).
+      let hotelId: string | null = null;
+      let userType = 'admin';
+      try {
+        const { data: ownedHotel } = await supabase
+          .from('hotels')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (ownedHotel?.id) {
+          hotelId = ownedHotel.id;
+          userType = 'establishment';
+        }
+      } catch (_) {
+        /* keep defaults */
+      }
+
       const { data: newSession, error: createError } = await supabase
         .from('user_sessions')
         .insert({
           user_id: user.id,
           user_name: user.email || 'Utilisateur',
-          user_type: 'admin',
+          user_type: userType,
+          hotel_id: hotelId,
           session_token: crypto.randomUUID(),
           is_active: true,
           login_time: new Date().toISOString(),
