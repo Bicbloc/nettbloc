@@ -261,29 +261,15 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
           <div className="space-y-4">
             <div className="text-center">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Code d'accès pour {name}:
+                <p className="text-sm text-muted-foreground">
+                  Invitation envoyée pour {name}
                 </p>
-                <div className="flex items-center justify-center space-x-2">
-                  <code className="text-lg font-mono bg-background px-3 py-2 rounded border">
-                    {accessCode}
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={copyToClipboard}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
             </div>
 
             <div className="text-sm text-muted-foreground space-y-2">
-              <p>• Code permanent pour {name}</p>
               <p>• Interface mobile: {window.location.origin}/housekeeper/work</p>
               {email && <p>• Email d'invitation envoyé à: {email}</p>}
-              {!email && <p>• Communiquez ce code directement à {name}</p>}
             </div>
 
             <div className="flex justify-end space-x-2">

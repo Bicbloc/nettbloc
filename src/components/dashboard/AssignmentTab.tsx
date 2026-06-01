@@ -271,17 +271,6 @@ export function AssignmentTab({
             hotelId={currentHotelId || undefined}
           />
 
-          {/* Info codes d'accès */}
-          {housekeeperNames.some(name => getHousekeeperRooms(name).length > 0) && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <Key className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Codes d'accès mobile :</strong> Chaque colonne affiche le code d'accès 
-                spécifique à chaque femme de chambre pour l'interface mobile.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* Grille des femmes de chambre */}
           <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
             {housekeeperNames.map((name) => {
