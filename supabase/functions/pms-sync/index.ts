@@ -332,7 +332,9 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('hotel_id', hotel_id);
 
-    if (action !== 'test') {
+    // Only the automatic 'sync' action requires an active config.
+    // 'test' and 'import' run on demand even before activation.
+    if (action === 'sync') {
       configQuery = configQuery.eq('is_active', true);
     }
 
@@ -367,7 +369,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ 
           success: true, 
           message: `Connexion réussie : ${rooms.length} chambres trouvées`,
-          rooms_count: rooms.length 
+          rooms_count: rooms.length,
+          rooms: rooms.map(r => ({
+            roomNumber: r.roomNumber,
+            floor: r.floor ?? null,
+            roomType: r.roomType ?? null,
+            cleaningType: r.cleaningType,
+            guestName: r.guestName ?? null,
+            arrivalDate: r.arrivalDate ?? null,
+            departureDate: r.departureDate ?? null,
+          })),
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -402,20 +413,34 @@ Deno.serve(async (req) => {
           throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
       }
 
-      // Upsert rooms into the rooms table
+      // Map cleaningType (depart/arrivee/recouche) -> cleaning_type stocké en base
+      const toDbCleaningType = (t?: string): string => {
+        switch ((t || '').toLowerCase()) {
+          case 'depart':
+          case 'arrivee':
+          case 'full':
+          case 'a_blanc':
+            return 'a_blanc';
+          case 'recouche':
+          case 'quick':
+          case 'occupied':
+            return 'recouche';
+          default:
+            return 'none';
+        }
+      };
+
+      // Upsert rooms into the rooms table (colonnes existantes uniquement)
       for (const room of rooms) {
         await adminClient
           .from('rooms')
           .upsert({
             hotel_id,
             room_number: room.roomNumber,
-            status: room.cleaningType || 'recouche',
-            floor: room.floor,
-            room_type: room.roomType,
-            guest_name: room.guestName,
-            arrival_date: room.arrivalDate,
-            departure_date: room.departureDate,
-            notes: room.notes,
+            status: 'needs-cleaning',
+            cleaning_type: toDbCleaningType(room.cleaningType),
+            floor: room.floor ?? null,
+            room_type: room.roomType ?? null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'hotel_id,room_number' });
       }

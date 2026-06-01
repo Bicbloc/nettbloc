@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,14 +8,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useHotel } from '@/contexts/HotelContext';
 import { FeatureGuard } from '@/components/FeatureGuard';
 import { 
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
-  Eye, EyeOff, Trash2, Loader2, Wifi
+  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks
 } from 'lucide-react';
+
+interface PreviewRoom {
+  roomNumber: string;
+  floor: number | null;
+  roomType: string | null;
+  cleaningType: string;
+  guestName: string | null;
+  arrivalDate: string | null;
+  departureDate: string | null;
+}
+
+const cleaningLabel = (t: string): { label: string; className: string } => {
+  const v = (t || '').toLowerCase();
+  if (v === 'depart' || v === 'a_blanc' || v === 'full') return { label: 'À blanc', className: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
+  if (v === 'arrivee') return { label: 'Arrivée', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
+  if (v === 'recouche' || v === 'quick' || v === 'occupied') return { label: 'Recouche', className: 'bg-blue-500/15 text-blue-600 border-blue-500/30' };
+  return { label: 'Aucun', className: 'bg-muted text-muted-foreground' };
+};
 
 interface PmsConfig {
   id?: string;
@@ -47,6 +67,7 @@ const SYNC_FREQUENCIES = [
 
 export function PmsApiConfigPanel() {
   const { hotelId } = useHotel();
+  const navigate = useNavigate();
   const [config, setConfig] = useState<PmsConfig>({
     pms_type: '',
     credentials: {},
@@ -63,6 +84,9 @@ export function PmsApiConfigPanel() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [previewRooms, setPreviewRooms] = useState<PreviewRoom[] | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   useEffect(() => {
     if (hotelId) loadConfig();
@@ -138,6 +162,8 @@ export function PmsApiConfigPanel() {
   const testConnection = async () => {
     if (!hotelId) return;
     setTesting(true);
+    setPreviewRooms(null);
+    setImported(false);
     try {
       // Save first
       await saveConfig();
@@ -156,6 +182,7 @@ export function PmsApiConfigPanel() {
       }
 
       if (data?.success) {
+        setPreviewRooms(Array.isArray(data.rooms) ? data.rooms : []);
         toast({ title: '✅ Connexion réussie', description: data.message });
       } else {
         toast({ title: '❌ Échec de connexion', description: data?.error || 'Erreur inconnue', variant: 'destructive' });
@@ -166,6 +193,37 @@ export function PmsApiConfigPanel() {
       setTesting(false);
     }
   };
+
+  const importRooms = async () => {
+    if (!hotelId) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('pms-sync', {
+        body: { hotel_id: hotelId, action: 'import' },
+      });
+
+      if (error) {
+        toast({ title: 'Erreur', description: "L'import n'a pas pu être effectué.", variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        setImported(true);
+        toast({
+          title: '✅ Chambres enregistrées',
+          description: `${data.rooms_synced ?? previewRooms?.length ?? 0} chambres ajoutées au registre.`,
+        });
+        loadConfig();
+      } else {
+        toast({ title: '❌ Échec', description: data?.error || 'Import impossible', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
 
   const syncNow = async () => {
     if (!hotelId) return;
@@ -365,7 +423,81 @@ export function PmsApiConfigPanel() {
             </>
           )}
 
+          {/* Aperçu des chambres récupérées depuis le PMS */}
+          {previewRooms && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <DoorOpen className="h-4 w-4 text-primary" />
+                  <h4 className="font-medium text-sm">
+                    {previewRooms.length} chambre{previewRooms.length > 1 ? 's' : ''} trouvée{previewRooms.length > 1 ? 's' : ''}
+                  </h4>
+                </div>
+
+                {previewRooms.length > 0 && (
+                  <ScrollArea className="h-64 rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Chambre</th>
+                          <th className="px-3 py-2 font-medium">Étage</th>
+                          <th className="px-3 py-2 font-medium">Type</th>
+                          <th className="px-3 py-2 font-medium">Nettoyage</th>
+                          <th className="px-3 py-2 font-medium">Client</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewRooms.map((r) => {
+                          const c = cleaningLabel(r.cleaningType);
+                          return (
+                            <tr key={r.roomNumber} className="border-t">
+                              <td className="px-3 py-2 font-medium">{r.roomNumber}</td>
+                              <td className="px-3 py-2">{r.floor ?? '—'}</td>
+                              <td className="px-3 py-2">{r.roomType ?? '—'}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className={c.className}>{c.label}</Badge>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">{r.guestName ?? '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </ScrollArea>
+                )}
+
+                {previewRooms.length > 0 && !imported && (
+                  <Button onClick={importRooms} disabled={importing} className="w-full sm:w-auto">
+                    {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Enregistrer ces {previewRooms.length} chambres dans le registre
+                  </Button>
+                )}
+
+                {imported && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Chambres enregistrées dans le registre
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/room-registry')}>
+                        <ListChecks className="h-4 w-4 mr-2" />
+                        Voir le registre
+                      </Button>
+                      <Button size="sm" onClick={() => navigate('/')}>
+                        <Users className="h-4 w-4 mr-2" />
+                        Affecter les chambres
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           {/* Actions */}
+
           <Separator />
           <div className="flex flex-wrap gap-2">
             <Button onClick={saveConfig} disabled={saving || !config.pms_type}>
