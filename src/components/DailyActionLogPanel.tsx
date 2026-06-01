@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { realtimeManager } from '@/services/RealtimeManager';
 
 interface ActionLog {
   id: string;
@@ -37,6 +38,7 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
   onClose, 
   hotelId 
 }) => {
+  const queryClient = useQueryClient();
   const [roomFilter, setRoomFilter] = useState('');
   const [userFilter, setUserFilter] = useState('all');
   const [actionTypeFilter, setActionTypeFilter] = useState('all');
@@ -60,6 +62,23 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
     enabled: isOpen && !!hotelId,
     staleTime: 30000,
   });
+
+  useEffect(() => {
+    if (!isOpen || !hotelId) return;
+
+    const refreshLogs = () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-action-logs', hotelId] });
+    };
+
+    const roomStatusSubscriptionId = realtimeManager.subscribe('room_status_updates', refreshLogs);
+    const notificationsSubscriptionId = realtimeManager.subscribe('notifications', refreshLogs);
+    void realtimeManager.connect(hotelId);
+
+    return () => {
+      realtimeManager.unsubscribe(roomStatusSubscriptionId);
+      realtimeManager.unsubscribe(notificationsSubscriptionId);
+    };
+  }, [hotelId, isOpen, queryClient]);
 
   // Liste unique des utilisateurs pour le filtre
   const uniqueUsers = useMemo(() => {
@@ -104,6 +123,9 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
         return <UserMinus className={iconClasses} />;
       case 'incident':
         return <AlertTriangle className={iconClasses} />;
+      case 'pms_checkout':
+      case 'pms_checkin':
+        return <RefreshCw className={iconClasses} />;
       case 'comment':
       case 'room_remark':
         return <MessageSquare className={iconClasses} />;
@@ -124,6 +146,10 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
         return 'Désassignation';
       case 'incident':
         return '⚠️ Incident';
+      case 'pms_checkout':
+        return 'PMS · Client sorti';
+      case 'pms_checkin':
+        return 'PMS · Client arrivé';
       case 'comment':
         return 'Commentaire';
       case 'room_remark':
@@ -145,6 +171,10 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
         return 'bg-orange-500/10 text-orange-500';
       case 'incident':
         return 'bg-destructive/10 text-destructive';
+      case 'pms_checkout':
+        return 'bg-orange-500/10 text-orange-600 border border-orange-200';
+      case 'pms_checkin':
+        return 'bg-emerald-500/10 text-emerald-600 border border-emerald-200';
       case 'comment':
       case 'room_remark':
         return 'bg-purple-500/10 text-purple-500 border border-purple-200';
