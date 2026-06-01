@@ -19,6 +19,7 @@ interface ExtractedRoom {
   roomNumber: string;
   status: string;
   cleaningType: string;
+  condition?: string | null;
   floor?: number;
   roomType?: string;
   guestName?: string;
