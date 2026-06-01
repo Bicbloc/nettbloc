@@ -1,10 +1,12 @@
 
+import { useState } from "react";
 import { Room } from "@/services/pdfService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { RoomAssignmentButton } from "./RoomAssignmentButton";
 import { AlertTriangle, Layers } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,6 +31,32 @@ export function UnassignedRoomsColumn({
   onDirectAssign, // Callback pour assignation directe
   hotelId
 }: UnassignedRoomsColumnProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    try {
+      const roomData = e.dataTransfer.getData('application/json');
+      if (!roomData) return;
+      const room = JSON.parse(roomData) as Room;
+      if (!room.assignedTo) return; // Already unassigned
+      onRoomUpdate({ ...room, assignedTo: undefined });
+    } catch (error) {
+      console.error("Erreur lors du retrait d'affectation:", error);
+    }
+  };
+  
   
   // Récupérer le nombre d'incidents actifs par chambre
   const { data: incidentCounts } = useQuery({
@@ -84,7 +112,15 @@ export function UnassignedRoomsColumn({
   };
   
   return (
-    <Card className="border-red-200">
+    <Card
+      className={cn(
+        "border-red-200 transition-colors",
+        isDragOver && "border-primary border-2 bg-primary/5 ring-2 ring-primary/30"
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-red-600">

@@ -86,6 +86,7 @@ export function HousekeeperCard({
   const [showMaxRoomsSettings, setShowMaxRoomsSettings] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Récupérer le nombre d'incidents actifs par chambre
   const { data: incidentCounts } = useQuery({
@@ -175,14 +176,25 @@ export function HousekeeperCard({
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
   };
-  
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear when leaving the card itself, not its children
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver(false);
     try {
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
+        // Already in this column → nothing to do
+        if (room.assignedTo === name) return;
+
         // Check if room limit is reached
         if (rooms.length >= effectiveMaxRooms) {
           toast({
@@ -414,11 +426,13 @@ export function HousekeeperCard({
     <>
       <Card 
         className={cn(
-          "border rounded-lg",
+          "border rounded-lg transition-colors",
           isOverloaded && "border-red-400",
-          isUnderloaded && "border-amber-400"
+          isUnderloaded && "border-amber-400",
+          isDragOver && "border-primary border-2 bg-primary/5 ring-2 ring-primary/30"
         )}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <CardHeader className="p-4 pb-0">
