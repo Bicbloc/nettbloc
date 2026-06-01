@@ -91,6 +91,7 @@ export function AppSidebar({
       return (
         <Button
           key={item.value}
+          data-tour={`nav-${item.value}`}
           variant={isActive ? "default" : "ghost"}
           size="icon"
           className={cn(
@@ -113,6 +114,7 @@ export function AppSidebar({
     return (
       <Button
         key={item.value}
+        data-tour={`nav-${item.value}`}
         variant="ghost"
         className={cn(
           "w-full justify-start gap-3 px-3 py-2.5 h-auto text-left",
