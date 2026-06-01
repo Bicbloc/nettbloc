@@ -130,7 +130,7 @@ export const FirstTimeSetupWizard = ({
     });
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (goToTraining = false) => {
     if (!isValid) {
       toast({ 
         variant: "destructive", 
@@ -168,6 +168,11 @@ export const FirstTimeSetupWizard = ({
       });
       
       onComplete(config);
+
+      // Proposer immédiatement d'entraîner l'import PDF
+      if (goToTraining) {
+        window.dispatchEvent(new CustomEvent('navigate-to-training'));
+      }
     } catch (error) {
       console.error('Erreur sauvegarde config:', error);
       toast({ 
