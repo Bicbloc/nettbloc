@@ -131,12 +131,13 @@ export function useDashboardRooms({
         return;
       }
 
-      // Get assignments
+      // Get assignments (inclure 'completed' pour rester synchronisé avec
+      // l'interface de la femme de chambre et éviter une désassignation auto).
       const { data: dbAssignments, error: assignError } = await supabase
         .from('assignments')
         .select('*')
         .eq('hotel_id', hotelId)
-        .in('status', ['assigned', 'in_progress']);
+        .in('status', ['assigned', 'in_progress', 'completed']);
 
       if (assignError) {
       }

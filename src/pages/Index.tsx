@@ -468,12 +468,13 @@ const IndexDashboard = () => {
 
         if (error || !roomsData) return;
 
-        // Récupérer les assignations actives
+        // Récupérer les assignations (inclure 'completed' pour ne pas désassigner
+        // automatiquement les chambres terminées par la femme de chambre).
         const { data: assignmentsData } = await supabase
           .from('assignments')
           .select('room_id, housekeeper_name')
           .eq('hotel_id', currentHotelId)
-          .in('status', ['assigned', 'in_progress']);
+          .in('status', ['assigned', 'in_progress', 'completed']);
 
         const assignmentMap: Record<string, string> = {};
         (assignmentsData || []).forEach((a: any) => {
@@ -530,8 +531,11 @@ const IndexDashboard = () => {
     };
 
     loadRoomsFromDatabase();
-    // Realtime sync handles updates — no polling needed
-  }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
+    // IMPORTANT: ne PAS inclure `isAssigning` dans les dépendances.
+    // Sinon, 2s après chaque affectation (quand isAssigning repasse à false),
+    // un rechargement complet se déclenche et peut désassigner les chambres
+    // à cause d'une course avec l'écriture en base. Le temps réel gère les MAJ.
+  }, [currentHotelId, isImporting, setRooms, setIsDistributed]);
 
   // handlePdfProcessed is now provided by usePdfWorkflow hook
 
