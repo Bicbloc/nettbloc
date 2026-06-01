@@ -208,16 +208,31 @@ interface FeatureTourProps {
   isOpen: boolean;
   onTabChange: (tab: TabValue) => void;
   onClose: () => void;
+  /** Étape de départ (permet de revoir directement une fonctionnalité) */
+  initialStep?: number;
 }
 
 interface Rect { top: number; left: number; width: number; height: number; }
 
-export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) {
+/** Liste des sujets sélectionnables pour le menu « revoir une fonctionnalité » */
+export const TOUR_TOPICS = STEPS.map((s, i) => ({
+  index: i,
+  title: s.title,
+  icon: s.icon,
+}));
+
+export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: FeatureTourProps) {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const lang = language === "fr" ? "fr" : "en";
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialStep);
   const [rect, setRect] = useState<Rect | null>(null);
+
+  // Se positionner sur l'étape demandée à chaque ouverture
+  useEffect(() => {
+    if (isOpen) setIndex(initialStep);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialStep]);
 
   const step = STEPS[index];
   const total = STEPS.length;
