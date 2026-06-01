@@ -88,9 +88,9 @@ export function ApiClientsPanel() {
   const totals = useMemo(() => ({
     pmsClients: clients.filter(c => c.pms_type).length,
     aiClients: clients.filter(c => Number(c.ai_calls) > 0).length,
-    tokens: clients.reduce((s, c) => s + Number(c.ai_tokens || 0), 0),
-    calls: clients.reduce((s, c) => s + Number(c.ai_calls || 0), 0),
-  }), [clients]);
+    tokens: byFunction.reduce((s, f) => s + Number(f.tokens || 0), 0),
+    calls: byFunction.reduce((s, f) => s + Number(f.calls || 0), 0),
+  }), [clients, byFunction]);
 
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
 
