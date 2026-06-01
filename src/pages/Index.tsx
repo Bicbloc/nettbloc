@@ -398,6 +398,11 @@ const IndexDashboard = () => {
     markFeatureTourDone(currentHotelId);
   };
 
+  const handleStartTour = () => {
+    setActiveTab('overview');
+    setShowFeatureTour(true);
+  };
+
   // Update config based on premium status
   useEffect(() => {
     if (!subscriptionLoading) {
