@@ -9,6 +9,7 @@ import { ActionLogService } from '@/services/actionLogService';
 import { RoomArchiveService } from '@/services/roomArchiveService';
 import { generateAndUploadDailyReportPdf } from '@/services/dailyReportPdfService';
 import { supabase } from '@/integrations/supabase/client';
+import { createNotification } from '@/services/notificationService';
 
 interface DailyReportCloseButtonProps {
   hotelId: string;
