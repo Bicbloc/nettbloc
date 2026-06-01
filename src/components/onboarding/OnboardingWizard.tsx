@@ -111,7 +111,8 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <div>
                 <h3 className="text-2xl font-bold">Bienvenue sur NettoBloc !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Configurez votre compte en 30 secondes pour profiter de votre période d'essai gratuite.
+                  Quelques informations de base suffisent pour démarrer. La configuration complète
+                  (chambres, équipe, consignes…) se fait ensuite tranquillement depuis votre tableau de bord.
                 </p>
               </div>
             </div>
@@ -119,14 +120,26 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             <Card className="border-primary/20 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <Gift className="h-8 w-8 text-green-600" />
+                  <Gift className="h-8 w-8 text-green-600 shrink-0" />
                   <div>
                     <p className="font-semibold text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
-                      Accès complet à toutes les fonctionnalités
+                      Accès complet à toutes les fonctionnalités, sans carte bancaire.
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/50">
+              <CardContent className="p-4 space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Vous pourrez faire plus tard :</p>
+                <ul className="space-y-1 list-disc pl-4">
+                  <li>Importer ou créer vos chambres</li>
+                  <li>Inviter vos gouvernantes et femmes de chambre</li>
+                  <li>Définir vos consignes et temps de nettoyage</li>
+                </ul>
+                <p className="pt-1">Rien d'urgent : tout reste modifiable à tout moment.</p>
               </CardContent>
             </Card>
           </div>
@@ -135,6 +148,11 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
       case 1:
         return (
           <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Ces informations identifient votre établissement et nous permettent de vous contacter
+              si besoin. Vous pourrez les modifier plus tard dans votre profil.
+            </p>
+
             <div className="space-y-2">
               <Label htmlFor="companyName">Nom de l'établissement *</Label>
               <Input
@@ -166,9 +184,12 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               />
             </div>
 
-            <p className="text-xs text-muted-foreground mt-4">
-              Les informations de facturation (SIRET, IBAN) seront demandées uniquement à la fin de votre période d'essai.
-            </p>
+            <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">
+                💳 Les informations de facturation (SIRET, IBAN) seront demandées uniquement à la fin
+                de votre période d'essai. Inutile de les préparer maintenant.
+              </p>
+            </div>
           </div>
         );
 
@@ -204,6 +225,16 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                     <span className="font-medium text-green-600">3 mois</span>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/50">
+              <CardContent className="p-4 space-y-1 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Prochaines étapes (quand vous voulez)</p>
+                <p>
+                  Depuis votre tableau de bord : ajoutez vos chambres, invitez votre équipe et
+                  définissez vos consignes. Vous pouvez aussi le faire plus tard.
+                </p>
               </CardContent>
             </Card>
 

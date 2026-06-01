@@ -374,6 +374,7 @@ export function GovernessAssignmentStep({
                 onInstructionsChange={setInstructions}
                 onToKnowChange={setToKnow}
                 onTodoListChange={setTodoList}
+                hideTemplateManager
               />
             </div>
           </TabsContent>
