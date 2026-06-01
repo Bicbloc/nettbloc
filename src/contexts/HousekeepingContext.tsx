@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
 import { type Notification } from '@/hooks/use-notifications';
 import { useNotificationContext } from '@/contexts/NotificationContext';
