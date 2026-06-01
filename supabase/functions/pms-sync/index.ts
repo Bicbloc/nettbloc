@@ -262,10 +262,15 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
 
   return units.map((unit: any) => {
     const reservation = reservationByUnit[unit.id];
-    let cleaningType = 'depart';
+    const condition = conditionByUnit[unit.id]; // Clean | Dirty | CleanToBeInspected | OutOfService | OutOfOrder
+    let cleaningType = 'none';
     let status = 'vacant';
 
-    if (reservation) {
+    if (condition === 'OutOfService' || condition === 'OutOfOrder') {
+      // Chambre hors service : pas de ménage
+      cleaningType = 'hors_service';
+      status = 'out-of-service';
+    } else if (reservation) {
       const departure = reservation.departure?.split('T')[0];
       const arrival = reservation.arrival?.split('T')[0];
       if (departure === today) {
@@ -278,12 +283,26 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
         cleaningType = 'recouche';
         status = 'occupied';
       }
+    } else {
+      // Aucune réservation : on se fie à l'état de ménage Apaleo
+      if (condition === 'Dirty') {
+        cleaningType = 'depart';
+        status = 'checkout';
+      } else if (condition === 'Clean' || condition === 'CleanToBeInspected') {
+        cleaningType = 'none';
+        status = 'clean';
+      } else {
+        // Pas d'info de condition : repli sur l'ancien comportement (à blanc)
+        cleaningType = 'depart';
+        status = 'vacant';
+      }
     }
 
     return {
       roomNumber: unit.name || unit.id,
       status,
       cleaningType,
+      condition: condition ?? null,
       floor: unit.floor ? parseInt(unit.floor) : undefined,
       roomType: unit.unitGroup?.name,
       guestName: reservation?.primaryGuest ? `${reservation.primaryGuest.lastName || ''} ${reservation.primaryGuest.firstName || ''}`.trim() : undefined,
