@@ -565,6 +565,10 @@ export function PmsApiConfigPanel() {
             </>
           )}
 
+          <PendingRoomsSection hotelId={hotelId} refreshKey={pendingRefreshKey} />
+
+
+
           {/* Actions */}
 
           <Separator />
