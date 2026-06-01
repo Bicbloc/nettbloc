@@ -130,7 +130,7 @@ export const FirstTimeSetupWizard = ({
     });
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (goToTraining = false) => {
     if (!isValid) {
       toast({ 
         variant: "destructive", 
@@ -168,6 +168,11 @@ export const FirstTimeSetupWizard = ({
       });
       
       onComplete(config);
+
+      // Proposer immédiatement d'entraîner l'import PDF
+      if (goToTraining) {
+        window.dispatchEvent(new CustomEvent('navigate-to-training'));
+      }
     } catch (error) {
       console.error('Erreur sauvegarde config:', error);
       toast({ 
@@ -505,6 +510,26 @@ export const FirstTimeSetupWizard = ({
                 </p>
               </CardContent>
             </Card>
+
+            {/* Proposition: entraîner l'import PDF */}
+            <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Entraîner l'import PDF</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Apprenez à l'IA à lire votre PDF de réservations pour importer vos chambres automatiquement.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Recommandé dès maintenant : cliquez sur « Terminer et entraîner le PDF » ci-dessous.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         );
 
@@ -577,14 +602,25 @@ export const FirstTimeSetupWizard = ({
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button 
-              onClick={handleComplete}
-              disabled={!isValid}
-              className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80"
-            >
-              <Check className="h-4 w-4 mr-1" />
-              Terminer la configuration
-            </Button>
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => handleComplete(false)}
+                disabled={!isValid}
+                className="w-full sm:w-auto"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Terminer la configuration
+              </Button>
+              <Button 
+                onClick={() => handleComplete(true)}
+                disabled={!isValid}
+                className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Terminer et entraîner le PDF
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Settings, MinusSquare, PlusSquare, Edit, Save, X } from "lucide-react";
+import { Settings, MinusSquare, PlusSquare, Edit, Save, X, Sparkles } from "lucide-react";
 import { CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
@@ -72,6 +72,12 @@ export function ConfigDialog({
     toast({
       description: "Configuration sauvegardée"
     });
+  };
+
+  const handleTrainPdf = () => {
+    setOpen(false);
+    // Naviguer vers l'onglet d'entraînement de l'import PDF
+    window.dispatchEvent(new CustomEvent('navigate-to-training'));
   };
 
   const handleAddName = () => {
@@ -146,6 +152,21 @@ export function ConfigDialog({
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
             <ScrollArea className="flex-1 pr-4 -mr-4">
               <div className="space-y-4">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-primary">Entraîner l'import PDF</p>
+                  <p className="text-xs text-muted-foreground">
+                    Apprenez à l'IA à lire votre PDF de réservations pour importer vos chambres automatiquement.
+                  </p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleTrainPdf}>
+                <Sparkles className="h-4 w-4 mr-1" />
+                Entraîner le PDF maintenant
+              </Button>
+            </div>
             <FormField
               control={form.control}
               name="fullCleaningTime"
