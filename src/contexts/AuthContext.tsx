@@ -143,6 +143,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
+    // Filet de sécurité: si getSession() se bloque (verrou auth en WebView /
+    // multi-onglets), on débloque quand même l'app pour éviter le spinner infini
+    // "Vérification de l'authentification..." qui tourne en boucle.
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !sessionRestoredFromGetSession) {
+        console.warn('⚠️ getSession() trop lent - déblocage forcé de l\'auth');
+        setLoading(false);
+        setIsInitialized(true);
+      }
+    }, 5000);
+
     const initSession = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
@@ -171,6 +182,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } finally {
         if (mounted) {
+          clearTimeout(safetyTimeout);
           setLoading(false);
           setIsInitialized(true);
         }
@@ -178,6 +190,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
     
     initSession();
+
 
     // Récupération automatique de la session quand l'app revient au premier plan
     // (ex: l'utilisateur quitte Chrome puis revient). Sans cela, le token peut
@@ -206,6 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       stopTokenRefresh();
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleResume);
