@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
-import { AlertCircle, RefreshCw, LogOut } from "lucide-react";
+import { AlertCircle, RefreshCw, LogOut, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -185,7 +185,7 @@ const IndexDashboard = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
   const { hotelId, hotelName, hotelCode: contextHotelCode } = useHotel();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
 
@@ -396,6 +396,11 @@ const IndexDashboard = () => {
   const handleFeatureTourClose = () => {
     setShowFeatureTour(false);
     markFeatureTourDone(currentHotelId);
+  };
+
+  const handleStartTour = () => {
+    setActiveTab('overview');
+    setShowFeatureTour(true);
   };
 
   // Update config based on premium status
@@ -753,7 +758,18 @@ const IndexDashboard = () => {
         onTabChange={setActiveTab}
         onClose={handleFeatureTourClose}
       />
-      
+
+      {!isGuestMode && currentHotelId && !showFeatureTour && !showSetupWizard && !showOnboardingWizard && (
+        <Button
+          onClick={handleStartTour}
+          size="sm"
+          className="fixed bottom-20 right-4 z-50 rounded-full shadow-lg gap-2 sm:bottom-6"
+        >
+          <GraduationCap className="h-4 w-4" />
+          {language === 'fr' ? 'Tutoriel' : 'Tutorial'}
+        </Button>
+      )}
+
       <NotificationSound />
 
       
