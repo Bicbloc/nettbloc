@@ -168,7 +168,15 @@ export function RoomManagementTab({
       {rooms.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            {importMode === 'auto' ? (
+            {pmsActive ? (
+              <>
+                <Sparkles className="h-12 w-12 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Synchronisation PMS active</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  Les chambres sont récupérées automatiquement depuis votre PMS. Utilisez « Tester la connexion » puis enregistrez-les dans le registre depuis le panneau ci-dessus.
+                </p>
+              </>
+            ) : importMode === 'auto' ? (
               <>
                 <Sparkles className="h-12 w-12 text-primary mb-4" />
                 <h3 className="text-lg font-semibold mb-2">{t.importMode.importYourRooms}</h3>
