@@ -269,6 +269,7 @@ const IndexDashboard = () => {
   const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showFeatureTour, setShowFeatureTour] = useState(false);
+  const [tourStartStep, setTourStartStep] = useState(0);
   
   // Room management hooks
   const {
