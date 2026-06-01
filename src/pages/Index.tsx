@@ -27,6 +27,7 @@ import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { realtimeManager } from "@/services/RealtimeManager";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
 import { FeatureTour, isFeatureTourDone, markFeatureTourDone } from "@/components/FeatureTour";
 import { useRoomManagement } from "@/hooks/use-room-management";
@@ -487,13 +488,12 @@ const IndexDashboard = () => {
     onUpdate: handleRealtimeUpdate
   });
 
-  // Load rooms from database
-  useEffect(() => {
-    const loadRoomsFromDatabase = async () => {
-      // Ne pas recharger si une opération est en cours
-      if (!currentHotelId || isImporting || isAssigning) return;
-      
-      try {
+  // Rechargement réutilisable des chambres depuis la base (filet de secours)
+  const refetchRooms = useCallback(async () => {
+    // Ne pas recharger si une opération est en cours
+    if (!currentHotelId || isImporting || isAssigning) return;
+
+    try {
         const { data: roomsData, error } = await supabase
           .from('rooms')
           .select('*')
@@ -556,14 +556,49 @@ const IndexDashboard = () => {
       } catch (error) {
         console.error('Error loading rooms:', error);
       }
-    };
-
-    loadRoomsFromDatabase();
     // IMPORTANT: ne PAS inclure `isAssigning` dans les dépendances.
     // Sinon, 2s après chaque affectation (quand isAssigning repasse à false),
     // un rechargement complet se déclenche et peut désassigner les chambres
     // à cause d'une course avec l'écriture en base. Le temps réel gère les MAJ.
-  }, [currentHotelId, isImporting, setRooms, setIsDistributed]);
+  }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
+
+  // Chargement initial des chambres
+  useEffect(() => {
+    refetchRooms();
+  }, [refetchRooms]);
+
+  // Filet de secours: polling + rattrapage à la reconnexion temps réel
+  useEffect(() => {
+    if (!currentHotelId) return;
+
+    // 1) Polling de secours toutes les 20s (le temps réel reste prioritaire)
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refetchRooms();
+      }
+    }, 20000);
+
+    // 2) Rattrapage immédiat lorsqu'on récupère la connexion
+    const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
+      if (status === 'SUBSCRIBED' || status === 'ONLINE') {
+        refetchRooms();
+      }
+    });
+
+    // 3) Rattrapage au retour de l'onglet (téléphones mis en veille)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refetchRooms();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(intervalId);
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [currentHotelId, refetchRooms]);
 
   // handlePdfProcessed is now provided by usePdfWorkflow hook
 

@@ -14,6 +14,7 @@ import { HousekeeperActivityLog } from './housekeeper/HousekeeperActivityLog';
 import { HousekeeperStatsBar } from './housekeeper/HousekeeperStatsBar';
 import { HousekeeperTabNav } from './housekeeper/HousekeeperTabNav';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
+import { realtimeManager } from '@/services/RealtimeManager';
 import { storageService } from '@/services/storageService';
 import { LostItemReportWizard } from './lost-and-found/LostItemReportWizard';
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
@@ -548,6 +549,42 @@ const HousekeeperWorkContent: React.FC = () => {
     tables: ['assignments', 'rooms', 'daily_reports', 'notifications'],
     onUpdate: handleRealtimeUpdate
   });
+
+  // Filet de secours: recharge les données si le temps réel est coupé / au retour de connexion
+  useEffect(() => {
+    if (!isAuthChecked || !housekeeperProfile || !hotelId) return;
+
+    // Polling de secours toutes les 25s (le temps réel reste prioritaire)
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadWorkData();
+      }
+    }, 25000);
+
+    // Rattrapage immédiat au retour de connexion temps réel
+    const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
+      if (status === 'SUBSCRIBED' || status === 'ONLINE') {
+        loadWorkData();
+      }
+    });
+
+    // Rattrapage au retour de l'onglet (téléphone mis en veille)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadWorkData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(intervalId);
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthChecked, housekeeperProfile, hotelId]);
+
+
 
   const loadWorkData = async () => {
     try {
