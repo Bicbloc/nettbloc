@@ -301,11 +301,11 @@ export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) 
 
     return (
       <div className="fixed inset-0 z-[200] pointer-events-none">
-        {/* Voile sombre avec découpe sur la cible (sans flou) */}
+        {/* Voile très léger (pas de flou) — la page reste lisible */}
         <div
           className="absolute inset-0 transition-all duration-300 pointer-events-auto"
           style={{
-            background: "hsl(var(--background) / 0.55)",
+            background: "hsl(var(--foreground) / 0.12)",
             ...(spotlight
               ? {
                   clipPath: `polygon(
