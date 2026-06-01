@@ -231,6 +231,13 @@ export default function HousekeeperAuth() {
           });
           localStorage.setItem('housekeeper_profile', JSON.stringify(profileData));
           
+          console.log('🔍 [HK-AUTH] login success, navigating to /housekeeper/hotels', {
+            profileId: profileData.id,
+            authUserId: data.user.id,
+            idMatch: profileData.id === data.user.id,
+            ts: new Date().toISOString(),
+          });
+
           toast({
             title: t.auth.loginSuccess,
             description: `${language === 'en' ? 'Welcome' : 'Bienvenue'} ${profileData.name}`
