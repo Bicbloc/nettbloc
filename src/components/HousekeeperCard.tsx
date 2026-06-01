@@ -86,6 +86,7 @@ export function HousekeeperCard({
   const [showMaxRoomsSettings, setShowMaxRoomsSettings] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Récupérer le nombre d'incidents actifs par chambre
   const { data: incidentCounts } = useQuery({
