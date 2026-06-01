@@ -304,6 +304,158 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
   });
 }
 
+// ─── Shared mapping + sync helpers ────────────────────────────────
+// Map cleaningType (depart/arrivee/recouche/none/hors_service) -> cleaning_type stocké en base
+function toDbCleaningType(t?: string): string {
+  switch ((t || '').toLowerCase()) {
+    case 'depart':
+    case 'arrivee':
+    case 'full':
+    case 'a_blanc':
+      return 'a_blanc';
+    case 'recouche':
+    case 'quick':
+    case 'occupied':
+      return 'recouche';
+    default:
+      return 'none';
+  }
+}
+
+// Statut chambre : propre / hors service -> pas besoin de ménage
+function toDbStatus(room: ExtractedRoom): string {
+  if (room.cleaningType === 'hors_service' || room.status === 'out-of-service') return 'out-of-service';
+  if (room.status === 'clean' && room.cleaningType === 'none') return 'clean';
+  return 'needs-cleaning';
+}
+
+async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
+  const credentials = pmsConfig.credentials as PmsCredentials;
+  switch (pmsConfig.pms_type) {
+    case 'mews':
+      return await fetchMewsRooms(credentials);
+    case 'apaleo':
+      return await fetchApaleoRooms(credentials);
+    default:
+      throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
+  }
+}
+
+// Run a full sync for a single config: extract rooms, upsert, update logs/status.
+async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
+  const hotel_id = pmsConfig.hotel_id;
+
+  const { data: syncLog } = await adminClient
+    .from('pms_sync_logs')
+    .insert({ hotel_id, pms_type: pmsConfig.pms_type, status: 'running' })
+    .select('id')
+    .single();
+
+  try {
+    const rooms = await extractRoomsForConfig(pmsConfig);
+
+    for (const room of rooms) {
+      await adminClient
+        .from('rooms')
+        .upsert({
+          hotel_id,
+          room_number: room.roomNumber,
+          status: toDbStatus(room),
+          cleaning_type: toDbCleaningType(room.cleaningType),
+          floor: room.floor ?? null,
+          room_type: room.roomType ?? null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'hotel_id,room_number' });
+    }
+
+    await adminClient
+      .from('pms_sync_logs')
+      .update({ status: 'success', sync_ended_at: new Date().toISOString(), rooms_synced: rooms.length })
+      .eq('id', syncLog?.id);
+
+    await adminClient
+      .from('hotel_pms_configs')
+      .update({ last_sync_at: new Date().toISOString(), last_sync_status: 'success', last_sync_error: null })
+      .eq('id', pmsConfig.id);
+
+    return rooms.length;
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Sync failed';
+    await adminClient
+      .from('pms_sync_logs')
+      .update({ status: 'error', sync_ended_at: new Date().toISOString(), error_message: msg })
+      .eq('id', syncLog?.id);
+    await adminClient
+      .from('hotel_pms_configs')
+      .update({ last_sync_status: 'error', last_sync_error: msg })
+      .eq('id', pmsConfig.id);
+    throw error;
+  }
+}
+
+// Returns { date: "YYYY-MM-DD", minutes: minutesSinceMidnight } in the given timezone
+function nowInTimezone(timeZone: string): { date: string; minutes: number } {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = fmt.formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  const date = `${get('year')}-${get('month')}-${get('day')}`;
+  let hour = parseInt(get('hour'), 10);
+  if (hour === 24) hour = 0;
+  const minutes = hour * 60 + parseInt(get('minute'), 10);
+  return { date, minutes };
+}
+
+function timeToMinutes(t: string): number {
+  const [h, m] = (t || '06:00').split(':').map((x) => parseInt(x, 10));
+  return (h || 0) * 60 + (m || 0);
+}
+
+// Scheduled morning sync: loop active configs and sync those whose local time has reached auto_sync_time.
+async function runScheduledSync(adminClient: any) {
+  const { data: configs, error } = await adminClient
+    .from('hotel_pms_configs')
+    .select('*')
+    .eq('is_active', true)
+    .eq('auto_sync_enabled', true);
+
+  if (error) throw error;
+
+  const results: any[] = [];
+  for (const cfg of (configs || [])) {
+    // Resolve hotel timezone (reuse closure timezone)
+    const { data: hotel } = await adminClient
+      .from('hotels')
+      .select('id, name, auto_close_timezone')
+      .eq('id', cfg.hotel_id)
+      .maybeSingle();
+
+    const tz = hotel?.auto_close_timezone || 'Europe/Paris';
+    const { date, minutes } = nowInTimezone(tz);
+
+    const timeReached = minutes >= timeToMinutes(cfg.auto_sync_time);
+    const notYetSyncedToday = cfg.last_auto_sync_date !== date;
+
+    if (!(timeReached && notYetSyncedToday)) continue;
+
+    try {
+      const count = await performSync(adminClient, cfg);
+      await adminClient
+        .from('hotel_pms_configs')
+        .update({ last_auto_sync_date: date })
+        .eq('id', cfg.id);
+      results.push({ hotel_id: cfg.hotel_id, name: hotel?.name, synced: true, rooms: count });
+    } catch (e) {
+      console.error(`Scheduled sync error hotel ${cfg.hotel_id}:`, e);
+      results.push({ hotel_id: cfg.hotel_id, name: hotel?.name, synced: false, error: String(e) });
+    }
+  }
+  return results;
+}
+
 // ─── Main handler ─────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
