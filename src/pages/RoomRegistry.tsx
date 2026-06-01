@@ -221,11 +221,11 @@ const RoomRegistry = () => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
+            <Button data-tour="reg-bulk" onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
               <Layers className="h-4 w-4 mr-2" />
               Équipement en masse
             </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
+            <Button data-tour="reg-add" onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
               <Plus className="h-4 w-4 mr-2" />
               Ajouter un espace
             </Button>
