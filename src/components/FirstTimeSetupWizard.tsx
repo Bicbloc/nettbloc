@@ -602,14 +602,25 @@ export const FirstTimeSetupWizard = ({
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button 
-              onClick={handleComplete}
-              disabled={!isValid}
-              className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80"
-            >
-              <Check className="h-4 w-4 mr-1" />
-              Terminer la configuration
-            </Button>
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => handleComplete(false)}
+                disabled={!isValid}
+                className="w-full sm:w-auto"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Terminer la configuration
+              </Button>
+              <Button 
+                onClick={() => handleComplete(true)}
+                disabled={!isValid}
+                className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Terminer et entraîner le PDF
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
