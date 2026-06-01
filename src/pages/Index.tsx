@@ -524,13 +524,7 @@ const IndexDashboard = () => {
           } else if (r.cleaning_type === 'none') {
             cleaningType = 'none';
           }
-          // IMPORTANT: ne jamais mettre automatiquement "Client sorti".
-          // Les statuts 'checkout'/'ready-to-clean' issus du PMS restent en 'needs-cleaning'.
-          // Seul le réceptionniste peut marquer manuellement "Client sorti".
           let status = r.status;
-          if (status === 'checkout' || status === 'ready-to-clean') {
-            status = 'needs-cleaning';
-          }
           return {
             number: r.room_number,
             status,
