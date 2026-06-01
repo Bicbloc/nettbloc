@@ -60,7 +60,7 @@ export function ImageRecognitionButton({
 
 
       const { data, error } = await supabase.functions.invoke('recognize-incident-item', {
-        body: { imageBase64 },
+        body: { imageBase64, context: { hotelId } },
       });
 
       if (error) {
