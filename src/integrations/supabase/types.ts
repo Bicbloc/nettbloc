@@ -1851,11 +1851,16 @@ export type Database = {
       hotels: {
         Row: {
           address: string | null
+          auto_close_days: number[]
+          auto_close_enabled: boolean
+          auto_close_time: string
+          auto_close_timezone: string
           created_at: string
           email: string
           hotel_code: string | null
           id: string
           import_mode: string | null
+          last_auto_close_date: string | null
           name: string
           phone: string | null
           settings: Json | null
@@ -1866,11 +1871,16 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          auto_close_days?: number[]
+          auto_close_enabled?: boolean
+          auto_close_time?: string
+          auto_close_timezone?: string
           created_at?: string
           email: string
           hotel_code?: string | null
           id?: string
           import_mode?: string | null
+          last_auto_close_date?: string | null
           name: string
           phone?: string | null
           settings?: Json | null
@@ -1881,11 +1891,16 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          auto_close_days?: number[]
+          auto_close_enabled?: boolean
+          auto_close_time?: string
+          auto_close_timezone?: string
           created_at?: string
           email?: string
           hotel_code?: string | null
           id?: string
           import_mode?: string | null
+          last_auto_close_date?: string | null
           name?: string
           phone?: string | null
           settings?: Json | null

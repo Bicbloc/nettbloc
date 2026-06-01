@@ -79,3 +79,6 @@ verify_jwt = false
 
 [functions.activate-subaccount]
 verify_jwt = false
+
+[functions.auto-close-day]
+verify_jwt = false
