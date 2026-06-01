@@ -332,7 +332,9 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('hotel_id', hotel_id);
 
-    if (action !== 'test') {
+    // Only the automatic 'sync' action requires an active config.
+    // 'test' and 'import' run on demand even before activation.
+    if (action === 'sync') {
       configQuery = configQuery.eq('is_active', true);
     }
 
