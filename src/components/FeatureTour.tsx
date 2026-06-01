@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import {
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText,
   Archive, ClipboardCheck, Package, Repeat, TicketCheck,
-  Sparkles, ArrowRight, ArrowLeft, X, Check,
+  Sparkles, ArrowRight, ArrowLeft, X, Check, Settings, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
