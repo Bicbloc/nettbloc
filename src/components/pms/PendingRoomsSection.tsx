@@ -23,6 +23,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
   const [rooms, setRooms] = useState<PendingRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!hotelId) return;
@@ -86,15 +87,57 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     }
   };
 
+  const addAll = async () => {
+    if (!hotelId || rooms.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const { error: insertError } = await supabase
+        .from('hotel_rooms_registry')
+        .insert(
+          rooms.map(room => ({
+            hotel_id: hotelId,
+            room_number: room.room_number,
+            floor: room.floor,
+            room_type: room.room_type,
+            source: 'pms',
+            imported_from: room.pms_type,
+            is_active: true,
+            space_category: 'room',
+          })) as any
+        );
+      if (insertError) throw insertError;
+
+      await supabase
+        .from('pms_pending_rooms')
+        .update({ status: 'added', resolved_at: new Date().toISOString() })
+        .in('id', rooms.map(r => r.id));
+
+      toast({ title: 'Chambres ajoutées', description: `${rooms.length} chambres ajoutées au registre.` });
+      setRooms([]);
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || "Impossible d'ajouter les chambres.", variant: 'destructive' });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!hotelId || (!loading && rooms.length === 0)) return null;
 
   return (
     <>
       <Separator />
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
-          <DoorClosed className="h-4 w-4" />
-          Nouvelles chambres détectées ({rooms.length})
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+            <DoorClosed className="h-4 w-4" />
+            Nouvelles chambres détectées ({rooms.length})
+          </div>
+          {rooms.length > 0 && (
+            <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
+              {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+              Tout valider
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Ces chambres ont été synchronisées pour les opérations du jour mais ne sont pas encore dans le registre permanent. Validez leur ajout ou ignorez-les.
