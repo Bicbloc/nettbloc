@@ -531,8 +531,11 @@ const IndexDashboard = () => {
     };
 
     loadRoomsFromDatabase();
-    // Realtime sync handles updates — no polling needed
-  }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
+    // IMPORTANT: ne PAS inclure `isAssigning` dans les dépendances.
+    // Sinon, 2s après chaque affectation (quand isAssigning repasse à false),
+    // un rechargement complet se déclenche et peut désassigner les chambres
+    // à cause d'une course avec l'écriture en base. Le temps réel gère les MAJ.
+  }, [currentHotelId, isImporting, setRooms, setIsDistributed]);
 
   // handlePdfProcessed is now provided by usePdfWorkflow hook
 
