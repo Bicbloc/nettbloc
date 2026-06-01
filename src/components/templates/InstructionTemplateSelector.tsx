@@ -32,6 +32,8 @@ interface InstructionTemplateSelectorProps {
   onInstructionsChange: (value: string) => void;
   onToKnowChange: (value: string) => void;
   onTodoListChange: (value: string) => void;
+  /** Hide the "Gérer les templates" button (e.g. inside the daily setup step). */
+  hideTemplateManager?: boolean;
 }
 
 interface Template {
