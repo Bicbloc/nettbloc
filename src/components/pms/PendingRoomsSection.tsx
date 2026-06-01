@@ -87,6 +87,40 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     }
   };
 
+  const addAll = async () => {
+    if (!hotelId || rooms.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const { error: insertError } = await supabase
+        .from('hotel_rooms_registry')
+        .insert(
+          rooms.map(room => ({
+            hotel_id: hotelId,
+            room_number: room.room_number,
+            floor: room.floor,
+            room_type: room.room_type,
+            source: 'pms',
+            imported_from: room.pms_type,
+            is_active: true,
+            space_category: 'room',
+          })) as any
+        );
+      if (insertError) throw insertError;
+
+      await supabase
+        .from('pms_pending_rooms')
+        .update({ status: 'added', resolved_at: new Date().toISOString() })
+        .in('id', rooms.map(r => r.id));
+
+      toast({ title: 'Chambres ajoutées', description: `${rooms.length} chambres ajoutées au registre.` });
+      setRooms([]);
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || "Impossible d'ajouter les chambres.", variant: 'destructive' });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!hotelId || (!loading && rooms.length === 0)) return null;
 
   return (
