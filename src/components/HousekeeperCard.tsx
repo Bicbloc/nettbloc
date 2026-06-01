@@ -3,7 +3,8 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download, Sparkles } from "lucide-react";
+import { isHousekeeperNew } from "@/utils/newHousekeepers";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -457,8 +458,14 @@ export function HousekeeperCard({
                   </Button>
                 </div>
               ) : (
-                <h3 className="font-bold text-lg">
+                <h3 className="font-bold text-lg flex items-center gap-2">
                   {name}
+                  {isHousekeeperNew(name) && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500 text-white">
+                      <Sparkles className="h-3 w-3" />
+                      Nouveau
+                    </span>
+                  )}
                 </h3>
               )}
               <Button
