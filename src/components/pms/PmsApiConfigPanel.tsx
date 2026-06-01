@@ -485,7 +485,7 @@ export function PmsApiConfigPanel() {
                         <ListChecks className="h-4 w-4 mr-2" />
                         Voir le registre
                       </Button>
-                      <Button size="sm" onClick={() => navigate('/team')}>
+                      <Button size="sm" onClick={() => navigate('/')}>
                         <Users className="h-4 w-4 mr-2" />
                         Affecter les chambres
                       </Button>
