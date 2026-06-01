@@ -40,6 +40,7 @@ const EstablishmentAuth = () => {
   // Vérifier si l'utilisateur actuel a le droit d'accéder à cette interface
   // Si non, le déconnecter pour permettre une nouvelle connexion
   useEffect(() => {
+    let cancelled = false;
     const checkExistingSession = async () => {
       if (!isInitialized || loading) return;
       
@@ -56,31 +57,40 @@ const EstablishmentAuth = () => {
         return;
       }
 
-      const accessCheck = await validateUserAccessToInterface(email, 'establishment');
-
-      if (accessCheck.allowed) {
-        navigate('/', { replace: true });
-        return;
-      }
-
-      // L'utilisateur connecté n'est PAS un établissement
-      // Déconnecter pour permettre une connexion avec le bon compte
-      // Nettoyer TOUS les profils locaux d'abord
-      localStorage.removeItem('housekeeper_profile');
-      localStorage.removeItem('governess_profile');
-      localStorage.removeItem('technician_profile');
       try {
-        await supabase.auth.signOut();
+        const accessCheck = await validateUserAccessToInterface(email, 'establishment');
+        if (cancelled) return;
+
+        if (accessCheck.allowed) {
+          navigate('/', { replace: true });
+          return;
+        }
+
+        // L'utilisateur connecté n'est PAS un établissement
+        // Déconnecter pour permettre une connexion avec le bon compte
+        // Nettoyer TOUS les profils locaux d'abord
+        localStorage.removeItem('housekeeper_profile');
+        localStorage.removeItem('governess_profile');
+        localStorage.removeItem('technician_profile');
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
+        }
+        // Petit délai pour laisser le listener auth mettre à jour l'état
+        await new Promise(resolve => setTimeout(resolve, 300));
       } catch (err) {
-        localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
+        console.error('❌ Erreur vérification accès établissement:', err);
+      } finally {
+        // Toujours débloquer l'écran pour éviter le spinner infini
+        if (!cancelled) setIsCheckingAccess(false);
       }
-      // Petit délai pour laisser le listener auth mettre à jour l'état
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setIsCheckingAccess(false);
     };
 
     checkExistingSession();
+    return () => { cancelled = true; };
   }, [isInitialized, loading, user, navigate, signOut]);
+
 
   // Handle password reset from URL
   useEffect(() => {
