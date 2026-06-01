@@ -453,6 +453,7 @@ export function IncidentReportDialogSimple({
                       <ImageRecognitionButton
                         imageFile={selectedImages[0]}
                         onResult={handleAiResult}
+                        hotelId={hotelId}
                       />
                     </AiFeatureGuard>
                     {aiSuggestion && (

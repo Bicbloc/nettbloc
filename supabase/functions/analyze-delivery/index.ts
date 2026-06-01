@@ -19,9 +19,10 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, linenTypes } = await req.json() as {
+    const { imageBase64, linenTypes, hotelId } = await req.json() as {
       imageBase64: string;
       linenTypes: LinenType[];
+      hotelId?: string;
     };
 
     if (!imageBase64) {
@@ -126,7 +127,7 @@ Tu dois retourner un JSON avec EXACTEMENT ce format (aucun texte autour):
     }
 
     const data = await response.json();
-void logAiUsage({ functionName: "analyze-delivery", aiData: data, model: "google/gemini-2.5-flash" });
+void logAiUsage({ functionName: "analyze-delivery", aiData: data, model: "google/gemini-2.5-flash", hotelId: hotelId ?? null });
     const content = data.choices?.[0]?.message?.content || "";
 
     // Extract JSON from the response
