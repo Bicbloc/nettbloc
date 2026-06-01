@@ -64,13 +64,22 @@ const USER_TYPE_CONFIGS = {
 
 const PAGE_SIZE = 50;
 
-export function UsersManagementPanel() {
+interface UsersManagementPanelProps {
+  /** Pre-filter and lock the panel to a single user type */
+  defaultUserType?: string;
+  /** Hide the user-type selector when locked to one role */
+  lockUserType?: boolean;
+  /** Optional custom heading */
+  title?: string;
+}
+
+export function UsersManagementPanel({ defaultUserType, lockUserType, title }: UsersManagementPanelProps = {}) {
   const [users, setUsers] = useState<AllUser[]>([]);
   const [hotels, setHotels] = useState<HotelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all');
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(defaultUserType ?? 'all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'name'>('created_at');
