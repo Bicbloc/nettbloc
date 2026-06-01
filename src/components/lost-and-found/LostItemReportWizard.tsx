@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { useAiFeatures } from "@/hooks/use-ai-features";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -404,6 +405,16 @@ export function LostItemReportWizard({
         actor_name: reporterName,
         actor_type: reporterType,
       }).then(() => {});
+
+      // Notification à l'établissement
+      createNotification({
+        hotelId,
+        title: "🧳 Objet trouvé signalé",
+        description: `${objectDescription}${locationType === 'room' && roomNumber ? ` — Chambre ${roomNumber}` : ''} (par ${reporterName})`,
+        type: "lost_item",
+        roomNumber: locationType === 'room' ? roomNumber : undefined,
+        housekeeperName: reporterName,
+      });
 
       toast({
         title: "✅ Objet signalé",

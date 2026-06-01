@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -621,6 +622,16 @@ export function IncidentReportWizard({
         actor_name: userName || 'Utilisateur',
         actor_type: userType,
       }).then(() => {});
+
+      // Notification à l'établissement
+      createNotification({
+        hotelId,
+        title: "🛠️ Incident signalé",
+        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''} (par ${incident.reported_by_name || 'Utilisateur'})`,
+        type: "incident",
+        roomNumber: incident.location_reference || undefined,
+        housekeeperName: incident.reported_by_name || undefined,
+      });
 
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({

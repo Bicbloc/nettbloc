@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,13 +43,24 @@ export function PhoneOrdersPanel() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status, tracking_number }: { id: string; status?: string; tracking_number?: string }) => {
+    mutationFn: async ({ id, hotelId, status, tracking_number }: { id: string; hotelId?: string; status?: string; tracking_number?: string }) => {
       const updates: any = { updated_at: new Date().toISOString() };
       if (status) updates.status = status;
       if (tracking_number !== undefined) updates.tracking_number = tracking_number;
 
       const { error } = await supabase.from("phone_orders").update(updates).eq("id", id);
       if (error) throw error;
+
+      // Notifier l'établissement du changement de statut
+      if (hotelId && status) {
+        const label = STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
+        await createNotification({
+          hotelId,
+          title: "📦 Commande de téléphones mise à jour",
+          description: `Votre commande est maintenant : ${label}.`,
+          type: "phone_order",
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-phone-orders"] });
@@ -121,7 +133,7 @@ export function PhoneOrdersPanel() {
                   <OrderRow
                     key={order.id}
                     order={order}
-                    onUpdate={(data) => updateMutation.mutate({ id: order.id, ...data })}
+                    onUpdate={(data) => updateMutation.mutate({ id: order.id, hotelId: order.hotel_id, ...data })}
                   />
                 ))}
               </TableBody>
