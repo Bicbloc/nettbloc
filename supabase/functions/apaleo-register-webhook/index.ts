@@ -115,8 +115,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         endpointUrl,
-        topic: 'reservation',
-        type: ['checked-in', 'checked-out'],
+        events: ['reservation/checked-in', 'reservation/checked-out'],
+        propertyIds: creds.propertyId ? [creds.propertyId] : undefined,
       }),
     });
 
