@@ -371,6 +371,7 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
           const r2 = await callAI(consensusPrompt, 0.2, 500, 30000);
           if (r2.ok) {
             const d2 = await r2.json();
+            logAiUsage(d2, model);
             const c2 = d2.choices?.[0]?.message?.content || '';
             const result2 = parseAIResult(c2);
             if (result2 && typeof result2.count === 'number') {
