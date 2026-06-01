@@ -362,6 +362,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
 
 
 
+        {!collapsed && (
         <CardContent className="space-y-6">
           {/* PMS Type Selection */}
           <div className="space-y-2">
