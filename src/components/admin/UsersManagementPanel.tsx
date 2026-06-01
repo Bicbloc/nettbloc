@@ -64,13 +64,22 @@ const USER_TYPE_CONFIGS = {
 
 const PAGE_SIZE = 50;
 
-export function UsersManagementPanel() {
+interface UsersManagementPanelProps {
+  /** Pre-filter and lock the panel to a single user type */
+  defaultUserType?: string;
+  /** Hide the user-type selector when locked to one role */
+  lockUserType?: boolean;
+  /** Optional custom heading */
+  title?: string;
+}
+
+export function UsersManagementPanel({ defaultUserType, lockUserType, title }: UsersManagementPanelProps = {}) {
   const [users, setUsers] = useState<AllUser[]>([]);
   const [hotels, setHotels] = useState<HotelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all');
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(defaultUserType ?? 'all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'name'>('created_at');
@@ -489,7 +498,7 @@ export function UsersManagementPanel() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Gestion des Utilisateurs
+              {title ?? 'Gestion des Utilisateurs'}
             </CardTitle>
             <CardDescription>
               {filteredUsers.length} utilisateur(s) • {users.filter(u => !u.is_suspended).length} actifs
@@ -583,23 +592,25 @@ export function UsersManagementPanel() {
           </div>
           
           {/* User Type Filter */}
-          <Select value={userTypeFilter} onValueChange={(v) => { setUserTypeFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger className="w-[180px]">
-              <Users className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les types</SelectItem>
-              {Object.entries(USER_TYPE_CONFIGS).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <div className="flex items-center gap-2">
-                    <config.icon className="h-4 w-4" />
-                    {config.label}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!lockUserType && (
+            <Select value={userTypeFilter} onValueChange={(v) => { setUserTypeFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[180px]">
+                <Users className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                {Object.entries(USER_TYPE_CONFIGS).map(([key, config]) => (
+                  <SelectItem key={key} value={key}>
+                    <div className="flex items-center gap-2">
+                      <config.icon className="h-4 w-4" />
+                      {config.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           
           {/* Plan Filter (only for establishments) */}
           <Select value={planFilter} onValueChange={setPlanFilter}>

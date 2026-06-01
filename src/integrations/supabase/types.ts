@@ -245,6 +245,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_logs: {
+        Row: {
+          completion_tokens: number
+          created_at: string
+          function_name: string
+          hotel_id: string | null
+          id: string
+          model: string | null
+          prompt_tokens: number
+          status: string
+          total_tokens: number
+          user_id: string | null
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string
+          function_name: string
+          hotel_id?: string | null
+          id?: string
+          model?: string | null
+          prompt_tokens?: number
+          status?: string
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string
+          function_name?: string
+          hotel_id?: string | null
+          id?: string
+          model?: string | null
+          prompt_tokens?: number
+          status?: string
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       archived_daily_logs: {
         Row: {
           archive_date: string
@@ -6104,6 +6143,53 @@ export type Database = {
           p_xp_amount: number
         }
         Returns: Json
+      }
+      admin_get_ai_usage_daily: {
+        Args: { p_days?: number }
+        Returns: {
+          calls: number
+          day: string
+          tokens: number
+        }[]
+      }
+      admin_get_api_clients: {
+        Args: { p_days?: number }
+        Returns: {
+          ai_calls: number
+          ai_last_at: string
+          ai_tokens: number
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
+          pms_active: boolean
+          pms_last_status: string
+          pms_last_sync: string
+          pms_syncs: number
+          pms_type: string
+        }[]
+      }
+      admin_get_connections_daily: {
+        Args: { p_days?: number }
+        Returns: {
+          connections: number
+          day: string
+          user_type: string
+        }[]
+      }
+      admin_get_establishment_connections: {
+        Args: never
+        Returns: {
+          active_sessions: number
+          governesses_count: number
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
+          housekeepers_count: number
+          last_login: string
+          owner_email: string
+          subaccounts_count: number
+          technicians_count: number
+        }[]
       }
       admin_set_ai_features_enabled: {
         Args: { p_enabled: boolean; p_user_id: string }

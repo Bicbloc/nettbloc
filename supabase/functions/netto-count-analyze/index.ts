@@ -4,6 +4,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { logAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,6 +121,7 @@ Response format (no markdown, just raw JSON):
     }
 
     const aiResponse = await response.json();
+void logAiUsage({ functionName: "netto-count-analyze", aiData: aiResponse, model: "google/gemini-2.5-flash" });
     const content = aiResponse.choices?.[0]?.message?.content;
 
     if (!content) {

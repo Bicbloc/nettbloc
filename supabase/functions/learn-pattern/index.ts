@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { logAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -278,6 +279,7 @@ ${reportDate ? `- DATE_DÉPART == ${reportDate} → À BLANC (départ aujourd'hu
     }
 
     const data = await response.json();
+void logAiUsage({ functionName: "learn-pattern", aiData: data, model: "google/gemini-2.5-flash" });
     console.log("AI response received");
 
     // Extraire les arguments du tool call

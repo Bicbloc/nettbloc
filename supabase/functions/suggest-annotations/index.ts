@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { logAiUsage } from "../_shared/aiUsage.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -160,6 +161,7 @@ Retourne un JSON avec cette structure:
     }
 
     const aiData = await response.json();
+void logAiUsage({ functionName: "suggest-annotations", aiData, model: "google/gemini-2.5-flash", hotelId });
     const content = aiData.choices?.[0]?.message?.content || '';
     
     console.log("AI Response:", content);

@@ -39,6 +39,21 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Fire-and-forget AI token usage logging
+    const logAiUsage = (aiData: any, usedModel: string) => {
+      try {
+        const u = aiData?.usage || {};
+        supabase.from('ai_usage_logs').insert({
+          hotel_id: hotelId ?? null,
+          function_name: 'count-linen',
+          model: usedModel,
+          prompt_tokens: u.prompt_tokens ?? 0,
+          completion_tokens: u.completion_tokens ?? 0,
+          total_tokens: u.total_tokens ?? ((u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0)),
+        }).then(() => {}, () => {});
+      } catch (_) { /* ignore */ }
+    };
+
     // Get linen type details including thickness for ruler-based calculation
     const { data: linenType, error: linenError } = await supabase
       .from('linen_types')
@@ -326,6 +341,7 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
       }
 
       const aiData = await aiResponse.json();
+      logAiUsage(aiData, model);
       const aiContent = aiData.choices?.[0]?.message?.content || '';
       let result = parseAIResult(aiContent);
       if (!result) {
@@ -355,6 +371,7 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
           const r2 = await callAI(consensusPrompt, 0.2, 500, 30000);
           if (r2.ok) {
             const d2 = await r2.json();
+            logAiUsage(d2, model);
             const c2 = d2.choices?.[0]?.message?.content || '';
             const result2 = parseAIResult(c2);
             if (result2 && typeof result2.count === 'number') {

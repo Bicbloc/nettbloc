@@ -4,6 +4,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { logAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -200,6 +201,7 @@ Extrais chaque chambre avec son type de nettoyage et justifie ta d√©cision en r√
     }
 
     const data = await response.json();
+void logAiUsage({ functionName: "parse-report", aiData: data, model: "google/gemini-3-flash-preview", hotelId });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall?.function?.arguments) {
