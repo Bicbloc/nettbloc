@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHotel } from '@/contexts/HotelContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -30,6 +31,7 @@ interface UserProfile {
 
 const Profile = () => {
   const { user } = useAuth();
+  const { refreshHotel } = useHotel();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { plan, subscribed, canAccessFeature, isInTrial, trialDaysRemaining } = useSubscription();
@@ -146,6 +148,8 @@ const Profile = () => {
           .from('hotels')
           .update({ name: newName })
           .eq('user_id', user.id);
+        // Rafraîchir le contexte pour que le nom se mette à jour partout (page principale, en-têtes…)
+        await refreshHotel();
       }
 
       setProfile(prev => prev ? {
