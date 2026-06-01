@@ -426,11 +426,13 @@ export function HousekeeperCard({
     <>
       <Card 
         className={cn(
-          "border rounded-lg",
+          "border rounded-lg transition-colors",
           isOverloaded && "border-red-400",
-          isUnderloaded && "border-amber-400"
+          isUnderloaded && "border-amber-400",
+          isDragOver && "border-primary border-2 bg-primary/5 ring-2 ring-primary/30"
         )}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <CardHeader className="p-4 pb-0">
