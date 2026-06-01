@@ -179,10 +179,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     initSession();
 
+    // Récupération automatique de la session quand l'app revient au premier plan
+    // (ex: l'utilisateur quitte Chrome puis revient). Sans cela, le token peut
+    // être expiré et les requêtes (inventaire, etc.) ne retournent aucune valeur.
+    let lastResume = 0;
+    const handleResume = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      // throttle pour éviter les appels multiples rapprochés
+      if (now - lastResume < 3000) return;
+      lastResume = now;
+
+      const { data: { session: current } } = await supabase.auth.getSession();
+      if (!mounted || !current) return;
+
+      // Re-valider/rafraîchir la session puis signaler aux écrans de recharger
+      const ok = await refreshSession();
+      if (ok && mounted) {
+        startTokenRefresh();
+        window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SESSION_REFRESHED));
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('focus', handleResume);
+
     return () => {
       mounted = false;
       stopTokenRefresh();
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleResume);
     };
   }, [refreshSession, startTokenRefresh, stopTokenRefresh]);
 
