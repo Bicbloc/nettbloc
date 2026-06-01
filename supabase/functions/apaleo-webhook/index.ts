@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
 
     // Apaleo notification format:
     // { topic, type, accountId, propertyId, data: { entityId, propertyId } }
-    const topic: string = payload.topic || '';
+    const topic: string = (payload.topic || '').toLowerCase();
     const type: string = (payload.type || '').toLowerCase();
     const propertyId: string =
       payload.propertyId || payload.data?.propertyId || '';
