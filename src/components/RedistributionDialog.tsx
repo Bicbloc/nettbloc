@@ -5,8 +5,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shuffle, Layers, Zap, Calendar, Users, UserPlus, AlertCircle } from 'lucide-react';
+import { Shuffle, Layers, Zap, Calendar, Users, UserPlus, AlertCircle, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { isHousekeeperNew } from '@/utils/newHousekeepers';
 
 interface RedistributionDialogProps {
   isOpen: boolean;
@@ -146,6 +148,12 @@ export function RedistributionDialog({
                           onCheckedChange={() => handleToggleHousekeeper(name)}
                         />
                         <span className="font-medium truncate">{name}</span>
+                        {isHousekeeperNew(name) && (
+                          <Badge className="ml-auto shrink-0 gap-1 bg-emerald-500 text-white hover:bg-emerald-500">
+                            <Sparkles className="h-3 w-3" />
+                            Nouveau
+                          </Badge>
+                        )}
                       </div>
                     ))}
                   </div>
