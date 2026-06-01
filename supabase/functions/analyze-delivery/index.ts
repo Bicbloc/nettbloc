@@ -19,9 +19,10 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, linenTypes } = await req.json() as {
+    const { imageBase64, linenTypes, hotelId } = await req.json() as {
       imageBase64: string;
       linenTypes: LinenType[];
+      hotelId?: string;
     };
 
     if (!imageBase64) {
