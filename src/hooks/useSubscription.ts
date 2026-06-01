@@ -162,7 +162,9 @@ export function useSubscription() {
       let subscriptionStatus: SubscriptionState['subscriptionStatus'] = 'none';
 
       // If user has active subscription
-      if (profile?.subscription_status === 'active' || profile?.subscription_type === 'confort') {
+      if (profile?.subscription_status === 'paused') {
+        subscriptionStatus = 'paused';
+      } else if (profile?.subscription_status === 'active' || profile?.subscription_type === 'confort') {
         subscriptionStatus = 'active';
       } else if (profile?.trial_end_date) {
         trialEndDate = new Date(profile.trial_end_date);
