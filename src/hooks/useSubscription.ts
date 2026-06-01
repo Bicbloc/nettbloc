@@ -70,7 +70,8 @@ export interface SubscriptionState {
   maxRooms: number;
   featuresEnabled: Record<string, boolean>;
   planConfig: PlanConfig;
-  subscriptionStatus: 'none' | 'trial' | 'active' | 'expired' | 'cancelled';
+  subscriptionStatus: 'none' | 'trial' | 'active' | 'expired' | 'cancelled' | 'paused';
+  isPaused: boolean;
 }
 
 const DEFAULT_FEATURES = {
@@ -112,7 +113,9 @@ export function useSubscription() {
     maxRooms: 15,
     featuresEnabled: DEFAULT_FEATURES,
     planConfig: PLAN_CONFIGS.decouverte,
-    subscriptionStatus: 'none'
+    subscriptionStatus: 'none',
+    isPaused: false
+
   });
 
   const checkSubscription = async () => {
@@ -126,7 +129,9 @@ export function useSubscription() {
         maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
         planConfig: PLAN_CONFIGS.decouverte,
-        subscriptionStatus: 'none'
+        subscriptionStatus: 'none',
+        isPaused: false
+
       });
       return;
     }
@@ -157,7 +162,9 @@ export function useSubscription() {
       let subscriptionStatus: SubscriptionState['subscriptionStatus'] = 'none';
 
       // If user has active subscription
-      if (profile?.subscription_status === 'active' || profile?.subscription_type === 'confort') {
+      if (profile?.subscription_status === 'paused') {
+        subscriptionStatus = 'paused';
+      } else if (profile?.subscription_status === 'active' || profile?.subscription_type === 'confort') {
         subscriptionStatus = 'active';
       } else if (profile?.trial_end_date) {
         trialEndDate = new Date(profile.trial_end_date);
@@ -226,7 +233,9 @@ export function useSubscription() {
         maxRooms: isInTrial ? 999999 : (planConfig.maxRooms || 999999),
         featuresEnabled,
         planConfig,
-        subscriptionStatus
+        subscriptionStatus,
+        isPaused: subscriptionStatus === 'paused'
+
       });
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -239,7 +248,9 @@ export function useSubscription() {
         maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
         planConfig: PLAN_CONFIGS.decouverte,
-        subscriptionStatus: 'none'
+        subscriptionStatus: 'none',
+        isPaused: false
+
       });
     }
   };

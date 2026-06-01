@@ -60,12 +60,15 @@ interface SubscriptionDetails {
 }
 
 export function SubscriptionCard() {
-  const { plan, subscribed, subscription_end, isPremium, isFree, isInTrial, trialDaysRemaining, loading, refreshSubscription } = useSubscription();
+  const { plan, subscribed, subscription_end, isPremium, isFree, isInTrial, isPaused, trialDaysRemaining, loading, refreshSubscription } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const [changingPlan, setChangingPlan] = useState<PlanType | null>(null);
 
   const planOrder: PlanType[] = ['decouverte', 'essentiel', 'confort', 'business', 'entreprise'];
@@ -151,6 +154,55 @@ export function SubscriptionCard() {
       setIsCancelling(false);
     }
   };
+
+  const handlePauseSubscription = async () => {
+    setIsPausing(true);
+    try {
+      const { error } = await supabase.functions.invoke('pause-subscription');
+      if (error) throw error;
+      toast({
+        title: 'Abonnement suspendu',
+        description: 'Votre abonnement est temporairement suspendu. Les prélèvements sont mis en pause.',
+      });
+      setShowPauseDialog(false);
+      setShowDetails(false);
+      refreshSubscription();
+    } catch (error: any) {
+      console.error('Erreur suspension:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: error.message || "Impossible de suspendre l'abonnement",
+      });
+    } finally {
+      setIsPausing(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setIsResuming(true);
+    try {
+      const { error } = await supabase.functions.invoke('resume-subscription');
+      if (error) throw error;
+      toast({
+        title: 'Abonnement réactivé',
+        description: 'Votre abonnement a été réactivé. Les prélèvements reprennent.',
+      });
+      setShowDetails(false);
+      refreshSubscription();
+    } catch (error: any) {
+      console.error('Erreur réactivation:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: error.message || "Impossible de réactiver l'abonnement",
+      });
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+
 
   const formatPaymentStatus = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
@@ -265,6 +317,14 @@ export function SubscriptionCard() {
             </div>
           </div>
 
+          {/* Bandeau suspension */}
+          {isPaused && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Votre abonnement est suspendu temporairement. Réactivez-le pour reprendre les prélèvements.</span>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-2 pt-2">
             {isFree || isInTrial ? (
@@ -272,6 +332,15 @@ export function SubscriptionCard() {
                 variant="default" 
                 className="flex-1 bg-gradient-premium hover:bg-gradient-premium/90" 
               />
+            ) : isPaused ? (
+              <Button
+                onClick={handleResumeSubscription}
+                disabled={isResuming}
+                className="flex-1"
+              >
+                {isResuming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crown className="mr-2 h-4 w-4" />}
+                {isResuming ? 'Réactivation...' : "Réactiver l'abonnement"}
+              </Button>
             ) : isPremium ? (
               <Button 
                 onClick={handleManageSubscription}
@@ -286,6 +355,7 @@ export function SubscriptionCard() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Dialog de gestion de l'abonnement */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
@@ -428,11 +498,22 @@ export function SubscriptionCard() {
               <Button variant="outline" className="flex-1" onClick={() => setShowDetails(false)}>
                 Fermer
               </Button>
-              {isPremium && (
-                <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
-                  Annuler l'abonnement
+              {isPremium && !isPaused && (
+                <Button variant="outline" onClick={() => setShowPauseDialog(true)}>
+                  Suspendre temporairement
                 </Button>
               )}
+              {isPaused && (
+                <Button onClick={handleResumeSubscription} disabled={isResuming}>
+                  {isResuming ? 'Réactivation...' : 'Réactiver'}
+                </Button>
+              )}
+              {isPremium && (
+                <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
+                  Résilier l'abonnement
+                </Button>
+              )}
+
             </div>
           </div>
         </DialogContent>
@@ -462,6 +543,28 @@ export function SubscriptionCard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de confirmation de suspension */}
+      <AlertDialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Suspendre temporairement ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Votre abonnement sera mis en pause et les prélèvements seront temporairement suspendus. Vous pourrez le réactiver à tout moment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPausing}>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePauseSubscription} disabled={isPausing}>
+              {isPausing ? 'Suspension...' : 'Confirmer la suspension'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </>
   );
 }
