@@ -148,6 +148,8 @@ const Profile = () => {
           .from('hotels')
           .update({ name: newName })
           .eq('user_id', user.id);
+        // Rafraîchir le contexte pour que le nom se mette à jour partout (page principale, en-têtes…)
+        await refreshHotel();
       }
 
       setProfile(prev => prev ? {
