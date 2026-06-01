@@ -498,7 +498,7 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
           <div>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Gestion des Utilisateurs
+              {title ?? 'Gestion des Utilisateurs'}
             </CardTitle>
             <CardDescription>
               {filteredUsers.length} utilisateur(s) • {users.filter(u => !u.is_suspended).length} actifs
