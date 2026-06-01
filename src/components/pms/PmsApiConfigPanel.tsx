@@ -67,6 +67,7 @@ const SYNC_FREQUENCIES = [
 
 export function PmsApiConfigPanel() {
   const { hotelId } = useHotel();
+  const navigate = useNavigate();
   const [config, setConfig] = useState<PmsConfig>({
     pms_type: '',
     credentials: {},
@@ -83,6 +84,9 @@ export function PmsApiConfigPanel() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [previewRooms, setPreviewRooms] = useState<PreviewRoom[] | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   useEffect(() => {
     if (hotelId) loadConfig();
