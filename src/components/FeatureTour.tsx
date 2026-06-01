@@ -383,6 +383,19 @@ export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) 
           <div className="p-4">
             <p className="text-sm text-muted-foreground leading-relaxed">{step.desc[lang]}</p>
 
+            {step.action && (
+              <Button
+                size="sm"
+                className="mt-3 w-full"
+                onClick={() => { onClose(); navigate(step.action!.to); }}
+              >
+                {step.action.label[lang]}
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+
+
+
             {/* Indicateurs cliquables étape par étape */}
             <div className="mt-4 flex flex-wrap items-center gap-1.5">
               {STEPS.map((s, i) => (
