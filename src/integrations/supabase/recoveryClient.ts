@@ -10,7 +10,9 @@ const SUPABASE_PUBLISHABLE_KEY =
 
 export const supabaseRecovery = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    // Clé de stockage ISOLÉE pour ne pas entrer en conflit avec le client principal.
+    // Sinon deux GoTrueClient écrivent sur la même clé -> session instable -> rechargements.
+    storageKey: "sb-nettobloc-recovery-auth-token",
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,
