@@ -142,7 +142,7 @@ export function RoomManagementTab({
             onAddRoom={onAddRoom} 
             existingRooms={rooms} 
           />
-          {importMode === 'auto' ? (
+          {!pmsActive && (importMode === 'auto' ? (
             <PdfWorkflowDialog 
               hotelId={currentHotelId}
               onWorkflowComplete={onPdfProcessed}
@@ -153,7 +153,7 @@ export function RoomManagementTab({
               onRoomsAdded={handleManualRoomsAdded}
               existingRoomNumbers={existingRoomNumbers}
             />
-          )}
+          ))}
           <Button
             onClick={onOpenManualAssignment}
             variant="outline"
