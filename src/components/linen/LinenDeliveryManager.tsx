@@ -164,6 +164,7 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
         body: {
           imageBase64: base64,
           linenTypes: linenTypes,
+          hotelId,
         },
       });
 
