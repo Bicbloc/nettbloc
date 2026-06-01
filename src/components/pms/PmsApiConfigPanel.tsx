@@ -58,6 +58,9 @@ interface PmsConfig {
   property_id: string;
   is_active: boolean;
   sync_frequency: number;
+  auto_sync_enabled: boolean;
+  auto_sync_time: string;
+  last_auto_sync_date: string | null;
   last_sync_at: string | null;
   last_sync_status: string | null;
   last_sync_error: string | null;
@@ -89,6 +92,9 @@ export function PmsApiConfigPanel() {
     property_id: '',
     is_active: false,
     sync_frequency: 30,
+    auto_sync_enabled: true,
+    auto_sync_time: '06:00',
+    last_auto_sync_date: null,
     last_sync_at: null,
     last_sync_status: null,
     last_sync_error: null,
@@ -125,6 +131,9 @@ export function PmsApiConfigPanel() {
           property_id: (data as any).property_id || '',
           is_active: (data as any).is_active || false,
           sync_frequency: (data as any).sync_frequency || 30,
+          auto_sync_enabled: (data as any).auto_sync_enabled ?? true,
+          auto_sync_time: ((data as any).auto_sync_time || '06:00:00').slice(0, 5),
+          last_auto_sync_date: (data as any).last_auto_sync_date ?? null,
           last_sync_at: (data as any).last_sync_at,
           last_sync_status: (data as any).last_sync_status,
           last_sync_error: (data as any).last_sync_error,
@@ -149,6 +158,9 @@ export function PmsApiConfigPanel() {
         property_id: config.property_id || null,
         is_active: config.is_active,
         sync_frequency: config.sync_frequency,
+        auto_sync_enabled: config.auto_sync_enabled,
+        auto_sync_time: config.auto_sync_time,
+
       };
 
       if (config.id) {
@@ -273,6 +285,7 @@ export function PmsApiConfigPanel() {
       setConfig({
         pms_type: '', credentials: {}, base_url: '', property_id: '',
         is_active: false, sync_frequency: 30,
+        auto_sync_enabled: true, auto_sync_time: '06:00', last_auto_sync_date: null,
         last_sync_at: null, last_sync_status: null, last_sync_error: null,
       });
       toast({ title: 'Configuration supprimée' });
@@ -409,7 +422,41 @@ export function PmsApiConfigPanel() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="border-t pt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Synchro automatique chaque matin</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Recrée les chambres du jour (départs, recouches…) prêtes pour l'affectation
+                      </p>
+                    </div>
+                    <Switch
+                      checked={config.auto_sync_enabled}
+                      onCheckedChange={(v) => setConfig(prev => ({ ...prev, auto_sync_enabled: v }))}
+                    />
+                  </div>
+
+                  {config.auto_sync_enabled && (
+                    <div className="space-y-2">
+                      <Label>Heure de synchro</Label>
+                      <Input
+                        type="time"
+                        value={config.auto_sync_time}
+                        onChange={(e) => setConfig(prev => ({ ...prev, auto_sync_time: e.target.value }))}
+                        className="w-40"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Heure locale de l'établissement. Par défaut 06:00.
+                        {config.last_auto_sync_date && (
+                          <> Dernière synchro auto : {config.last_auto_sync_date}.</>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
+
             </>
           )}
 

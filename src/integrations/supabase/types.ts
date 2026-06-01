@@ -1541,12 +1541,15 @@ export type Database = {
       }
       hotel_pms_configs: {
         Row: {
+          auto_sync_enabled: boolean
+          auto_sync_time: string
           base_url: string | null
           created_at: string
           credentials: Json
           hotel_id: string
           id: string
           is_active: boolean
+          last_auto_sync_date: string | null
           last_sync_at: string | null
           last_sync_error: string | null
           last_sync_status: string | null
@@ -1556,12 +1559,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_sync_enabled?: boolean
+          auto_sync_time?: string
           base_url?: string | null
           created_at?: string
           credentials?: Json
           hotel_id: string
           id?: string
           is_active?: boolean
+          last_auto_sync_date?: string | null
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
@@ -1571,12 +1577,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_sync_enabled?: boolean
+          auto_sync_time?: string
           base_url?: string | null
           created_at?: string
           credentials?: Json
           hotel_id?: string
           id?: string
           is_active?: boolean
+          last_auto_sync_date?: string | null
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
