@@ -1157,7 +1157,16 @@ const HousekeeperWorkContent: React.FC = () => {
                 </div>
               </div>
             </Card>
-            
+
+            {/* Incidents attribués à cette femme de chambre */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                Incidents qui me sont attribués
+              </h3>
+              <HousekeeperIncidentsList hotelId={hotelId} housekeeperName={housekeeperName} />
+            </div>
+
             <StaffTasksList
               hotelId={hotelId}
               staffType="housekeeper"
