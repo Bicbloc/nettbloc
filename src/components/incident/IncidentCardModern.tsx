@@ -174,7 +174,20 @@ export function IncidentCardModern({
                 <StatusIcon className={cn("h-5 w-5", statusConfig.color)} />
               </div>
               <div>
-                <h3 className="font-semibold text-lg leading-tight">{incident.title}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg leading-tight">{incident.title}</h3>
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={onEdit}
+                      title="Modifier l'incident"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                   <MapPin className="h-3 w-3" />
                   <span>Chambre {incident.location_reference}</span>
