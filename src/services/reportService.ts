@@ -1,5 +1,5 @@
 import { Room, CleaningConfig } from "./pdfService";
-import html2pdf from "html2pdf.js";
+// html2pdf.js is imported dynamically inside the functions that generate PDFs
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 import { ReportFields as CustomReportFields, LinenInventoryItem } from "@/components/ReportCustomFields";
 import { toast } from "@/hooks/use-toast";
