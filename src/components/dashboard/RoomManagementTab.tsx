@@ -124,14 +124,16 @@ export function RoomManagementTab({
   return (
     <div className="space-y-6">
       {/* PMS API Config Panel (Entreprise only) */}
-      <PmsApiConfigPanel />
+      <PmsApiConfigPanel onActiveChange={setPmsActive} />
 
-      {/* Import Mode Switch */}
-      <ImportModeSwitch 
-        hotelId={currentHotelId}
-        currentMode={importMode}
-        onModeChange={setImportMode}
-      />
+      {/* Import Mode Switch — masqué lorsqu'une connexion API PMS est active */}
+      {!pmsActive && (
+        <ImportModeSwitch 
+          hotelId={currentHotelId}
+          currentMode={importMode}
+          onModeChange={setImportMode}
+        />
+      )}
 
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">{t.rooms.roomManagement}</h2>
