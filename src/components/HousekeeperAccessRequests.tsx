@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Bell, Check, X, Clock, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
+import { markHousekeeperAsNew } from '@/utils/newHousekeepers';
 import {
   Table,
   TableBody,
@@ -211,6 +212,7 @@ export const HousekeeperAccessRequests = () => {
         console.error('Erreur notification:', notifError);
       }
 
+      markHousekeeperAsNew(request.housekeeper_profiles.name);
       toast.success('Demande approuvée !');
       await refreshHousekeepers();
       loadRequests();
