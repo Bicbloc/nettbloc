@@ -384,7 +384,7 @@ function HousekeeperProfileContent() {
                 </div>
               )}
               {housekeeperData?.accessCode && (
-                <p className="text-blue-100 text-sm">Code: {housekeeperData.accessCode}</p>
+                
               )}
               {levelData && (
                 <div className="flex items-center gap-2 mt-2">

@@ -299,9 +299,6 @@ export function CreateColumnDialog({
                           <User className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">{h.name}</span>
                         </div>
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {h.access_code}
-                        </Badge>
                       </button>
                     ))}
                   </div>
