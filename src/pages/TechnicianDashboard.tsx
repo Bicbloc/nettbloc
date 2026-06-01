@@ -164,10 +164,12 @@ function TechnicianDashboardContent() {
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
       <StaffNotificationBanner hotelId={currentHotelSession.hotel_id} />
 
       {/* Content */}
       <div className="px-4 py-4 space-y-4">
+
         {activeTab === 'incidents' && (
           <div className="space-y-4">
             <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
