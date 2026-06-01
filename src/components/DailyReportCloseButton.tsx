@@ -92,6 +92,14 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
           .update({ pdf_url: pdfUrl })
           .eq('hotel_id', hotelId)
           .eq('report_date', today);
+
+        // Notifier l'établissement qu'un rapport est prêt à imprimer
+        await createNotification({
+          hotelId,
+          title: "🖨️ Rapport disponible",
+          description: `Le rapport du ${new Date(today).toLocaleDateString('fr-FR')} est prêt à être consulté et imprimé.`,
+          type: "report",
+        });
       }
 
       // 6. Désactiver la session actuelle si elle existe
