@@ -285,6 +285,7 @@ export function PmsApiConfigPanel() {
       setConfig({
         pms_type: '', credentials: {}, base_url: '', property_id: '',
         is_active: false, sync_frequency: 30,
+        auto_sync_enabled: true, auto_sync_time: '06:00', last_auto_sync_date: null,
         last_sync_at: null, last_sync_status: null, last_sync_error: null,
       });
       toast({ title: 'Configuration supprimée' });
