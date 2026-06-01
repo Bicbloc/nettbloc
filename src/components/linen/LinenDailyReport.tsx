@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+// html2pdf.js is imported dynamically when generating the PDF
 
 interface LinenEntry {
   id: string;
@@ -108,6 +108,7 @@ export const LinenDailyReport = ({
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       };
 
+      const html2pdf = (await import("html2pdf.js")).default;
       await html2pdf().set(opt).from(element).save();
       toast.success("Rapport PDF téléchargé");
     } catch (error) {
