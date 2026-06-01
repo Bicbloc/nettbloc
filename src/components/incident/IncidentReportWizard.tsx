@@ -622,6 +622,16 @@ export function IncidentReportWizard({
         actor_type: userType,
       }).then(() => {});
 
+      // Notification à l'établissement
+      createNotification({
+        hotelId,
+        title: "🛠️ Incident signalé",
+        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''} (par ${reportedByName})`,
+        type: "incident",
+        roomNumber: incident.location_reference || undefined,
+        housekeeperName: reportedByName,
+      });
+
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({
         title: "✅ Incident signalé",
