@@ -48,7 +48,7 @@ const UserMenu = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button data-tour="user-menu" variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className={`h-8 w-8 ${isPremium ? 'ring-2 ring-premium/50' : ''}`}>
             <AvatarFallback className={isPremium ? 'bg-gradient-premium text-premium-foreground' : ''}>
               {userInitials}
