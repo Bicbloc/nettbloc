@@ -1,10 +1,12 @@
 
+import { useState } from "react";
 import { Room } from "@/services/pdfService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { RoomAssignmentButton } from "./RoomAssignmentButton";
 import { AlertTriangle, Layers } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
