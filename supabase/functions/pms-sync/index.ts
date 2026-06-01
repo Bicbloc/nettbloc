@@ -369,7 +369,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ 
           success: true, 
           message: `Connexion réussie : ${rooms.length} chambres trouvées`,
-          rooms_count: rooms.length 
+          rooms_count: rooms.length,
+          rooms: rooms.map(r => ({
+            roomNumber: r.roomNumber,
+            floor: r.floor ?? null,
+            roomType: r.roomType ?? null,
+            cleaningType: r.cleaningType,
+            guestName: r.guestName ?? null,
+            arrivalDate: r.arrivalDate ?? null,
+            departureDate: r.departureDate ?? null,
+          })),
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
