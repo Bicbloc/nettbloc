@@ -284,6 +284,17 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
     return () => window.removeEventListener(AUTH_EVENTS.SIGNED_OUT, handleSignOut);
   }, [clearHotel]);
 
+  // Au retour au premier plan (session rafraîchie), recharger l'hôtel si perdu
+  useEffect(() => {
+    const handleRefreshed = () => {
+      if (!hotel && user?.id) {
+        setHasAttemptedLoad(false);
+      }
+    };
+    window.addEventListener(AUTH_EVENTS.SESSION_REFRESHED, handleRefreshed);
+    return () => window.removeEventListener(AUTH_EVENTS.SESSION_REFRESHED, handleRefreshed);
+  }, [hotel, user?.id]);
+
   // isHotelReady = on a terminé le chargement ET on a un hôtel (ou pas authentifié)
   const isHotelReady = hasAttemptedLoad && !isLoading;
 
