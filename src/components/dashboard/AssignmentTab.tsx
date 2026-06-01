@@ -129,8 +129,11 @@ export function AssignmentTab({
   };
 
   const getHousekeeperRooms = (name: string) => {
-    return rooms.filter(room => room.assignedTo === name);
+    // Exclure les chambres propres: elles passent dans la section "Chambres propres"
+    // et ne doivent plus rester dans le cadre d'affectation de la femme de chambre.
+    return rooms.filter(room => room.assignedTo === name && room.status !== 'clean');
   };
+
 
   const getUnassignedRooms = () => {
     return rooms.filter(room => 
