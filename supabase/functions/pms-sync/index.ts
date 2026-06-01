@@ -380,7 +380,7 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
           : nextStatus;
 
       // Opérations du jour : on (re)crée la chambre dans rooms.
-      await adminClient
+      const { error: roomUpsertError } = await adminClient
         .from('rooms')
         .upsert({
           hotel_id,
@@ -391,6 +391,11 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
           room_type: room.roomType ?? null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'hotel_id,room_number' });
+
+      if (roomUpsertError) {
+        console.error(`Échec upsert room ${room.roomNumber}:`, JSON.stringify(roomUpsertError));
+        throw new Error(`Échec d'enregistrement de la chambre ${room.roomNumber}: ${roomUpsertError.message}`);
+      }
 
       // Nouvelle chambre absente du registre -> proposition (sans écraser les statuts ignored/added existants).
       if (!registrySet.has(String(room.roomNumber))) {
