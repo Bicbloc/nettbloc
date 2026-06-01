@@ -23,6 +23,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
   const [rooms, setRooms] = useState<PendingRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!hotelId) return;
