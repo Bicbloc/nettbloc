@@ -341,6 +341,7 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
       }
 
       const aiData = await aiResponse.json();
+      logAiUsage(aiData, model);
       const aiContent = aiData.choices?.[0]?.message?.content || '';
       let result = parseAIResult(aiContent);
       if (!result) {
