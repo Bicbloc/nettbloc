@@ -214,7 +214,20 @@ export function FeatureTour({ isOpen, onTabChange, onClose }: FeatureTourProps) 
           <div className="p-4">
             <p className="text-sm text-muted-foreground leading-relaxed">{step.desc[lang]}</p>
 
-            <div className="mt-4 flex items-center gap-1.5">
+            <div className="mt-4 flex items-center justify-between text-xs font-medium text-muted-foreground">
+              <span>
+                {lang === "fr" ? "Étape" : "Step"} {index + 1} / {total}
+              </span>
+              <span>{Math.round(((index + 1) / total) * 100)}%</span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${((index + 1) / total) * 100}%` }}
+              />
+            </div>
+
+            <div className="mt-3 flex items-center gap-1.5">
               {STEPS.map((_, i) => (
                 <span
                   key={i}
