@@ -143,6 +143,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
+    // Filet de sécurité: si getSession() se bloque (verrou auth en WebView /
+    // multi-onglets), on débloque quand même l'app pour éviter le spinner infini
+    // "Vérification de l'authentification..." qui tourne en boucle.
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !sessionRestoredFromGetSession) {
+        console.warn('⚠️ getSession() trop lent - déblocage forcé de l\'auth');
+        setLoading(false);
+        setIsInitialized(true);
+      }
+    }, 5000);
+
     const initSession = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
