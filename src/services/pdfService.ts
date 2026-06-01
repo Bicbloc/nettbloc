@@ -1,5 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
-import * as pdfjs from 'pdfjs-dist';
+// pdfjs-dist is imported dynamically inside extractPdfText to keep it out of the initial bundle
 import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
 import { parseRoomLines, RoomLine } from "@/services/pms/RoomLineParser";
 import { detectReportFormat, ParsedRow, type FormatDetection } from "@/services/training/ReportFormatDetector";
