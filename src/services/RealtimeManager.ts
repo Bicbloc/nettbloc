@@ -57,7 +57,11 @@ class RealtimeManager {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && this.hotelId) {
           const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
-          if (timeSinceLastPing > 60000) {
+          // Reconnecter dès qu'on revient si la connexion est perdue
+          // (ex: retour de l'appareil photo pour l'inventaire) ou inactif
+          if (!this.isSubscribed || timeSinceLastPing > 30000) {
+            this.reconnectAttempts = 0;
+            this.consecutiveFailures = 0;
             this.softReconnect();
           }
         }
