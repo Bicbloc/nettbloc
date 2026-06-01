@@ -28,14 +28,31 @@ export function EditRoomNoteDialog({
 
   const handleSave = async () => {
     setIsSaving(true);
-    try {
-      const { error } = await supabase
+
+    const runUpdate = async () => {
+      const updatePromise = supabase
         .from('rooms')
         .update({ notes: note || null })
         .eq('hotel_id', hotelId)
         .eq('room_number', room.number);
 
+      // Guard against a request that stalls on a flaky connection.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 8000)
+      );
+
+      const { error } = (await Promise.race([updatePromise, timeout])) as { error: unknown };
       if (error) throw error;
+    };
+
+    try {
+      try {
+        await runUpdate();
+      } catch (firstError) {
+        // One automatic retry to absorb transient network stalls.
+        console.warn('Réessai de la mise à jour du commentaire…', firstError);
+        await runUpdate();
+      }
 
       onNoteUpdated(room, note);
       toast({
@@ -48,7 +65,7 @@ export function EditRoomNoteDialog({
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de mettre à jour le commentaire"
+        description: "Connexion lente ou interrompue. Veuillez réessayer."
       });
     } finally {
       setIsSaving(false);
