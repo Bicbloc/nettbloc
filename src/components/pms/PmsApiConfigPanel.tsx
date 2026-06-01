@@ -322,6 +322,8 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     );
   }
 
+  const collapsed = isConfigured && !expanded;
+
   return (
     <FeatureGuard feature="api_access">
       <Card data-pms-config>
@@ -331,17 +333,34 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               <Plug className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Connexion API PMS</CardTitle>
             </div>
-            {config.is_active && (
-              <Badge variant="default" className="bg-primary">
-                <Wifi className="h-3 w-3 mr-1" />
-                Actif
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {config.is_active && (
+                <Badge variant="default" className="bg-primary">
+                  <Wifi className="h-3 w-3 mr-1" />
+                  Actif
+                </Badge>
+              )}
+              {isConfigured && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExpanded(e => !e)}
+                  className="gap-1"
+                >
+                  {expanded ? 'Réduire' : 'Configurer'}
+                  <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </Button>
+              )}
+            </div>
           </div>
           <CardDescription>
-            Connectez votre PMS pour synchroniser automatiquement les chambres
+            {collapsed
+              ? `${selectedPms?.label || config.pms_type} connecté — synchronisation en temps réel active`
+              : 'Connectez votre PMS pour synchroniser automatiquement les chambres'}
           </CardDescription>
         </CardHeader>
+
+
 
         <CardContent className="space-y-6">
           {/* PMS Type Selection */}
