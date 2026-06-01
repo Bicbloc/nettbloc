@@ -29,6 +29,8 @@ import { IncidentsPanel } from '@/components/admin/IncidentsPanel';
 import { TrainingPanel } from '@/components/admin/TrainingPanel';
 import { SystemPanel } from '@/components/admin/SystemPanel';
 import { EmailsPanel } from '@/components/admin/EmailsPanel';
+import { ApiClientsPanel } from '@/components/admin/ApiClientsPanel';
+import { ConnectionsPanel } from '@/components/admin/ConnectionsPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
