@@ -142,10 +142,17 @@ export function AssignmentTab({
   };
 
   const getCleanRooms = () => {
-    return rooms.filter(room => 
-      room.status === 'clean' &&
-      room.cleaningType !== 'none'
-    );
+    return rooms
+      .filter(room => 
+        room.status === 'clean' &&
+        room.cleaningType !== 'none'
+      )
+      // Trier par chambre la plus récemment nettoyée en premier
+      .sort((a, b) => {
+        const ta = a.lastCleanedAt ? new Date(a.lastCleanedAt).getTime() : 0;
+        const tb = b.lastCleanedAt ? new Date(b.lastCleanedAt).getTime() : 0;
+        return tb - ta;
+      });
   };
 
   const handleRedistributeMethod = (method: RedistributionMethod, selectedHousekeepers: string[]) => {
