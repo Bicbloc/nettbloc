@@ -421,6 +421,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
                 onDeleteComment={(commentId) =>
                   deleteCommentMutation.mutate(commentId)
                 }
+                onEdit={() => openEditDialog(incident)}
               />
             ))
           )}
