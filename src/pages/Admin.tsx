@@ -29,6 +29,8 @@ import { IncidentsPanel } from '@/components/admin/IncidentsPanel';
 import { TrainingPanel } from '@/components/admin/TrainingPanel';
 import { SystemPanel } from '@/components/admin/SystemPanel';
 import { EmailsPanel } from '@/components/admin/EmailsPanel';
+import { ApiClientsPanel } from '@/components/admin/ApiClientsPanel';
+import { ConnectionsPanel } from '@/components/admin/ConnectionsPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
@@ -116,6 +118,11 @@ const Admin = () => {
     switch (section) {
       case 'dashboard': return <AdminDashboard onNavigate={(s) => setSection(s as AdminSection)} />;
       case 'users': return <UsersManagementPanel />;
+      case 'connections': return <ConnectionsPanel />;
+      case 'api-usage': return <ApiClientsPanel />;
+      case 'establishments': return <UsersManagementPanel defaultUserType="establishment" lockUserType title="Établissements" />;
+      case 'housekeepers': return <UsersManagementPanel defaultUserType="housekeeper" lockUserType title="Femmes de chambre" />;
+      case 'governesses': return <UsersManagementPanel defaultUserType="governess" lockUserType title="Gouvernantes" />;
       case 'sessions': return <SessionsManagementPanel />;
       case 'access-codes': return <AccessCodesPanel />;
       case 'housekeeper-requests': return <HousekeeperAccessRequests />;
