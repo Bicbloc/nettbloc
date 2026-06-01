@@ -89,28 +89,28 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
           if (emailError) {
             console.error('Erreur envoi email:', emailError);
             toast({
-              title: "Code généré",
-              description: `Code: ${accessCode}. Erreur envoi email: ${emailError.message}`,
+              title: "Invitation créée",
+              description: `Erreur envoi email: ${emailError.message}`,
               variant: "destructive"
             });
           } else {
             toast({
-              title: "Code généré et copié",
-              description: `Code d'accès généré pour ${housekeeperName}, email envoyé et code copié dans le presse-papiers.`
+              title: "Invitation envoyée",
+              description: `Email d'invitation envoyé pour ${housekeeperName}.`
             });
           }
         } catch (emailError) {
           console.error('Erreur envoi email:', emailError);
           toast({
-            title: "Code généré",
-            description: `Code: ${accessCode}. Email non envoyé: ${emailError}`,
+            title: "Invitation créée",
+            description: `Email non envoyé: ${emailError}`,
             variant: "destructive"
           });
         }
       } else {
         toast({
-          title: "Code généré et copié",
-          description: `Code d'accès généré pour ${housekeeperName} et copié dans le presse-papiers: ${accessCode}`
+          title: "Invitation créée",
+          description: `Invitation créée pour ${housekeeperName}.`
         });
       }
 
