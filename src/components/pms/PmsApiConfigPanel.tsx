@@ -23,6 +23,7 @@ interface PreviewRoom {
   floor: number | null;
   roomType: string | null;
   cleaningType: string;
+  condition?: string | null;
   guestName: string | null;
   arrivalDate: string | null;
   departureDate: string | null;
@@ -33,8 +34,21 @@ const cleaningLabel = (t: string): { label: string; className: string } => {
   if (v === 'depart' || v === 'a_blanc' || v === 'full') return { label: 'À blanc', className: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
   if (v === 'arrivee') return { label: 'Arrivée', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
   if (v === 'recouche' || v === 'quick' || v === 'occupied') return { label: 'Recouche', className: 'bg-blue-500/15 text-blue-600 border-blue-500/30' };
-  return { label: 'Aucun', className: 'bg-muted text-muted-foreground' };
+  if (v === 'hors_service') return { label: 'Hors service', className: 'bg-red-500/15 text-red-600 border-red-500/30' };
+  return { label: 'Rien à faire', className: 'bg-muted text-muted-foreground' };
 };
+
+const conditionLabel = (c: string | null): { label: string; className: string } => {
+  switch (c) {
+    case 'Clean': return { label: 'Propre', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
+    case 'CleanToBeInspected': return { label: 'À inspecter', className: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+    case 'Dirty': return { label: 'Sale', className: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
+    case 'OutOfService':
+    case 'OutOfOrder': return { label: 'Hors service', className: 'bg-red-500/15 text-red-600 border-red-500/30' };
+    default: return { label: '—', className: 'bg-muted text-muted-foreground' };
+  }
+};
+
 
 interface PmsConfig {
   id?: string;
@@ -443,6 +457,7 @@ export function PmsApiConfigPanel() {
                           <th className="px-3 py-2 font-medium">Chambre</th>
                           <th className="px-3 py-2 font-medium">Étage</th>
                           <th className="px-3 py-2 font-medium">Type</th>
+                          <th className="px-3 py-2 font-medium">État ménage</th>
                           <th className="px-3 py-2 font-medium">Nettoyage</th>
                           <th className="px-3 py-2 font-medium">Client</th>
                         </tr>
@@ -450,11 +465,15 @@ export function PmsApiConfigPanel() {
                       <tbody>
                         {previewRooms.map((r) => {
                           const c = cleaningLabel(r.cleaningType);
+                          const cond = conditionLabel(r.condition ?? null);
                           return (
                             <tr key={r.roomNumber} className="border-t">
                               <td className="px-3 py-2 font-medium">{r.roomNumber}</td>
                               <td className="px-3 py-2">{r.floor ?? '—'}</td>
                               <td className="px-3 py-2">{r.roomType ?? '—'}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className={cond.className}>{cond.label}</Badge>
+                              </td>
                               <td className="px-3 py-2">
                                 <Badge variant="outline" className={c.className}>{c.label}</Badge>
                               </td>

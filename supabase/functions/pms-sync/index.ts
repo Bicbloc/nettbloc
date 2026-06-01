@@ -19,6 +19,7 @@ interface ExtractedRoom {
   roomNumber: string;
   status: string;
   cleaningType: string;
+  condition?: string | null;
   floor?: number;
   roomType?: string;
   guestName?: string;
@@ -220,6 +221,23 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
   );
   const units = unitsData.units || [];
 
+  // 2b. Fetch housekeeping conditions (Clean/Dirty/...) from Operations API
+  const conditionByUnit: Record<string, string> = {};
+  try {
+    const opsData = await getJson(
+      `https://api.apaleo.com/operations/v1/units?propertyId=${propertyId}&pageSize=200`,
+      access_token,
+      'États de ménage Apaleo'
+    );
+    const opsUnits = opsData?.units || [];
+    for (const ou of opsUnits) {
+      const cond = ou?.status?.condition || ou?.condition;
+      if (ou?.id && cond) conditionByUnit[ou.id] = cond;
+    }
+  } catch (e) {
+    console.warn('Conditions de ménage Apaleo non récupérées:', e instanceof Error ? e.message : e);
+  }
+
   // 3. Fetch reservations for today
   const today = new Date().toISOString().split('T')[0];
   let reservations: any[] = [];
@@ -245,10 +263,15 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
 
   return units.map((unit: any) => {
     const reservation = reservationByUnit[unit.id];
-    let cleaningType = 'depart';
+    const condition = conditionByUnit[unit.id]; // Clean | Dirty | CleanToBeInspected | OutOfService | OutOfOrder
+    let cleaningType = 'none';
     let status = 'vacant';
 
-    if (reservation) {
+    if (condition === 'OutOfService' || condition === 'OutOfOrder') {
+      // Chambre hors service : pas de ménage
+      cleaningType = 'hors_service';
+      status = 'out-of-service';
+    } else if (reservation) {
       const departure = reservation.departure?.split('T')[0];
       const arrival = reservation.arrival?.split('T')[0];
       if (departure === today) {
@@ -261,12 +284,26 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
         cleaningType = 'recouche';
         status = 'occupied';
       }
+    } else {
+      // Aucune réservation : on se fie à l'état de ménage Apaleo
+      if (condition === 'Dirty') {
+        cleaningType = 'depart';
+        status = 'checkout';
+      } else if (condition === 'Clean' || condition === 'CleanToBeInspected') {
+        cleaningType = 'none';
+        status = 'clean';
+      } else {
+        // Pas d'info de condition : repli sur l'ancien comportement (à blanc)
+        cleaningType = 'depart';
+        status = 'vacant';
+      }
     }
 
     return {
       roomNumber: unit.name || unit.id,
       status,
       cleaningType,
+      condition: condition ?? null,
       floor: unit.floor ? parseInt(unit.floor) : undefined,
       roomType: unit.unitGroup?.name,
       guestName: reservation?.primaryGuest ? `${reservation.primaryGuest.lastName || ''} ${reservation.primaryGuest.firstName || ''}`.trim() : undefined,
@@ -375,6 +412,7 @@ Deno.serve(async (req) => {
             floor: r.floor ?? null,
             roomType: r.roomType ?? null,
             cleaningType: r.cleaningType,
+            condition: r.condition ?? null,
             guestName: r.guestName ?? null,
             arrivalDate: r.arrivalDate ?? null,
             departureDate: r.departureDate ?? null,
@@ -413,7 +451,7 @@ Deno.serve(async (req) => {
           throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
       }
 
-      // Map cleaningType (depart/arrivee/recouche) -> cleaning_type stocké en base
+      // Map cleaningType (depart/arrivee/recouche/none/hors_service) -> cleaning_type stocké en base
       const toDbCleaningType = (t?: string): string => {
         switch ((t || '').toLowerCase()) {
           case 'depart':
@@ -430,6 +468,13 @@ Deno.serve(async (req) => {
         }
       };
 
+      // Statut chambre : propre / hors service -> pas besoin de ménage
+      const toDbStatus = (room: ExtractedRoom): string => {
+        if (room.cleaningType === 'hors_service' || room.status === 'out-of-service') return 'out-of-service';
+        if (room.status === 'clean' && room.cleaningType === 'none') return 'clean';
+        return 'needs-cleaning';
+      };
+
       // Upsert rooms into the rooms table (colonnes existantes uniquement)
       for (const room of rooms) {
         await adminClient
@@ -437,7 +482,7 @@ Deno.serve(async (req) => {
           .upsert({
             hotel_id,
             room_number: room.roomNumber,
-            status: 'needs-cleaning',
+            status: toDbStatus(room),
             cleaning_type: toDbCleaningType(room.cleaningType),
             floor: room.floor ?? null,
             room_type: room.roomType ?? null,
