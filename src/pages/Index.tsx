@@ -468,12 +468,13 @@ const IndexDashboard = () => {
 
         if (error || !roomsData) return;
 
-        // Récupérer les assignations actives
+        // Récupérer les assignations (inclure 'completed' pour ne pas désassigner
+        // automatiquement les chambres terminées par la femme de chambre).
         const { data: assignmentsData } = await supabase
           .from('assignments')
           .select('room_id, housekeeper_name')
           .eq('hotel_id', currentHotelId)
-          .in('status', ['assigned', 'in_progress']);
+          .in('status', ['assigned', 'in_progress', 'completed']);
 
         const assignmentMap: Record<string, string> = {};
         (assignmentsData || []).forEach((a: any) => {
