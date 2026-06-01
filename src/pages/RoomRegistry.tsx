@@ -48,6 +48,20 @@ interface RoomRegistryItem {
 
 const RoomRegistry = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('tour') === '1') {
+      setShowTour(true);
+    }
+  }, [searchParams]);
+
+  const closeTour = () => {
+    setShowTour(false);
+    searchParams.delete('tour');
+    setSearchParams(searchParams, { replace: true });
+  };
   const { hotelId: ownerHotelId, hotelName: ownerHotelName, isLoading: hotelContextLoading } = useHotel();
   const { currentHotelSession, loading: housekeeperLoading } = useHousekeeperAuth();
   const { currentHotelSession: techHotelSession, loading: techLoading } = useTechnicianAuth();
