@@ -1229,7 +1229,9 @@ const HousekeeperWorkContent: React.FC = () => {
           </Card>
         )}
       </div>
+      </div>
     </div>
+
   );
 };
 
