@@ -266,6 +266,7 @@ export function PmsApiConfigPanel() {
       if (data?.success) {
         toast({ title: '✅ Synchronisation terminée', description: data.message });
         loadConfig(); // Refresh to show last_sync
+        setPendingRefreshKey(k => k + 1);
       } else {
         toast({ title: '❌ Échec synchronisation', description: data?.error || 'Erreur', variant: 'destructive' });
       }
