@@ -498,11 +498,22 @@ export function SubscriptionCard() {
               <Button variant="outline" className="flex-1" onClick={() => setShowDetails(false)}>
                 Fermer
               </Button>
-              {isPremium && (
-                <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
-                  Annuler l'abonnement
+              {isPremium && !isPaused && (
+                <Button variant="outline" onClick={() => setShowPauseDialog(true)}>
+                  Suspendre temporairement
                 </Button>
               )}
+              {isPaused && (
+                <Button onClick={handleResumeSubscription} disabled={isResuming}>
+                  {isResuming ? 'Réactivation...' : 'Réactiver'}
+                </Button>
+              )}
+              {isPremium && (
+                <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
+                  Résilier l'abonnement
+                </Button>
+              )}
+
             </div>
           </div>
         </DialogContent>
