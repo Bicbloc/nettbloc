@@ -474,9 +474,11 @@ function GovernessDashboardContent() {
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
       <StaffNotificationBanner hotelId={selectedHotel?.id} />
 
       <main className="px-4 py-4 space-y-4">
+
         {/* Demandes en attente */}
         {pendingRequests.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50 rounded-2xl">
