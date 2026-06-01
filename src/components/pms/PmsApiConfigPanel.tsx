@@ -314,6 +314,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     }
   };
 
+  const deleteConfig = async () => {
     if (!config.id) return;
     try {
       await supabase
