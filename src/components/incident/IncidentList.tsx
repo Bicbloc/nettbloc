@@ -35,6 +35,10 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
   const [filterStatus, setFilterStatus] = useState<string>(defaultFilterStatus);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [editingIncident, setEditingIncident] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string>("");
 
   const { data: incidents, isLoading } = useQuery({
     queryKey: ["incidents", hotelId, filterStatus, filterPriority, sortByPriority],
@@ -101,7 +105,46 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
     },
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ["incident-categories", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("incident_categories")
+        .select("id, name, icon")
+        .eq("hotel_id", hotelId)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const updateIncidentMutation = useMutation({
+    mutationFn: async ({ incidentId, title, description, categoryId }: { incidentId: string; title: string; description: string; categoryId: string | null }) => {
+      const { error } = await supabase
+        .from("incidents")
+        .update({ title, description, category_id: categoryId })
+        .eq("id", incidentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      setEditingIncident(null);
+      toast({ title: "Incident modifié" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (incident: any) => {
+    setEditingIncident(incident);
+    setEditTitle(incident.title || "");
+    setEditDescription(incident.description || "");
+    setEditCategoryId(incident.category_id || "");
+  };
+
   const updateStatusMutation = useMutation({
+
     mutationFn: async ({ incidentId, status }: { incidentId: string; status: string }) => {
       const userResp = await supabase.auth.getUser();
       const userId = userResp.data.user?.id;
@@ -378,6 +421,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
                 onDeleteComment={(commentId) =>
                   deleteCommentMutation.mutate(commentId)
                 }
+                onEdit={() => openEditDialog(incident)}
               />
             ))
           )}
@@ -458,6 +502,66 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
               className="w-full"
             >
               {addCommentMutation.isPending ? "Envoi..." : "Ajouter le commentaire"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Incident Dialog */}
+      <Dialog open={!!editingIncident} onOpenChange={(open) => !open && setEditingIncident(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Modifier l'incident</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nom</label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Nom de l'incident"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Description"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Catégorie</label>
+              <Select value={editCategoryId || "none"} onValueChange={(v) => setEditCategoryId(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir une catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {categories?.map((cat: any) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                if (editingIncident && editTitle.trim()) {
+                  updateIncidentMutation.mutate({
+                    incidentId: editingIncident.id,
+                    title: editTitle.trim(),
+                    description: editDescription.trim(),
+                    categoryId: editCategoryId || null,
+                  });
+                }
+              }}
+              disabled={!editTitle.trim() || updateIncidentMutation.isPending}
+              className="w-full"
+            >
+              {updateIncidentMutation.isPending ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </div>
         </DialogContent>
