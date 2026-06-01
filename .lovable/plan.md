@@ -1,43 +1,44 @@
-# Détection fiable des types de nettoyage Apaleo
+# Synchro automatique du matin (6h) + fonctionnement de la clôture
+
+## Ce qui existe déjà
+
+**La clôture fonctionne** (fonction `auto-close-day`, cron toutes les 15 min) :
+- Chaque hôtel a ses réglages : `auto_close_enabled`, `auto_close_time`, `auto_close_days`, `auto_close_timezone`.
+- Quand l'heure configurée est atteinte (dans le fuseau de l'hôtel), la journée se clôture : archivage du rapport quotidien + logs, puis **suppression des chambres, des affectations et des inventaires linge du jour**, et désactivation des sessions.
+- Conséquence importante : après la clôture, la table des chambres est **vide** jusqu'à la prochaine synchro/import.
+
+**Ce qui manque :** il n'y a **aucune synchro PMS automatique le matin**. Aujourd'hui il faut relancer manuellement « Tester la connexion » puis « Enregistrer les chambres » chaque jour. Le réglage « fréquence de synchro » est stocké mais n'est branché sur aucune tâche planifiée.
 
 ## Objectif
-Aujourd'hui, le type de nettoyage (À blanc / Recouche / Arrivée) est déduit **uniquement** des dates `arrival` / `departure` des réservations. C'est fragile : une chambre sans réservation trouvée est mise « À blanc » par défaut, et on ignore l'état réel du ménage. On va croiser cette logique avec le **statut de ménage natif d'Apaleo** (champ `condition`: `Clean`, `Dirty`, `CleanToBeInspected`, `OutOfService`, `OutOfOrder`).
+Chaque matin à 6h (heure locale de l'hôtel), synchroniser automatiquement Apaleo/Mews pour recréer les chambres du jour avec leur type (À blanc / Recouche / Arrivée / Hors service), prêtes pour l'affectation.
 
-## Logique cible (dans `pms-sync`)
+## Plan
 
-Pour chaque chambre, on combine deux sources :
+### 1. Réglages de synchro auto (base de données)
+Ajouter sur `hotel_pms_configs` :
+- `auto_sync_enabled` (booléen, défaut `true`)
+- `auto_sync_time` (heure, défaut `06:00`)
+- `last_auto_sync_date` (date, pour éviter de synchroniser deux fois le même jour)
 
-1. **`condition`** Apaleo (état physique de la chambre) — récupéré via l'API Inventory (les units exposent `condition`).
-2. **Réservation du jour** (dates arrivée/départ) — déjà récupérée.
+Le fuseau horaire réutilise celui de la clôture (`hotels.auto_close_timezone`, défaut `Europe/Paris`).
 
-Règles de décision :
+### 2. Action planifiée dans `pms-sync`
+Ajouter une action `scheduled` à la fonction `pms-sync`, protégée par un secret (`CRON_SECRET`) au lieu de l'authentification utilisateur :
+- Parcourt toutes les configs `is_active = true` et `auto_sync_enabled = true`.
+- Pour chaque hôtel, calcule l'heure locale ; si l'heure de synchro est atteinte et que la synchro du jour n'a pas encore eu lieu, lance l'extraction des chambres (logique Apaleo/Mews déjà en place) et fait l'upsert dans `rooms`.
+- Met à jour `last_auto_sync_date`, `last_sync_at`, `last_sync_status` et écrit un `pms_sync_logs`.
 
-```text
-Si condition = OutOfService / OutOfOrder  -> chambre HORS SERVICE (pas de ménage)
-Sinon, selon la réservation du jour :
-  - départ aujourd'hui                     -> À BLANC (a_blanc)
-  - arrivée aujourd'hui (sans départ)      -> ARRIVÉE (arrivee)
-  - séjour en cours (ni l'un ni l'autre)   -> RECOUCHE (recouche)
-  - aucune réservation :
-        condition = Dirty                  -> À BLANC (a_blanc)
-        condition = Clean / CleanToInspect -> RIEN À FAIRE (none / clean)
-```
+### 3. Tâche planifiée (cron)
+Créer un cron Supabase qui appelle `pms-sync` (action `scheduled`) **toutes les 15 minutes** avec le `CRON_SECRET`. Le déclenchement réel au bon moment est géré dans la fonction selon le fuseau de chaque hôtel (même principe que `auto-close-day`).
 
-Le statut affiché en base reste cohérent avec le registre existant (`needs-cleaning`, etc.), et les chambres déjà propres / hors service ne sont plus systématiquement marquées « À blanc ».
+### 4. Interface (PmsApiConfigPanel)
+- Ajouter un interrupteur « Synchro automatique chaque matin » + un champ heure (défaut 06:00).
+- Afficher la date/heure de dernière synchro auto.
 
-## Détails techniques
+## Points techniques
+- Le secret `CRON_SECRET` sera ajouté via l'outil de secrets avant de brancher le cron.
+- La synchro du matin a lieu après la clôture de la veille (chambres vides) → recréation propre, sans écraser le travail en cours.
+- Repli : si un hôtel n'a pas de fuseau défini, on utilise `Europe/Paris`.
 
-- Modifier `fetchApaleoRooms()` dans `supabase/functions/pms-sync/index.ts` :
-  - Lire le champ `condition` retourné par l'endpoint `inventory/v1/units` (ajouter `expand=condition` ou utiliser `operations/v1/maintenances` si le champ n'est pas présent ; vérifier via un appel test).
-  - Ajouter `condition` à l'objet chambre retourné (pour l'affichage dans l'aperçu).
-  - Mettre à jour la logique `cleaningType` / `status` selon les règles ci-dessus.
-- Adapter le mapping `toDbCleaningType()` pour gérer le cas « propre / rien à faire » et « hors service ».
-- Afficher la colonne « État ménage » (Clean/Dirty) dans le tableau d'aperçu de `PmsApiConfigPanel.tsx` pour que l'utilisateur voie d'où vient la décision.
-
-## Validation
-- Déployer `pms-sync`, relancer « Tester la connexion » sur le compte démo.
-- Vérifier que les chambres propres ne sont plus toutes en « À blanc » et que `condition` remonte bien.
-- Contrôler les logs de la fonction en cas de réponse vide.
-
-## Note
-Si l'API du compte Apaleo n'expose pas le champ `condition` (selon les scopes accordés), on conserve la logique actuelle basée sur les dates comme repli automatique, sans casser la synchro.
+## Question
+Veux-tu que l'heure de 6h soit **configurable par hôtel** (recommandé, comme la clôture) ou **fixe à 6h** pour tout le monde ?
