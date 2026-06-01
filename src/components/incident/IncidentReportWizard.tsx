@@ -627,10 +627,10 @@ export function IncidentReportWizard({
       createNotification({
         hotelId,
         title: "🛠️ Incident signalé",
-        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''} (par ${reportedByName})`,
+        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''} (par ${incident.reported_by_name || 'Utilisateur'})`,
         type: "incident",
         roomNumber: incident.location_reference || undefined,
-        housekeeperName: reportedByName,
+        housekeeperName: incident.reported_by_name || undefined,
       });
 
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
