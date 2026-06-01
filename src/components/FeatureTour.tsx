@@ -36,6 +36,8 @@ interface TourStep {
   badge?: { fr: string; en: string };
   title: { fr: string; en: string };
   desc: { fr: string; en: string };
+  /** Action optionnelle : ouvre une autre page guidée */
+  action?: { label: { fr: string; en: string }; to: string };
 }
 
 const STEPS: TourStep[] = [
