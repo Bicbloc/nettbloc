@@ -188,6 +188,7 @@ const STEPS: TourStep[] = [
     },
   },
   {
+    icon: <Check className="h-6 w-6" />,
     title: { fr: "Vous êtes prêt ! 🎉", en: "You're all set! 🎉" },
     desc: {
       fr: "Récapitulatif : 1) invitez vos employés, 2) entraînez le PDF, 3) importez et affectez les chambres. Le reste se gère au quotidien. Bon travail avec Nettobloc !",
