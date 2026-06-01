@@ -423,7 +423,81 @@ export function PmsApiConfigPanel() {
             </>
           )}
 
+          {/* Aperçu des chambres récupérées depuis le PMS */}
+          {previewRooms && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <DoorOpen className="h-4 w-4 text-primary" />
+                  <h4 className="font-medium text-sm">
+                    {previewRooms.length} chambre{previewRooms.length > 1 ? 's' : ''} trouvée{previewRooms.length > 1 ? 's' : ''}
+                  </h4>
+                </div>
+
+                {previewRooms.length > 0 && (
+                  <ScrollArea className="h-64 rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Chambre</th>
+                          <th className="px-3 py-2 font-medium">Étage</th>
+                          <th className="px-3 py-2 font-medium">Type</th>
+                          <th className="px-3 py-2 font-medium">Nettoyage</th>
+                          <th className="px-3 py-2 font-medium">Client</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewRooms.map((r) => {
+                          const c = cleaningLabel(r.cleaningType);
+                          return (
+                            <tr key={r.roomNumber} className="border-t">
+                              <td className="px-3 py-2 font-medium">{r.roomNumber}</td>
+                              <td className="px-3 py-2">{r.floor ?? '—'}</td>
+                              <td className="px-3 py-2">{r.roomType ?? '—'}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className={c.className}>{c.label}</Badge>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">{r.guestName ?? '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </ScrollArea>
+                )}
+
+                {previewRooms.length > 0 && !imported && (
+                  <Button onClick={importRooms} disabled={importing} className="w-full sm:w-auto">
+                    {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Enregistrer ces {previewRooms.length} chambres dans le registre
+                  </Button>
+                )}
+
+                {imported && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Chambres enregistrées dans le registre
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/room-registry')}>
+                        <ListChecks className="h-4 w-4 mr-2" />
+                        Voir le registre
+                      </Button>
+                      <Button size="sm" onClick={() => navigate('/team')}>
+                        <Users className="h-4 w-4 mr-2" />
+                        Affecter les chambres
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           {/* Actions */}
+
           <Separator />
           <div className="flex flex-wrap gap-2">
             <Button onClick={saveConfig} disabled={saving || !config.pms_type}>
