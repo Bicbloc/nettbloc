@@ -412,6 +412,7 @@ Deno.serve(async (req) => {
             floor: r.floor ?? null,
             roomType: r.roomType ?? null,
             cleaningType: r.cleaningType,
+            condition: r.condition ?? null,
             guestName: r.guestName ?? null,
             arrivalDate: r.arrivalDate ?? null,
             departureDate: r.departureDate ?? null,
