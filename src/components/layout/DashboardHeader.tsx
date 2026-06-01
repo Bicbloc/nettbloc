@@ -11,6 +11,7 @@ import { UpgradeButton } from "@/components/UpgradeButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import UserMenu from "@/components/UserMenu";
 import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
+import { AutoCloseSettingsDialog } from "@/components/AutoCloseSettingsDialog";
 import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
 import { cn } from "@/lib/utils";
 
