@@ -20,6 +20,7 @@ interface ImageRecognitionButtonProps {
   onResult: (result: RecognitionResult) => void;
   disabled?: boolean;
   className?: string;
+  hotelId?: string;
 }
 
 export function ImageRecognitionButton({
@@ -27,6 +28,7 @@ export function ImageRecognitionButton({
   onResult,
   disabled,
   className,
+  hotelId,
 }: ImageRecognitionButtonProps) {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
