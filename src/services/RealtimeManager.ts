@@ -383,10 +383,15 @@ class RealtimeManager {
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       this.notifyStatus('FAILED');
+      // Après une pause, réinitialiser et retenter automatiquement
+      // pour éviter d'avoir à ressortir/rentrer manuellement
       setTimeout(() => {
         this.reconnectAttempts = 0;
         this.consecutiveFailures = 0;
-      }, 120000);
+        if (this.hotelId && this.isOnline && !this.isPaused) {
+          this.softReconnect();
+        }
+      }, 20000);
       return;
     }
 
