@@ -473,7 +473,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return () => { supabase.removeChannel(channel); };
   }, [hotelId, refreshHousekeepers]);
 
-  const value = {
+  const value = useMemo(() => ({
     housekeeperNames,
     rooms,
     isDistributed,
@@ -487,7 +487,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     addNotification: addNotificationFn || (async () => null),
     validateHotelConnection,
     refreshHousekeepers,
-  };
+  }), [housekeeperNames, rooms, isDistributed, notifications, housekeepers, addNotificationFn, refreshHousekeepers]);
 
   return (
     <HousekeepingContext.Provider value={value}>
