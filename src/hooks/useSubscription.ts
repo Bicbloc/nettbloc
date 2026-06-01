@@ -233,7 +233,9 @@ export function useSubscription() {
         maxRooms: isInTrial ? 999999 : (planConfig.maxRooms || 999999),
         featuresEnabled,
         planConfig,
-        subscriptionStatus
+        subscriptionStatus,
+        isPaused: subscriptionStatus === 'paused'
+
       });
     } catch (error) {
       console.error('Error checking subscription:', error);
