@@ -624,6 +624,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
             )}
           </div>
         </CardContent>
+        )}
       </Card>
     </FeatureGuard>
   );
