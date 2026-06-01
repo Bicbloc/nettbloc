@@ -4010,6 +4010,63 @@ export type Database = {
           },
         ]
       }
+      pms_pending_rooms: {
+        Row: {
+          created_at: string
+          detected_at: string
+          floor: number | null
+          hotel_id: string
+          id: string
+          pms_type: string | null
+          resolved_at: string | null
+          room_number: string
+          room_type: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detected_at?: string
+          floor?: number | null
+          hotel_id: string
+          id?: string
+          pms_type?: string | null
+          resolved_at?: string | null
+          room_number: string
+          room_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detected_at?: string
+          floor?: number | null
+          hotel_id?: string
+          id?: string
+          pms_type?: string | null
+          resolved_at?: string | null
+          room_number?: string
+          room_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pms_pending_rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pms_pending_rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pms_rules: {
         Row: {
           combination_rules: Json | null

@@ -354,7 +354,17 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
   try {
     const rooms = await extractRoomsForConfig(pmsConfig);
 
+    // Registre permanent : on ne l'enrichit PAS automatiquement.
+    // Les chambres détectées hors registre sont proposées à la validation (pms_pending_rooms).
+    const { data: registryRooms } = await adminClient
+      .from('hotel_rooms_registry')
+      .select('room_number')
+      .eq('hotel_id', hotel_id)
+      .eq('is_active', true);
+    const registrySet = new Set((registryRooms || []).map((r: any) => String(r.room_number)));
+
     for (const room of rooms) {
+      // Opérations du jour : on (re)crée la chambre dans rooms.
       await adminClient
         .from('rooms')
         .upsert({
@@ -366,6 +376,20 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
           room_type: room.roomType ?? null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'hotel_id,room_number' });
+
+      // Nouvelle chambre absente du registre -> proposition (sans écraser les statuts ignored/added existants).
+      if (!registrySet.has(String(room.roomNumber))) {
+        await adminClient
+          .from('pms_pending_rooms')
+          .upsert({
+            hotel_id,
+            room_number: room.roomNumber,
+            floor: room.floor ?? null,
+            room_type: room.roomType ?? null,
+            pms_type: pmsConfig.pms_type,
+            detected_at: new Date().toISOString(),
+          }, { onConflict: 'hotel_id,room_number', ignoreDuplicates: true });
+      }
     }
 
     await adminClient

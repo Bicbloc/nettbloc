@@ -17,6 +17,7 @@ import {
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
   Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks
 } from 'lucide-react';
+import { PendingRoomsSection } from './PendingRoomsSection';
 
 interface PreviewRoom {
   roomNumber: string;
@@ -107,6 +108,7 @@ export function PmsApiConfigPanel() {
   const [previewRooms, setPreviewRooms] = useState<PreviewRoom[] | null>(null);
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
 
   useEffect(() => {
     if (hotelId) loadConfig();
@@ -264,6 +266,7 @@ export function PmsApiConfigPanel() {
       if (data?.success) {
         toast({ title: '✅ Synchronisation terminée', description: data.message });
         loadConfig(); // Refresh to show last_sync
+        setPendingRefreshKey(k => k + 1);
       } else {
         toast({ title: '❌ Échec synchronisation', description: data?.error || 'Erreur', variant: 'destructive' });
       }
@@ -561,6 +564,10 @@ export function PmsApiConfigPanel() {
               </div>
             </>
           )}
+
+          <PendingRoomsSection hotelId={hotelId} refreshKey={pendingRefreshKey} />
+
+
 
           {/* Actions */}
 
