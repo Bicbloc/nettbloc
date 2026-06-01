@@ -39,6 +39,21 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Fire-and-forget AI token usage logging
+    const logAiUsage = (aiData: any, usedModel: string) => {
+      try {
+        const u = aiData?.usage || {};
+        supabase.from('ai_usage_logs').insert({
+          hotel_id: hotelId ?? null,
+          function_name: 'count-linen',
+          model: usedModel,
+          prompt_tokens: u.prompt_tokens ?? 0,
+          completion_tokens: u.completion_tokens ?? 0,
+          total_tokens: u.total_tokens ?? ((u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0)),
+        }).then(() => {}, () => {});
+      } catch (_) { /* ignore */ }
+    };
+
     // Get linen type details including thickness for ruler-based calculation
     const { data: linenType, error: linenError } = await supabase
       .from('linen_types')
