@@ -451,7 +451,7 @@ Deno.serve(async (req) => {
           throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
       }
 
-      // Map cleaningType (depart/arrivee/recouche) -> cleaning_type stocké en base
+      // Map cleaningType (depart/arrivee/recouche/none/hors_service) -> cleaning_type stocké en base
       const toDbCleaningType = (t?: string): string => {
         switch ((t || '').toLowerCase()) {
           case 'depart':
@@ -468,6 +468,13 @@ Deno.serve(async (req) => {
         }
       };
 
+      // Statut chambre : propre / hors service -> pas besoin de ménage
+      const toDbStatus = (room: ExtractedRoom): string => {
+        if (room.cleaningType === 'hors_service' || room.status === 'out-of-service') return 'out-of-service';
+        if (room.status === 'clean' && room.cleaningType === 'none') return 'clean';
+        return 'needs-cleaning';
+      };
+
       // Upsert rooms into the rooms table (colonnes existantes uniquement)
       for (const room of rooms) {
         await adminClient
@@ -475,7 +482,7 @@ Deno.serve(async (req) => {
           .upsert({
             hotel_id,
             room_number: room.roomNumber,
-            status: 'needs-cleaning',
+            status: toDbStatus(room),
             cleaning_type: toDbCleaningType(room.cleaningType),
             floor: room.floor ?? null,
             room_type: room.roomType ?? null,
