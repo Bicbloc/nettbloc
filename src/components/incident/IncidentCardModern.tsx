@@ -109,6 +109,7 @@ export function IncidentCardModern({
   onAddComment,
   onEditComment,
   onDeleteComment,
+  onEdit,
 }: IncidentCardModernProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
