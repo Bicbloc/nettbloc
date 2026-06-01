@@ -294,7 +294,7 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
       roomNumber: unit.name || unit.id,
       status,
       cleaningType,
-      condition: condition ?? null,
+      condition: maintenance ?? condition ?? null,
       floor: unit.floor ? parseInt(unit.floor) : undefined,
       roomType: unit.unitGroup?.name,
       guestName: reservation?.primaryGuest ? `${reservation.primaryGuest.lastName || ''} ${reservation.primaryGuest.firstName || ''}`.trim() : undefined,
