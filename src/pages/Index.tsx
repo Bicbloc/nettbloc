@@ -766,7 +766,7 @@ const IndexDashboard = () => {
           className="fixed bottom-20 right-4 z-50 rounded-full shadow-lg gap-2 sm:bottom-6"
         >
           <GraduationCap className="h-4 w-4" />
-          {t('Tutoriel') || 'Tutoriel'}
+          {language === 'fr' ? 'Tutoriel' : 'Tutorial'}
         </Button>
       )}
 
