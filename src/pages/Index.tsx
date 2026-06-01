@@ -28,6 +28,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
+import { FeatureTour, isFeatureTourDone, markFeatureTourDone } from "@/components/FeatureTour";
 import { useRoomManagement } from "@/hooks/use-room-management";
 import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
@@ -266,6 +267,7 @@ const IndexDashboard = () => {
   
   const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [showFeatureTour, setShowFeatureTour] = useState(false);
   
   // Room management hooks
   const {
@@ -371,6 +373,29 @@ const IndexDashboard = () => {
   const handleSetupComplete = (newConfig: CleaningConfig) => {
     setCleaningConfig(newConfig);
     setShowSetupWizard(false);
+    // Lancer le tutoriel guidé juste après la configuration initiale
+    if (!isFeatureTourDone(currentHotelId)) {
+      setShowFeatureTour(true);
+    }
+  };
+
+  // Démarrer le tutoriel à la première connexion (si pas de wizard en cours)
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      currentHotelId &&
+      !showSetupWizard &&
+      !setupCheckLoading &&
+      !needsSetup &&
+      !isFeatureTourDone(currentHotelId)
+    ) {
+      setShowFeatureTour(true);
+    }
+  }, [isAuthenticated, currentHotelId, showSetupWizard, setupCheckLoading, needsSetup]);
+
+  const handleFeatureTourClose = () => {
+    setShowFeatureTour(false);
+    markFeatureTourDone(currentHotelId);
   };
 
   // Update config based on premium status
@@ -722,8 +747,15 @@ const IndexDashboard = () => {
           isPremium={isPremium}
         />
       )}
+
+      <FeatureTour
+        isOpen={showFeatureTour && !showOnboardingWizard && !showSetupWizard}
+        onTabChange={setActiveTab}
+        onClose={handleFeatureTourClose}
+      />
       
       <NotificationSound />
+
       
       <MainLayout
         activeTab={activeTab}
