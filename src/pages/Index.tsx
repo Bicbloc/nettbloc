@@ -28,6 +28,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
+import { FeatureTour, isFeatureTourDone, markFeatureTourDone } from "@/components/FeatureTour";
 import { useRoomManagement } from "@/hooks/use-room-management";
 import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
