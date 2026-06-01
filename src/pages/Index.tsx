@@ -487,12 +487,12 @@ const IndexDashboard = () => {
     onUpdate: handleRealtimeUpdate
   });
 
-  // Load rooms from database
-  useEffect(() => {
-    const loadRoomsFromDatabase = async () => {
-      // Ne pas recharger si une opération est en cours
-      if (!currentHotelId || isImporting || isAssigning) return;
-      
+  // Rechargement réutilisable des chambres depuis la base (filet de secours)
+  const refetchRooms = useCallback(async () => {
+    // Ne pas recharger si une opération est en cours
+    if (!currentHotelId || isImporting || isAssigning) return;
+
+    {
       try {
         const { data: roomsData, error } = await supabase
           .from('rooms')
