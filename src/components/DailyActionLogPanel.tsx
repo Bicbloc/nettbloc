@@ -70,11 +70,13 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
       queryClient.invalidateQueries({ queryKey: ['daily-action-logs', hotelId] });
     };
 
+    const actionLogSubscriptionId = realtimeManager.subscribe('daily_action_logs', refreshLogs);
     const roomStatusSubscriptionId = realtimeManager.subscribe('room_status_updates', refreshLogs);
     const notificationsSubscriptionId = realtimeManager.subscribe('notifications', refreshLogs);
     void realtimeManager.connect(hotelId);
 
     return () => {
+      realtimeManager.unsubscribe(actionLogSubscriptionId);
       realtimeManager.unsubscribe(roomStatusSubscriptionId);
       realtimeManager.unsubscribe(notificationsSubscriptionId);
     };
