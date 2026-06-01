@@ -255,7 +255,9 @@ export const LinenDailyReport = ({
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
+
 
         {/* Pied de page */}
         <div className="text-center text-xs text-gray-400 pt-4 border-t border-gray-200">
