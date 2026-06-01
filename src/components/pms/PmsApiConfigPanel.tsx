@@ -108,6 +108,7 @@ export function PmsApiConfigPanel() {
   const [previewRooms, setPreviewRooms] = useState<PreviewRoom[] | null>(null);
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
 
   useEffect(() => {
     if (hotelId) loadConfig();
