@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { RegistryTour } from '@/components/RegistryTour';
 import { useHotel } from '@/contexts/HotelContext';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
