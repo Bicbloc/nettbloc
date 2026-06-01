@@ -792,17 +792,35 @@ const IndexDashboard = () => {
         isOpen={showFeatureTour && !showOnboardingWizard && !showSetupWizard}
         onTabChange={setActiveTab}
         onClose={handleFeatureTourClose}
+        initialStep={tourStartStep}
       />
 
       {!isGuestMode && currentHotelId && !showFeatureTour && !showSetupWizard && !showOnboardingWizard && (
-        <Button
-          onClick={handleStartTour}
-          size="sm"
-          className="fixed bottom-20 right-4 z-50 rounded-full shadow-lg gap-2 sm:bottom-6"
-        >
-          <GraduationCap className="h-4 w-4" />
-          {language === 'fr' ? 'Tutoriel' : 'Tutorial'}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              className="fixed bottom-20 right-4 z-50 rounded-full shadow-lg gap-2 sm:bottom-6"
+            >
+              <GraduationCap className="h-4 w-4" />
+              {language === 'fr' ? 'Tutoriel' : 'Tutorial'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-[60vh] w-64 overflow-y-auto">
+            <DropdownMenuItem onClick={() => handleStartTour(0)} className="font-medium">
+              {language === 'fr' ? '▶ Revoir tout depuis le début' : '▶ Replay from the start'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>
+              {language === 'fr' ? 'Revoir une fonctionnalité' : 'Review a feature'}
+            </DropdownMenuLabel>
+            {TOUR_TOPICS.slice(1).map((topic) => (
+              <DropdownMenuItem key={topic.index} onClick={() => handleStartTour(topic.index)}>
+                {topic.title[language === 'fr' ? 'fr' : 'en']}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <NotificationSound />
