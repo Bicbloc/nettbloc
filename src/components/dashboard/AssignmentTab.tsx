@@ -296,6 +296,7 @@ export function AssignmentTab({
                 <div key={name} className="min-w-0 w-full">
                   <HousekeeperCard
                     name={name}
+                    draggable
                     rooms={housekeeperRooms}
                     cleaningConfig={cleaningConfig}
                     onGenerateReport={onGenerateReport}
