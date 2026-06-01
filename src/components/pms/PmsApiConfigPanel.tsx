@@ -162,6 +162,8 @@ export function PmsApiConfigPanel() {
   const testConnection = async () => {
     if (!hotelId) return;
     setTesting(true);
+    setPreviewRooms(null);
+    setImported(false);
     try {
       // Save first
       await saveConfig();
@@ -180,6 +182,7 @@ export function PmsApiConfigPanel() {
       }
 
       if (data?.success) {
+        setPreviewRooms(Array.isArray(data.rooms) ? data.rooms : []);
         toast({ title: '✅ Connexion réussie', description: data.message });
       } else {
         toast({ title: '❌ Échec de connexion', description: data?.error || 'Erreur inconnue', variant: 'destructive' });
@@ -190,6 +193,37 @@ export function PmsApiConfigPanel() {
       setTesting(false);
     }
   };
+
+  const importRooms = async () => {
+    if (!hotelId) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('pms-sync', {
+        body: { hotel_id: hotelId, action: 'import' },
+      });
+
+      if (error) {
+        toast({ title: 'Erreur', description: "L'import n'a pas pu être effectué.", variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        setImported(true);
+        toast({
+          title: '✅ Chambres enregistrées',
+          description: `${data.rooms_synced ?? previewRooms?.length ?? 0} chambres ajoutées au registre.`,
+        });
+        loadConfig();
+      } else {
+        toast({ title: '❌ Échec', description: data?.error || 'Import impossible', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
 
   const syncNow = async () => {
     if (!hotelId) return;
