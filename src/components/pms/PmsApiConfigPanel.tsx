@@ -457,6 +457,7 @@ export function PmsApiConfigPanel() {
                           <th className="px-3 py-2 font-medium">Chambre</th>
                           <th className="px-3 py-2 font-medium">Étage</th>
                           <th className="px-3 py-2 font-medium">Type</th>
+                          <th className="px-3 py-2 font-medium">État ménage</th>
                           <th className="px-3 py-2 font-medium">Nettoyage</th>
                           <th className="px-3 py-2 font-medium">Client</th>
                         </tr>
@@ -464,11 +465,15 @@ export function PmsApiConfigPanel() {
                       <tbody>
                         {previewRooms.map((r) => {
                           const c = cleaningLabel(r.cleaningType);
+                          const cond = conditionLabel(r.condition ?? null);
                           return (
                             <tr key={r.roomNumber} className="border-t">
                               <td className="px-3 py-2 font-medium">{r.roomNumber}</td>
                               <td className="px-3 py-2">{r.floor ?? '—'}</td>
                               <td className="px-3 py-2">{r.roomType ?? '—'}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className={cond.className}>{cond.label}</Badge>
+                              </td>
                               <td className="px-3 py-2">
                                 <Badge variant="outline" className={c.className}>{c.label}</Badge>
                               </td>
