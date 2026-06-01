@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -340,6 +341,15 @@ export function IncidentReportDialogSimple({
         actor_name: userType === 'admin' ? 'Admin' : 'Utilisateur',
         actor_type: userType,
       }).then(() => {});
+
+      // Notification à l'établissement
+      createNotification({
+        hotelId,
+        title: "🛠️ Incident signalé",
+        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''}`,
+        type: "incident",
+        roomNumber: incident.location_reference || undefined,
+      });
 
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({

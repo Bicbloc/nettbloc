@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/services/notificationService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,6 +183,15 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
       if (images.length > 0 && incident) {
         await uploadImages(incident.id, user.id);
       }
+
+      // Notification à l'établissement
+      await createNotification({
+        hotelId,
+        title: "🛠️ Incident signalé",
+        description: `${incident.title}${incident.location_reference ? ` — Chambre ${incident.location_reference}` : ''}`,
+        type: "incident",
+        roomNumber: incident.location_reference || undefined,
+      });
 
       toast({
         title: "Incident signalé",
