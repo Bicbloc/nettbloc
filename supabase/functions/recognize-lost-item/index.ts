@@ -106,6 +106,7 @@ Réponds UNIQUEMENT en JSON valide avec cette structure:
     }
 
     const aiResponse = await response.json();
+void logAiUsage({ functionName: "recognize-lost-item", aiData: aiResponse, model: "google/gemini-2.5-flash", hotelId: context?.hotelId ?? null });
     const content = aiResponse.choices?.[0]?.message?.content || '';
     
     console.log('🤖 AI Response:', content);

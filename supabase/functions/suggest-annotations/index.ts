@@ -161,6 +161,7 @@ Retourne un JSON avec cette structure:
     }
 
     const aiData = await response.json();
+void logAiUsage({ functionName: "suggest-annotations", aiData, model: "google/gemini-2.5-flash", hotelId });
     const content = aiData.choices?.[0]?.message?.content || '';
     
     console.log("AI Response:", content);
