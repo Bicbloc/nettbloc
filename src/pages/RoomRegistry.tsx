@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { RegistryTour } from '@/components/RegistryTour';
 import { useHotel } from '@/contexts/HotelContext';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
@@ -47,6 +48,20 @@ interface RoomRegistryItem {
 
 const RoomRegistry = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('tour') === '1') {
+      setShowTour(true);
+    }
+  }, [searchParams]);
+
+  const closeTour = () => {
+    setShowTour(false);
+    searchParams.delete('tour');
+    setSearchParams(searchParams, { replace: true });
+  };
   const { hotelId: ownerHotelId, hotelName: ownerHotelName, isLoading: hotelContextLoading } = useHotel();
   const { currentHotelSession, loading: housekeeperLoading } = useHousekeeperAuth();
   const { currentHotelSession: techHotelSession, loading: techLoading } = useTechnicianAuth();
@@ -221,11 +236,11 @@ const RoomRegistry = () => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
+            <Button data-tour="reg-bulk" onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
               <Layers className="h-4 w-4 mr-2" />
               Équipement en masse
             </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
+            <Button data-tour="reg-add" onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
               <Plus className="h-4 w-4 mr-2" />
               Ajouter un espace
             </Button>
@@ -266,7 +281,7 @@ const RoomRegistry = () => {
 
         {/* Filters & View Toggle */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <Tabs value={categoryFilter} onValueChange={setCategoryFilter} className="w-full sm:w-auto">
+          <Tabs data-tour="reg-filter" value={categoryFilter} onValueChange={setCategoryFilter} className="w-full sm:w-auto">
             <TabsList className="w-full sm:w-auto grid grid-cols-4">
               <TabsTrigger value="all">Tout</TabsTrigger>
               <TabsTrigger value="room">Chambres</TabsTrigger>
@@ -283,7 +298,7 @@ const RoomRegistry = () => {
               className="pl-10"
             />
           </div>
-          <div className="flex border rounded-lg overflow-hidden shrink-0">
+          <div data-tour="reg-view" className="flex border rounded-lg overflow-hidden shrink-0">
             <Button
               variant={viewMode === 'plan' ? 'default' : 'ghost'}
               size="sm"
@@ -484,6 +499,8 @@ const RoomRegistry = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RegistryTour isOpen={showTour} onClose={closeTour} />
     </div>
   );
 };
