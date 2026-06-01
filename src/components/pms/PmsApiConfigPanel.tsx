@@ -287,7 +287,33 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     }
   };
 
-  const deleteConfig = async () => {
+  const registerWebhook = async () => {
+    if (!hotelId) return;
+    setRegisteringWebhook(true);
+    try {
+      await saveConfig();
+      const { data, error } = await supabase.functions.invoke('apaleo-register-webhook', {
+        body: { hotel_id: hotelId },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast({
+          title: '✅ Temps réel activé',
+          description:
+            data.status === 'already_registered'
+              ? 'Les notifications check-in / check-out étaient déjà activées dans Apaleo.'
+              : 'Apaleo enverra désormais les check-in / check-out instantanément à Nettobloc.',
+        });
+      } else {
+        toast({ title: '❌ Activation impossible', description: data?.error || 'Erreur inconnue', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Activation échouée', variant: 'destructive' });
+    } finally {
+      setRegisteringWebhook(false);
+    }
+  };
+
     if (!config.id) return;
     try {
       await supabase
