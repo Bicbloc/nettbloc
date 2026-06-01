@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
-import { useNotifications, type Notification } from '@/hooks/use-notifications';
+import { type Notification } from '@/hooks/use-notifications';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { supabase } from '@/integrations/supabase/client';
 import { useHotel } from '@/contexts/HotelContext';
@@ -49,8 +50,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string, user_id: string}>>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   
-  // Hook notifications utilise hotelId du contexte
-  const notificationsHook = useNotifications(hotelId || undefined);
+  // Réutilise l'unique instance partagée via NotificationContext (plus de double souscription)
+  const notificationsHook = useNotificationContext();
   const notifications = notificationsHook?.notifications || [];
   const addNotificationFn = notificationsHook?.addNotification;
 
