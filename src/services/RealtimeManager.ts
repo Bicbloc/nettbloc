@@ -268,7 +268,7 @@ class RealtimeManager {
     const channelName = `realtime_${hotelId}_${Date.now()}`;
     this.channel = supabase.channel(channelName);
 
-    const tables = ['notifications', 'room_status_updates', 'assignments', 'rooms', 'daily_reports', 'manual_tasks', 'daily_action_logs'];
+    const tables = ['notifications', 'room_status_updates', 'assignments', 'rooms', 'daily_reports', 'manual_tasks', 'daily_action_logs', 'incidents'];
 
     tables.forEach((table) => {
       this.channel!.on(
