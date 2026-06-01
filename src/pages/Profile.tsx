@@ -96,8 +96,20 @@ const Profile = () => {
         return;
       }
 
-      setProfile(data);
-      setEditedCompanyName(data.company_name || '');
+      // Le nom de l'hôtel (affiché sur la page principale) est la source de vérité.
+      // On l'utilise pour aligner l'affichage des paramètres si les deux diffèrent.
+      let resolvedName = data.company_name || '';
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (hotelData?.name) {
+        resolvedName = hotelData.name;
+      }
+
+      setProfile({ ...data, company_name: resolvedName || data.company_name });
+      setEditedCompanyName(resolvedName);
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
