@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     }
 
     const already = existing.find(
-      (s: any) => (s.endpointUrl || '') === endpointUrl && s.topic === 'reservation',
+      (s: any) => (s.endpointUrl || '') === endpointUrl,
     );
 
     if (already) {
