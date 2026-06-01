@@ -78,9 +78,14 @@ export async function validateUserAccessToInterface(
   const normalizedEmail = email.trim().toLowerCase();
   
   try {
-    const { data, error } = await supabase.rpc('check_email_exists_for_role', {
+    const rpcPromise = supabase.rpc('check_email_exists_for_role', {
       p_email: normalizedEmail
     });
+    // Filet de sécurité: ne jamais bloquer l'écran si la requête traîne
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 8000)
+    );
+    const { data, error } = (await Promise.race([rpcPromise, timeoutPromise])) as any;
 
     if (error || !data || !Array.isArray(data) || data.length === 0) {
       // Aucun profil trouvé - nouvel utilisateur, autoriser
