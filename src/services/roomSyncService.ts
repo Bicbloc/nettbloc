@@ -120,11 +120,31 @@ export class RoomSyncService {
         return false;
       }
 
+      // Répercuter le statut (propre/sale) vers le PMS Apaleo (best-effort)
+      RoomSyncService.pushStatusToApaleo(hotelId, roomNumber, status);
+
       return true;
     } catch (error) {
       console.error('❌ Erreur mise à jour statut:', error);
       return false;
     }
+  }
+
+  /**
+   * Pousse le statut de la chambre (propre/sale) vers Apaleo si configuré.
+   * Best-effort : n'interrompt jamais le flux principal en cas d'échec.
+   */
+  private static pushStatusToApaleo(hotelId: string, roomNumber: string, status: string): void {
+    supabase.functions
+      .invoke('apaleo-update-condition', {
+        body: { hotelId, roomNumber, status },
+      })
+      .then(({ error }) => {
+        if (error) {
+          console.warn('⚠️ Synchro statut Apaleo échouée:', error.message);
+        }
+      })
+      .catch((e) => console.warn('⚠️ Synchro statut Apaleo échouée:', e));
   }
 
   /**
