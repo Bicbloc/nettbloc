@@ -321,6 +321,12 @@ const planDisplayNames: Record<string, Record<string, string>> = {
   }
 };
 
+const showcaseImages: Record<string, string> = {
+  housekeeper: showcaseHousekeeper,
+  photoAI: showcasePhotoAI,
+  linen: showcaseLinen,
+};
+
 const Landing = () => {
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
   const [plans, setPlans] = useState<PricingPlan[]>([]);
