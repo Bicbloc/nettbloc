@@ -213,7 +213,7 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: PASSWORD_RESET_URL
       });
       if (error) throw error;
       toast({ title: "Email envoyé", description: `Un lien de réinitialisation a été envoyé à ${email}` });
