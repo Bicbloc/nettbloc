@@ -31,7 +31,7 @@ export const InviteEmail = ({
     <Preview>You've been invited to join {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Img src=\"https://nettobloc.bicbloc.eu/Nettobloc.png\" width=\"140\" alt=\"Nettobloc\" style={logo} />
+        <Img src="https://nettobloc.bicbloc.eu/Nettobloc.png" width="140" alt="Nettobloc" style={logo} />
         <Heading style={h1}>You've been invited</Heading>
         <Text style={text}>
           You've been invited to join{' '}

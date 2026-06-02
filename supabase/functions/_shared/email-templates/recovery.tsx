@@ -28,7 +28,7 @@ export const RecoveryEmail = ({
     <Preview>Reset your password for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Img src=\"https://nettobloc.bicbloc.eu/Nettobloc.png\" width=\"140\" alt=\"Nettobloc\" style={logo} />
+        <Img src="https://nettobloc.bicbloc.eu/Nettobloc.png" width="140" alt="Nettobloc" style={logo} />
         <Heading style={h1}>Reset your password</Heading>
         <Text style={text}>
           We received a request to reset your password for {siteName}. Click

@@ -28,7 +28,7 @@ export const MagicLinkEmail = ({
     <Preview>Your login link for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Img src=\"https://nettobloc.bicbloc.eu/Nettobloc.png\" width=\"140\" alt=\"Nettobloc\" style={logo} />
+        <Img src="https://nettobloc.bicbloc.eu/Nettobloc.png" width="140" alt="Nettobloc" style={logo} />
         <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
           Click the button below to log in to {siteName}. This link will expire
