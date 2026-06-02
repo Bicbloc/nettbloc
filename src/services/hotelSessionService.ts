@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Room } from '@/services/pdfService';
 import { storageService } from './storageService';
+import { RoomSyncService } from './roomSyncService';
 
 interface HotelSessionRaw {
   id: string;
@@ -352,7 +353,46 @@ export class HotelSessionService {
 
   // Mettre à jour le statut d'une chambre (deprecated - les rooms sont maintenant dans la table rooms)
   static async updateRoomStatus(roomNumber: string, newStatus: string): Promise<boolean> {
-    return true;
+    try {
+      const normalizeStatus = (status: string) => {
+        switch ((status || '').toLowerCase()) {
+          case 'completed':
+          case 'clean':
+          case 'propre':
+            return 'clean';
+          case 'in-progress':
+          case 'in_progress':
+          case 'encours':
+          case 'en_cours':
+            return 'in_progress';
+          case 'to_clean':
+          case 'dirty':
+          case 'sale':
+          case 'needs-cleaning':
+          case 'needs_cleaning':
+            return 'dirty';
+          default:
+            return status;
+        }
+      };
+
+      let hotelId = storageService.getHotelId();
+
+      if (!hotelId) {
+        const session = await this.getSession();
+        hotelId = session?.hotel_id || null;
+      }
+
+      if (!hotelId) {
+        console.error('❌ Impossible de mettre à jour la chambre: hotelId introuvable');
+        return false;
+      }
+
+      return await RoomSyncService.updateStatus(hotelId, roomNumber, normalizeStatus(newStatus));
+    } catch (err) {
+      console.error('Erreur updateRoomStatus:', err);
+      return false;
+    }
   }
 
   /**
