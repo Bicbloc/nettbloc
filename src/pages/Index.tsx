@@ -222,6 +222,15 @@ const IndexDashboard = () => {
     window.addEventListener('navigate-to-training', handler);
     return () => window.removeEventListener('navigate-to-training', handler);
   }, []);
+
+  // Listen for navigate-to-assignment events (e.g. from PMS panel)
+  useEffect(() => {
+    const handler = () => {
+      setActiveTab('assignment' as TabValue);
+    };
+    window.addEventListener('navigate-to-assignment', handler);
+    return () => window.removeEventListener('navigate-to-assignment', handler);
+  }, []);
   
   const { 
     housekeeperNames, 
