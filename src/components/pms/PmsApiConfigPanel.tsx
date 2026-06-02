@@ -288,9 +288,6 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       loadConfig();
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
-      }
-    } catch (err: any) {
-      toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
     } finally {
       setImporting(false);
     }
