@@ -108,6 +108,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
   const [syncing, setSyncing] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [previewRooms, setPreviewRooms] = useState<PreviewRoom[] | null>(null);
+  const [registryNumbers, setRegistryNumbers] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
