@@ -113,8 +113,15 @@ const t = {
         entreprise: 'Groupes & chaînes hôtelières',
       },
     },
-    testimonials: {
-      title: 'Ils nous font confiance',
+    showcase: {
+      title: 'Un aperçu de la plateforme',
+      subtitle: 'Découvrez l\'interface pensée pour vos équipes terrain.',
+      items: [
+        { img: 'housekeeper', title: 'Interface femme de chambre', desc: 'Une appli mobile claire : chambres assignées, statuts en temps réel et marquage du nettoyage en un geste.' },
+        { img: 'photoAI', title: 'Analyse photo par IA', desc: 'Prenez une photo, l\'IA détecte l\'incident et pré-remplit automatiquement le rapport.' },
+        { img: 'linen', title: 'Inventaire du linge', desc: 'Scannez vos piles de linge, l\'IA compte chaque pièce par type instantanément.' },
+      ]
+    },
       subtitle: 'Découvrez pourquoi les meilleurs établissements choisissent Nettobloc.',
       items: [
         {
