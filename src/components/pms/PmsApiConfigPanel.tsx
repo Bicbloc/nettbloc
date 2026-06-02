@@ -11,6 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeRoomNumber } from '@/utils/roomFormatUtils';
+import { storageService } from '@/services/storageService';
 import { useHotel } from '@/contexts/HotelContext';
 import { FeatureGuard } from '@/components/FeatureGuard';
 import { 
