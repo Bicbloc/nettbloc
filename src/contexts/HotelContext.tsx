@@ -40,6 +40,20 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
 
+  const announceHotelReady = useCallback(async (hotelData: HotelData) => {
+    storageService.saveHotel({
+      id: hotelData.id,
+      name: hotelData.name,
+      code: hotelData.hotel_code,
+    });
+
+    await HotelSessionService.createSession(hotelData.id);
+
+    window.dispatchEvent(new CustomEvent('hotel:ready', {
+      detail: { hotelId: hotelData.id }
+    }));
+  }, []);
+
   // Charger l'hôtel depuis la base de données
   const loadHotel = useCallback(async () => {
     if (!user?.id) {
@@ -64,18 +78,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         // C'est un sous-compte - utiliser l'hôtel du parent
         const hotelData = subAccountData.hotels as unknown as HotelData;
         setHotel(hotelData);
-        storageService.saveHotel({
-          id: hotelData.id,
-          name: hotelData.name,
-          code: hotelData.hotel_code
-        });
-        
-        // Créer/restaurer la session hôtel
-        await HotelSessionService.createSession(hotelData.id);
-        
-        window.dispatchEvent(new CustomEvent('hotel:ready', { 
-          detail: { hotelId: hotelData.id } 
-        }));
+        await announceHotelReady(hotelData);
         
         setIsLoading(false);
         setHasAttemptedLoad(true);
@@ -93,14 +96,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         if (profileData?.hotels) {
           const hotelData = profileData.hotels as unknown as HotelData;
           setHotel(hotelData);
-          storageService.saveHotel({
-            id: hotelData.id,
-            name: hotelData.name,
-            code: hotelData.hotel_code
-          });
-          
-          await HotelSessionService.createSession(hotelData.id);
-          window.dispatchEvent(new CustomEvent('hotel:ready', { detail: { hotelId: hotelData.id } }));
+          await announceHotelReady(hotelData);
           
           setIsLoading(false);
           setHasAttemptedLoad(true);
@@ -126,6 +122,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
             hotel_code: hotelExists.hotel_code
           };
           setHotel(hotelData);
+          await announceHotelReady(hotelData);
           setIsLoading(false);
           setHasAttemptedLoad(true);
           return;
@@ -217,19 +214,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
       if (hotelResult) {
         setHotel(hotelResult);
-        storageService.saveHotel({
-          id: hotelResult.id,
-          name: hotelResult.name,
-          code: hotelResult.hotel_code
-        });
-
-        // Créer/restaurer la session hôtel
-        await HotelSessionService.createSession(hotelResult.id);
-        
-        // Émettre un événement pour signaler que l'hôtel est prêt
-        window.dispatchEvent(new CustomEvent('hotel:ready', { 
-          detail: { hotelId: hotelResult.id } 
-        }));
+        await announceHotelReady(hotelResult);
       }
     } catch (error) {
       console.error('❌ HotelContext: Erreur chargement hôtel:', error);
@@ -237,7 +222,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
       setIsLoading(false);
       setHasAttemptedLoad(true);
     }
-  }, [user?.id, user?.email, user?.user_metadata?.company_name]);
+  }, [announceHotelReady, user?.id, user?.email, user?.user_metadata?.company_name]);
 
   // Effacer l'hôtel (déconnexion)
   const clearHotel = useCallback(() => {
@@ -287,13 +272,18 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
   // Au retour au premier plan (session rafraîchie), recharger l'hôtel si perdu
   useEffect(() => {
     const handleRefreshed = () => {
+      if (user?.id && hotel) {
+        void announceHotelReady(hotel);
+        return;
+      }
+
       if (!hotel && user?.id) {
         setHasAttemptedLoad(false);
       }
     };
     window.addEventListener(AUTH_EVENTS.SESSION_REFRESHED, handleRefreshed);
     return () => window.removeEventListener(AUTH_EVENTS.SESSION_REFRESHED, handleRefreshed);
-  }, [hotel, user?.id]);
+  }, [announceHotelReady, hotel, user?.id]);
 
   // isHotelReady = on a terminé le chargement ET on a un hôtel (ou pas authentifié)
   const isHotelReady = hasAttemptedLoad && !isLoading;
