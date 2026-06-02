@@ -410,6 +410,7 @@ const PlanSelectionContent = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
