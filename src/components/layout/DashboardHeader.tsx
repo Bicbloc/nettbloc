@@ -10,8 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import UserMenu from "@/components/UserMenu";
-import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
-import { AutoCloseSettingsDialog } from "@/components/AutoCloseSettingsDialog";
+import { DayClosureControl } from "@/components/DayClosureControl";
 import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
 import { cn } from "@/lib/utils";
 
@@ -128,10 +127,9 @@ export function DashboardHeader({
                   <span className="xl:hidden">Staff</span>
                 </a>
               </Button>
-              <AutoCloseSettingsDialog hotelId={currentHotelId || ''} />
-              <DailyReportCloseButton 
-                hotelId={currentHotelId || ''} 
-                onReportClosed={() => window.location.reload()} 
+              <DayClosureControl
+                hotelId={currentHotelId || ''}
+                onReportClosed={() => window.location.reload()}
               />
             </div>
 

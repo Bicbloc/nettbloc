@@ -14,9 +14,18 @@ import { createNotification } from '@/services/notificationService';
 interface DailyReportCloseButtonProps {
   hotelId: string;
   onReportClosed?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
-export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportCloseButtonProps) {
+export function DailyReportCloseButton({ hotelId, onReportClosed, open: controlledOpen, onOpenChange, hideTrigger }: DailyReportCloseButtonProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [isClosing, setIsClosing] = useState(false);
   const [closingStep, setClosingStep] = useState('');
 
@@ -85,6 +94,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       // 4. Archiver chambres, assignations, inventaire linge et notifications
       setClosingStep('Archivage des chambres et inventaire...');
       const archiveResult = await RoomArchiveService.archiveAndResetRooms(hotelId);
+
+      // Marquer la journée comme clôturée pour éviter un double-archivage par la clôture automatique
+      try {
+        await supabase
+          .from('hotels')
+          .update({ last_auto_close_date: today })
+          .eq('id', hotelId);
+      } catch (markError) {
+        console.error('Impossible de marquer la date de clôture:', markError);
+      }
 
       // 5. Mettre à jour le rapport daily_reports avec l'URL du PDF
       if (pdfUrl) {
@@ -174,22 +193,24 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
   };
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={isClosing}>
-          {isClosing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {closingStep || 'Clôture en cours...'}
-            </>
-          ) : (
-            <>
-              <Calendar className="h-4 w-4" />
-              Clôturer la journée
-            </>
-          )}
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      {!hideTrigger && (
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="gap-2" disabled={isClosing}>
+            {isClosing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {closingStep || 'Clôture en cours...'}
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4" />
+                Clôturer la journée
+              </>
+            )}
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Clôturer la journée ?</AlertDialogTitle>

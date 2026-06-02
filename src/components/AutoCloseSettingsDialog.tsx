@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils';
 
 interface AutoCloseSettingsDialogProps {
   hotelId: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 // 1 = Monday ... 0 = Sunday (matches JS getDay)
@@ -24,8 +27,13 @@ const DAYS: { value: number; label: string }[] = [
   { value: 0, label: 'Dim' },
 ];
 
-export function AutoCloseSettingsDialog({ hotelId }: AutoCloseSettingsDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenChange, hideTrigger }: AutoCloseSettingsDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -81,12 +89,14 @@ export function AutoCloseSettingsDialog({ hotelId }: AutoCloseSettingsDialogProp
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5">
-          <Clock className="h-3.5 w-3.5" />
-          <span className="hidden xl:inline">Clôture auto</span>
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            <span className="hidden xl:inline">Clôture auto</span>
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Clôture automatique</DialogTitle>

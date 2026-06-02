@@ -457,6 +457,11 @@ const Reports = () => {
                               <Calendar className="h-4 w-4 text-muted-foreground" />
                               {format(parseISO(report.report_date), 'PPP', { locale: fr })}
                             </div>
+                            {report.created_at && (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Archivé le {format(parseISO(report.created_at), "PPP 'à' HH:mm", { locale: fr })}
+                              </div>
+                            )}
                           </TableCell>
                           
                           <TableCell>
