@@ -717,7 +717,13 @@ const Landing = () => {
               </div>
             </div>
           </div>
-          <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">{c.footer.rights}</div>
+          <div className="mt-10 pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+            <span>{c.footer.rights}</span>
+            <span className="hidden sm:inline">·</span>
+            <a href="https://bicbloc.eu" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+              Nettobloc by <span className="font-semibold">bicbloc</span>
+            </a>
+          </div>
         </div>
       </footer>
     </div>
