@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Seo } from '@/components/Seo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription, PLAN_CONFIGS, PlanType } from '@/hooks/useSubscription';
 import { Navigate } from 'react-router-dom';
