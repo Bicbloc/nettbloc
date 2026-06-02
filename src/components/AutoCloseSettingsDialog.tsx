@@ -27,8 +27,13 @@ const DAYS: { value: number; label: string }[] = [
   { value: 0, label: 'Dim' },
 ];
 
-export function AutoCloseSettingsDialog({ hotelId }: AutoCloseSettingsDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenChange, hideTrigger }: AutoCloseSettingsDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
