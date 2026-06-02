@@ -232,31 +232,13 @@ const t = {
         entreprise: 'Groups & hotel chains',
       },
     },
-    testimonials: {
-      title: 'Trusted by the best',
-      subtitle: 'Discover why leading properties choose Nettobloc.',
+    showcase: {
+      title: 'A glimpse of the platform',
+      subtitle: 'Discover the interface designed for your field teams.',
       items: [
-        {
-          quote: 'Nettobloc transformed our daily management. 1-click distribution saves us 45 minutes every morning. The AI incident recognition is stunning.',
-          name: 'Sophie Laurent',
-          role: 'Housekeeping Director',
-          hotel: 'Grand Hôtel du Palais ★★★★',
-          icon: 'hotel4',
-        },
-        {
-          quote: 'Service quality is our obsession. The quality control module and governess portal help us maintain our 5-star standards effortlessly.',
-          name: 'Jean-Marc Dubois',
-          role: 'General Manager',
-          hotel: 'Le Majestic Resort & Spa ★★★★★',
-          icon: 'hotel5',
-        },
-        {
-          quote: 'Deployed across our 12 properties in 2 weeks. Real-time sync and consolidated reports are exactly what we needed to manage the group.',
-          name: 'Caroline Mercier',
-          role: 'VP Operations',
-          hotel: 'Prestige Collection Hotel Group',
-          icon: 'group',
-        },
+        { img: 'housekeeper', title: 'Housekeeper interface', desc: 'A clear mobile app: assigned rooms, real-time statuses and one-tap cleaning updates.' },
+        { img: 'photoAI', title: 'AI photo analysis', desc: 'Take a photo, the AI detects the incident and auto-fills the report.' },
+        { img: 'linen', title: 'Linen inventory', desc: 'Scan your linen piles, the AI counts each piece by type instantly.' },
       ]
     },
     cta: {
