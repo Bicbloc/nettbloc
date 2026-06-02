@@ -565,6 +565,7 @@ const Auth = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 
