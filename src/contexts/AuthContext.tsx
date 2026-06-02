@@ -162,6 +162,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
+        // Si INITIAL_SESSION a déjà restauré la session, ne pas écraser
+        if (sessionRestoredFromGetSession) return;
         
         sessionRestoredFromGetSession = true;
         
@@ -178,7 +180,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (err) {
         console.error('❌ getSession exception:', err);
-        if (mounted) {
+        if (mounted && !sessionRestoredFromGetSession) {
           sessionRestoredFromGetSession = true;
           setSession(null);
           setUser(null);
