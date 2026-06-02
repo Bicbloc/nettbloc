@@ -6231,6 +6231,10 @@ export type Database = {
         Args: { target_hotel_id: string }
         Returns: boolean
       }
+      can_view_hotel_access_session: {
+        Args: { _hotel_id: string; _housekeeper_profile_id: string }
+        Returns: boolean
+      }
       change_subscription_status: {
         Args: { p_new_status: string; p_reason?: string; p_user_id: string }
         Returns: boolean
