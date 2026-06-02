@@ -224,6 +224,13 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
 
       if (data?.success) {
         setPreviewRooms(Array.isArray(data.rooms) ? data.rooms : []);
+        // Charger le registre existant pour ne proposer que les chambres inexistantes
+        const { data: registry } = await supabase
+          .from('hotel_rooms_registry')
+          .select('room_number')
+          .eq('hotel_id', hotelId)
+          .eq('is_active', true);
+        setRegistryNumbers(new Set((registry || []).map(r => normalizeRoomNumber(r.room_number))));
         toast({ title: '✅ Connexion réussie', description: data.message });
       } else {
         toast({ title: '❌ Échec de connexion', description: data?.error || 'Erreur inconnue', variant: 'destructive' });
