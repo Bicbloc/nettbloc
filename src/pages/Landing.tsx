@@ -382,7 +382,6 @@ const Landing = () => {
             <a href="#portals" className="hover:text-foreground transition-colors">{c.nav.portals}</a>
             <a href="#pricing" className="hover:text-foreground transition-colors">{c.nav.pricing}</a>
             <a href="#ai" className="hover:text-foreground transition-colors">{c.nav.ai}</a>
-            <a href="#contact" className="hover:text-foreground transition-colors">{c.nav.contact}</a>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} className="gap-1.5">
