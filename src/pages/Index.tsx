@@ -848,7 +848,17 @@ const IndexDashboard = () => {
         )}
         
         <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
-        
+
+        {!isGuestMode && currentHotelId && (
+          <div className="mt-6">
+            <NewDayBanner
+              hotelId={currentHotelId}
+              roomsEmpty={rooms.length === 0}
+              onStarted={refetchRooms}
+            />
+          </div>
+        )}
+
         <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
         <div className="space-y-6 mt-6">
           {/* Overview Tab */}
