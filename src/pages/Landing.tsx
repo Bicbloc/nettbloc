@@ -640,35 +640,36 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Showcase */}
       <section className="py-20 md:py-28 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.testimonials.title}</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.testimonials.subtitle}</p>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.showcase.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.showcase.subtitle}</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {c.testimonials.items.map((item, i) => (
-              <div key={i} className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <MessageSquareQuote className="w-8 h-8 text-primary/40 mb-4" />
-                <p className="text-sm leading-relaxed text-muted-foreground mb-6 flex-1 italic">
-                  "{item.quote}"
-                </p>
-                <div className="flex items-center gap-3 pt-4 border-t border-border/50">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                    {testimonialIcons[item.icon]}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm">{item.name}</div>
-                    <div className="text-xs text-muted-foreground">{item.role}</div>
-                    <div className="text-xs text-primary font-medium">{item.hotel}</div>
-                  </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {c.showcase.items.map((item, i) => (
+              <div key={i} className="rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4">
+                  <img
+                    src={showcaseImages[item.img]}
+                    alt={item.title}
+                    loading="lazy"
+                    width={1024}
+                    height={768}
+                    className="w-full h-auto rounded-xl shadow-lg"
+                  />
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* CTA */}
       <section className="py-20 md:py-28">
