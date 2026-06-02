@@ -235,7 +235,9 @@ const Auth = () => {
             <div className="inline-flex items-center justify-center p-3 bg-primary rounded-2xl mb-2">
               <Building className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold">Nettobloc</h1>
+            <h1 className="text-2xl font-bold">
+              {language === 'en' ? 'Nettobloc — Simplified hotel management' : 'Nettobloc — Gestion hôtelière simplifiée'}
+            </h1>
             <p className="text-muted-foreground text-sm">
               {language === 'en' ? 'Simplified hotel management' : 'Gestion hôtelière simplifiée'}
             </p>
