@@ -173,7 +173,7 @@ serve(async (req) => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: "Nettobloc <noreply@bicbloc.eu>",
+      from: "Nettobloc <support@bicbloc.eu>",
       to: [email],
       subject,
       html: emailContent,
