@@ -213,7 +213,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Re-valider/rafraîchir la session puis signaler aux écrans de recharger
       const ok = await refreshSession();
-      if (ok && mounted) {
+      if ((ok || current) && mounted) {
         startTokenRefresh();
         window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SESSION_REFRESHED));
       }
