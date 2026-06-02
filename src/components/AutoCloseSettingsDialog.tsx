@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils';
 
 interface AutoCloseSettingsDialogProps {
   hotelId: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 // 1 = Monday ... 0 = Sunday (matches JS getDay)
