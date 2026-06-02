@@ -407,6 +407,12 @@ const Auth = () => {
   const config = getFormConfig();
 
   return (
+    <>
+    <Seo
+      title="Connexion — Nettobloc"
+      description="Connectez-vous à votre espace Nettobloc pour gérer votre établissement, vos équipes et le suivi des chambres en temps réel."
+      path="/auth"
+    />
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="w-full max-w-sm">
         <Card className="border-0 shadow-lg">
