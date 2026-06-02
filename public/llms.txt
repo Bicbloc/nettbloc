@@ -1,0 +1,11 @@
+# Nettobloc
+
+> Plateforme moderne de gestion hôtelière avec assignation automatique des chambres et suivi en temps réel.
+
+Nettobloc aide les hôtels à organiser le travail des gouvernantes, femmes de chambre et techniciens, à suivre l'état des chambres en temps réel et à se connecter aux PMS (Apaleo, Mews, etc.).
+
+## Pages
+
+- [Accueil](/): Présentation de la plateforme de gestion hôtelière.
+- [Tarifs](/plans): Les plans et formules d'abonnement Nettobloc.
+- [Connexion](/auth): Accès à l'espace de gestion de l'établissement.
