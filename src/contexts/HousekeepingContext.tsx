@@ -3,6 +3,7 @@ import { Room } from '@/services/pdfService';
 import { type Notification } from '@/hooks/use-notifications';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { HotelSessionService } from '@/services/hotelSessionService';
+import { RoomSyncService } from '@/services/roomSyncService';
 import { supabase } from '@/integrations/supabase/client';
 import { useHotel } from '@/contexts/HotelContext';
 import { storageService } from '@/services/storageService';
@@ -316,6 +317,26 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   };
 
   const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
+    const normalizeStatus = (status: string) => {
+      switch ((status || '').toLowerCase()) {
+        case 'completed':
+        case 'clean':
+        case 'propre':
+          return 'clean';
+        case 'in-progress':
+        case 'in_progress':
+          return 'in_progress';
+        case 'to_clean':
+        case 'dirty':
+        case 'sale':
+        case 'needs-cleaning':
+        case 'needs_cleaning':
+          return 'dirty';
+        default:
+          return status;
+      }
+    };
+
     
     // Mettre à jour localement
     setRooms(prev => prev.map(room => 
@@ -326,7 +347,16 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
     // Mettre à jour en base de données
     try {
-      await HotelSessionService.updateRoomStatus(roomNumber, newStatus);
+      const effectiveHotelId = hotelId || storageService.getHotelId();
+      const normalizedStatus = normalizeStatus(newStatus);
+
+      const synced = effectiveHotelId
+        ? await RoomSyncService.updateStatus(effectiveHotelId, roomNumber, normalizedStatus)
+        : await HotelSessionService.updateRoomStatus(roomNumber, normalizedStatus);
+
+      if (!synced) {
+        console.warn('⚠️ Échec synchro statut chambre:', { roomNumber, newStatus, effectiveHotelId });
+      }
     } catch (error) {
       console.error('Erreur mise à jour statut chambre:', error);
     }
