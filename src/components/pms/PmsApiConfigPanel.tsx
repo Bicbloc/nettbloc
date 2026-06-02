@@ -576,15 +576,28 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
           )}
 
           {/* Aperçu des chambres récupérées depuis le PMS */}
-          {previewRooms && (
+          {previewRooms && (() => {
+            const newRooms = previewRooms.filter(r => !registryNumbers.has(normalizeRoomNumber(r.roomNumber)));
+            const alreadyCount = previewRooms.length - newRooms.length;
+            return (
             <>
               <Separator />
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <DoorOpen className="h-4 w-4 text-primary" />
                   <h4 className="font-medium text-sm">
                     {previewRooms.length} chambre{previewRooms.length > 1 ? 's' : ''} trouvée{previewRooms.length > 1 ? 's' : ''}
                   </h4>
+                  {newRooms.length > 0 && (
+                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">
+                      {newRooms.length} nouvelle{newRooms.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {alreadyCount > 0 && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      {alreadyCount} déjà au registre
+                    </Badge>
+                  )}
                 </div>
 
                 {previewRooms.length > 0 && (
@@ -604,9 +617,17 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
                         {previewRooms.map((r) => {
                           const c = cleaningLabel(r.cleaningType);
                           const cond = conditionLabel(r.condition ?? null);
+                          const inRegistry = registryNumbers.has(normalizeRoomNumber(r.roomNumber));
                           return (
                             <tr key={r.roomNumber} className="border-t">
-                              <td className="px-3 py-2 font-medium">{r.roomNumber}</td>
+                              <td className="px-3 py-2 font-medium">
+                                <span className="inline-flex items-center gap-1">
+                                  {r.roomNumber}
+                                  {inRegistry && (
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground">au registre</Badge>
+                                  )}
+                                </span>
+                              </td>
                               <td className="px-3 py-2">{r.floor ?? '—'}</td>
                               <td className="px-3 py-2">{r.roomType ?? '—'}</td>
                               <td className="px-3 py-2">
@@ -624,34 +645,43 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
                   </ScrollArea>
                 )}
 
-                {previewRooms.length > 0 && !imported && (
+                {newRooms.length > 0 && !imported && (
                   <Button onClick={importRooms} disabled={importing} className="w-full sm:w-auto">
                     {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                    Enregistrer ces {previewRooms.length} chambres dans le registre
+                    Ajouter {newRooms.length} nouvelle{newRooms.length > 1 ? 's' : ''} chambre{newRooms.length > 1 ? 's' : ''} au registre
                   </Button>
                 )}
 
-                {imported && (
+                {newRooms.length === 0 && !imported && previewRooms.length > 0 && (
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Toutes ces chambres sont déjà dans le registre.
+                  </div>
+                )}
+
+                {(imported || (newRooms.length === 0 && previewRooms.length > 0)) && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
                       <CheckCircle2 className="h-4 w-4" />
-                      Chambres enregistrées dans le registre
+                      Registre à jour
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="outline" size="sm" onClick={() => navigate('/room-registry')}>
                         <ListChecks className="h-4 w-4 mr-2" />
                         Voir le registre
                       </Button>
-                      <Button size="sm" onClick={() => navigate('/')}>
+                      <Button size="sm" onClick={goToAssignment}>
                         <Users className="h-4 w-4 mr-2" />
-                        Affecter les chambres
+                        Affecter aux femmes de chambre
                       </Button>
                     </div>
                   </div>
                 )}
               </div>
             </>
-          )}
+            );
+          })()}
+
 
           <PendingRoomsSection hotelId={hotelId} refreshKey={pendingRefreshKey} />
 
