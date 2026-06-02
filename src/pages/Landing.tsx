@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Seo } from '@/components/Seo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -367,6 +368,12 @@ const Landing = () => {
   };
 
   return (
+    <>
+    <Seo
+      title="Nettobloc — Gestion hôtelière intelligente et temps réel"
+      description="Optimisez la gestion de votre hôtel : assignation automatique des chambres, suivi en temps réel des gouvernantes, femmes de chambre et techniciens."
+      path="/landing"
+    />
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
@@ -720,6 +727,7 @@ const Landing = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 

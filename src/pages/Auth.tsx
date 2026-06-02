@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Seo } from '@/components/Seo';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -235,7 +236,9 @@ const Auth = () => {
             <div className="inline-flex items-center justify-center p-3 bg-primary rounded-2xl mb-2">
               <Building className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold">Nettobloc</h1>
+            <h1 className="text-2xl font-bold">
+              {language === 'en' ? 'Nettobloc — Simplified hotel management' : 'Nettobloc — Gestion hôtelière simplifiée'}
+            </h1>
             <p className="text-muted-foreground text-sm">
               {language === 'en' ? 'Simplified hotel management' : 'Gestion hôtelière simplifiée'}
             </p>
@@ -405,6 +408,12 @@ const Auth = () => {
   const config = getFormConfig();
 
   return (
+    <>
+    <Seo
+      title="Connexion — Nettobloc"
+      description="Connectez-vous à votre espace Nettobloc pour gérer votre établissement, vos équipes et le suivi des chambres en temps réel."
+      path="/auth"
+    />
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="w-full max-w-sm">
         <Card className="border-0 shadow-lg">
@@ -557,6 +566,7 @@ const Auth = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 

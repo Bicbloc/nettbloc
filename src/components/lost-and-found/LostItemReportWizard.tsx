@@ -576,7 +576,7 @@ export function LostItemReportWizard({
             {/* Image preview compact */}
             {imagePreview && currentStep !== 'photo' && currentStep !== 'analysis' && (
               <div className="flex items-center gap-2 p-2 bg-muted rounded-lg mb-4">
-                <img src={imagePreview} alt="Photo" className="h-10 w-10 object-cover rounded" />
+                <img src={imagePreview} alt="Photo de l'objet trouvé" className="h-10 w-10 object-cover rounded" />
                 <span className="text-xs text-muted-foreground">Photo jointe</span>
               </div>
             )}
@@ -589,7 +589,7 @@ export function LostItemReportWizard({
                     <div className="relative inline-block">
                       <img 
                         src={imagePreview} 
-                        alt="Preview" 
+                        alt="Aperçu de l'objet trouvé" 
                         className="max-h-48 rounded-lg mx-auto"
                       />
                       <Button
@@ -650,7 +650,7 @@ export function LostItemReportWizard({
                   {imagePreview && (
                     <img 
                       src={imagePreview} 
-                      alt="Analyse" 
+                      alt="Analyse de l'image" 
                       className="max-h-32 rounded-lg mx-auto opacity-50"
                     />
                   )}
