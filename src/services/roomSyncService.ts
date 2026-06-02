@@ -67,6 +67,12 @@ export class RoomSyncService {
         return false;
       }
 
+      // Répercuter aussi les mises à jour provenant du compte établissement
+      // (RoomCard/useRoomManagement) vers Apaleo, pas seulement updateStatus().
+      if (previousStatus !== safeStatus) {
+        RoomSyncService.pushStatusToApaleo(hotelId, room.number, safeStatus);
+      }
+
       // Logger le changement de statut si pertinent
       if (previousStatus !== room.status && actorName) {
         if (room.status === 'clean') {
