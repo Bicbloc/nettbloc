@@ -11,6 +11,9 @@ import {
   Smartphone, MousePointerClick, Bot, Search, ShieldCheck, Brush,
   Settings, Award, MessageSquareQuote, Building2, Hotel, Crown, Download
 } from 'lucide-react';
+import showcaseHousekeeper from '@/assets/showcase-housekeeper.jpg';
+import showcasePhotoAI from '@/assets/showcase-photo-ai.jpg';
+import showcaseLinen from '@/assets/showcase-linen.jpg';
 
 const t = {
   fr: {
