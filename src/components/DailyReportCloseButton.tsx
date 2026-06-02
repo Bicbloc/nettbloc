@@ -193,22 +193,24 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
   };
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={isClosing}>
-          {isClosing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {closingStep || 'Clôture en cours...'}
-            </>
-          ) : (
-            <>
-              <Calendar className="h-4 w-4" />
-              Clôturer la journée
-            </>
-          )}
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      {!hideTrigger && (
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="gap-2" disabled={isClosing}>
+            {isClosing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {closingStep || 'Clôture en cours...'}
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4" />
+                Clôturer la journée
+              </>
+            )}
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Clôturer la journée ?</AlertDialogTitle>
