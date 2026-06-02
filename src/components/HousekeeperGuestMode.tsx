@@ -186,6 +186,17 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         return;
       }
 
+      // Répercuter le statut (propre/sale) vers le PMS Apaleo (best-effort)
+      supabase.functions
+        .invoke('apaleo-update-condition', {
+          body: { hotelId: hotel.id, roomNumber, status: dbStatus },
+        })
+        .then(({ error: apaleoError }) => {
+          if (apaleoError) console.warn('⚠️ Synchro statut Apaleo échouée:', apaleoError.message);
+        })
+        .catch((e) => console.warn('⚠️ Synchro statut Apaleo échouée:', e));
+
+
       // Update local state
       setRooms(prev => prev.map(room => 
         room.number === roomNumber 
