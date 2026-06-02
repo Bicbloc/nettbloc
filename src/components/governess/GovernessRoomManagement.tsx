@@ -267,10 +267,11 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
 
   const handleSetClean = async (room: Room) => {
     try {
-      await supabase
-        .from('rooms')
-        .update({ status: 'clean' })
-        .eq('id', room.id);
+      const { RoomSyncService } = await import('@/services/roomSyncService');
+      const synced = await RoomSyncService.updateStatus(hotelId, room.room_number, 'clean');
+      if (!synced) {
+        throw new Error('Impossible de synchroniser le statut de la chambre');
+      }
 
       // Logger l'action
       await supabase.from('daily_action_logs').insert({
