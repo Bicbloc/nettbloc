@@ -122,31 +122,6 @@ const t = {
         { img: 'linen', title: 'Inventaire du linge', desc: 'Scannez vos piles de linge, l\'IA compte chaque pièce par type instantanément.' },
       ]
     },
-      subtitle: 'Découvrez pourquoi les meilleurs établissements choisissent Nettobloc.',
-      items: [
-        {
-          quote: 'Nettobloc a transformé notre gestion quotidienne. La répartition en 1 clic nous fait gagner 45 minutes chaque matin. L\'IA de reconnaissance des incidents est bluffante.',
-          name: 'Sophie Laurent',
-          role: 'Directrice Housekeeping',
-          hotel: 'Grand Hôtel du Palais ★★★★',
-          icon: 'hotel4',
-        },
-        {
-          quote: 'La qualité de service est notre obsession. Le module de contrôle qualité et le portail gouvernante nous permettent de maintenir nos standards 5 étoiles sans effort supplémentaire.',
-          name: 'Jean-Marc Dubois',
-          role: 'Directeur Général',
-          hotel: 'Le Majestic Resort & Spa ★★★★★',
-          icon: 'hotel5',
-        },
-        {
-          quote: 'Déployé sur nos 12 établissements en 2 semaines. La synchronisation temps réel et les rapports consolidés sont exactement ce qu\'il nous manquait pour piloter le groupe.',
-          name: 'Caroline Mercier',
-          role: 'VP Opérations',
-          hotel: 'Groupe Hôtelier Prestige Collection',
-          icon: 'group',
-        },
-      ]
-    },
     cta: {
       title: 'Prêt à révolutionner votre hôtel ?',
       subtitle: 'Rejoignez les établissements qui ont choisi l\'efficacité.',
