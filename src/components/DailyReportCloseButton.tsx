@@ -95,6 +95,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
       setClosingStep('Archivage des chambres et inventaire...');
       const archiveResult = await RoomArchiveService.archiveAndResetRooms(hotelId);
 
+      // Marquer la journée comme clôturée pour éviter un double-archivage par la clôture automatique
+      try {
+        await supabase
+          .from('hotels')
+          .update({ last_auto_close_date: today })
+          .eq('id', hotelId);
+      } catch (markError) {
+        console.error('Impossible de marquer la date de clôture:', markError);
+      }
+
       // 5. Mettre à jour le rapport daily_reports avec l'URL du PDF
       if (pdfUrl) {
         await supabase
