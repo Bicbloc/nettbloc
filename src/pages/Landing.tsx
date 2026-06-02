@@ -11,6 +11,9 @@ import {
   Smartphone, MousePointerClick, Bot, Search, ShieldCheck, Brush,
   Settings, Award, MessageSquareQuote, Building2, Hotel, Crown, Download
 } from 'lucide-react';
+import showcaseHousekeeper from '@/assets/showcase-housekeeper.jpg';
+import showcasePhotoAI from '@/assets/showcase-photo-ai.jpg';
+import showcaseLinen from '@/assets/showcase-linen.jpg';
 
 const t = {
   fr: {
@@ -110,31 +113,13 @@ const t = {
         entreprise: 'Groupes & chaînes hôtelières',
       },
     },
-    testimonials: {
-      title: 'Ils nous font confiance',
-      subtitle: 'Découvrez pourquoi les meilleurs établissements choisissent Nettobloc.',
+    showcase: {
+      title: 'Un aperçu de la plateforme',
+      subtitle: 'Découvrez l\'interface pensée pour vos équipes terrain.',
       items: [
-        {
-          quote: 'Nettobloc a transformé notre gestion quotidienne. La répartition en 1 clic nous fait gagner 45 minutes chaque matin. L\'IA de reconnaissance des incidents est bluffante.',
-          name: 'Sophie Laurent',
-          role: 'Directrice Housekeeping',
-          hotel: 'Grand Hôtel du Palais ★★★★',
-          icon: 'hotel4',
-        },
-        {
-          quote: 'La qualité de service est notre obsession. Le module de contrôle qualité et le portail gouvernante nous permettent de maintenir nos standards 5 étoiles sans effort supplémentaire.',
-          name: 'Jean-Marc Dubois',
-          role: 'Directeur Général',
-          hotel: 'Le Majestic Resort & Spa ★★★★★',
-          icon: 'hotel5',
-        },
-        {
-          quote: 'Déployé sur nos 12 établissements en 2 semaines. La synchronisation temps réel et les rapports consolidés sont exactement ce qu\'il nous manquait pour piloter le groupe.',
-          name: 'Caroline Mercier',
-          role: 'VP Opérations',
-          hotel: 'Groupe Hôtelier Prestige Collection',
-          icon: 'group',
-        },
+        { img: 'housekeeper', title: 'Interface femme de chambre', desc: 'Une appli mobile claire : chambres assignées, statuts en temps réel et marquage du nettoyage en un geste.' },
+        { img: 'photoAI', title: 'Analyse photo par IA', desc: 'Prenez une photo, l\'IA détecte l\'incident et pré-remplit automatiquement le rapport.' },
+        { img: 'linen', title: 'Inventaire du linge', desc: 'Scannez vos piles de linge, l\'IA compte chaque pièce par type instantanément.' },
       ]
     },
     cta: {
@@ -247,31 +232,13 @@ const t = {
         entreprise: 'Groups & hotel chains',
       },
     },
-    testimonials: {
-      title: 'Trusted by the best',
-      subtitle: 'Discover why leading properties choose Nettobloc.',
+    showcase: {
+      title: 'A glimpse of the platform',
+      subtitle: 'Discover the interface designed for your field teams.',
       items: [
-        {
-          quote: 'Nettobloc transformed our daily management. 1-click distribution saves us 45 minutes every morning. The AI incident recognition is stunning.',
-          name: 'Sophie Laurent',
-          role: 'Housekeeping Director',
-          hotel: 'Grand Hôtel du Palais ★★★★',
-          icon: 'hotel4',
-        },
-        {
-          quote: 'Service quality is our obsession. The quality control module and governess portal help us maintain our 5-star standards effortlessly.',
-          name: 'Jean-Marc Dubois',
-          role: 'General Manager',
-          hotel: 'Le Majestic Resort & Spa ★★★★★',
-          icon: 'hotel5',
-        },
-        {
-          quote: 'Deployed across our 12 properties in 2 weeks. Real-time sync and consolidated reports are exactly what we needed to manage the group.',
-          name: 'Caroline Mercier',
-          role: 'VP Operations',
-          hotel: 'Prestige Collection Hotel Group',
-          icon: 'group',
-        },
+        { img: 'housekeeper', title: 'Housekeeper interface', desc: 'A clear mobile app: assigned rooms, real-time statuses and one-tap cleaning updates.' },
+        { img: 'photoAI', title: 'AI photo analysis', desc: 'Take a photo, the AI detects the incident and auto-fills the report.' },
+        { img: 'linen', title: 'Linen inventory', desc: 'Scan your linen piles, the AI counts each piece by type instantly.' },
       ]
     },
     cta: {
@@ -352,6 +319,12 @@ const planDisplayNames: Record<string, Record<string, string>> = {
     entreprise: 'Enterprise',
     manual_entry: 'Manual Entry',
   }
+};
+
+const showcaseImages: Record<string, string> = {
+  housekeeper: showcaseHousekeeper,
+  photoAI: showcasePhotoAI,
+  linen: showcaseLinen,
 };
 
 const Landing = () => {
@@ -673,35 +646,36 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Showcase */}
       <section className="py-20 md:py-28 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.testimonials.title}</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.testimonials.subtitle}</p>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.showcase.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.showcase.subtitle}</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {c.testimonials.items.map((item, i) => (
-              <div key={i} className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <MessageSquareQuote className="w-8 h-8 text-primary/40 mb-4" />
-                <p className="text-sm leading-relaxed text-muted-foreground mb-6 flex-1 italic">
-                  "{item.quote}"
-                </p>
-                <div className="flex items-center gap-3 pt-4 border-t border-border/50">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                    {testimonialIcons[item.icon]}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm">{item.name}</div>
-                    <div className="text-xs text-muted-foreground">{item.role}</div>
-                    <div className="text-xs text-primary font-medium">{item.hotel}</div>
-                  </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {c.showcase.items.map((item, i) => (
+              <div key={i} className="rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4">
+                  <img
+                    src={showcaseImages[item.img]}
+                    alt={item.title}
+                    loading="lazy"
+                    width={1024}
+                    height={768}
+                    className="w-full h-auto rounded-xl shadow-lg"
+                  />
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* CTA */}
       <section className="py-20 md:py-28">
@@ -743,7 +717,13 @@ const Landing = () => {
               </div>
             </div>
           </div>
-          <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">{c.footer.rights}</div>
+          <div className="mt-10 pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+            <span>{c.footer.rights}</span>
+            <span className="hidden sm:inline">·</span>
+            <a href="https://bicbloc.eu" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+              Nettobloc by <span className="font-semibold">bicbloc</span>
+            </a>
+          </div>
         </div>
       </footer>
     </div>
