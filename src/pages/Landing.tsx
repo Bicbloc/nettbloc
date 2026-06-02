@@ -690,9 +690,9 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer id="contact" className="border-t border-border/50 bg-muted/30 py-12">
+      <footer className="border-t border-border/50 bg-muted/30 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 items-start">
+          <div className="grid md:grid-cols-2 gap-8 items-start">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
@@ -701,12 +701,6 @@ const Landing = () => {
                 <span className="text-lg font-bold">Nettobloc</span>
               </div>
               <p className="text-sm text-muted-foreground">{c.footer.tagline}</p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3">{c.footer.contact}</h4>
-              <a href="mailto:support@bicbloc.eu" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
-                <Mail className="w-4 h-4" />support@bicbloc.eu
-              </a>
             </div>
             <div>
               <h4 className="font-semibold mb-3">Legal</h4>
