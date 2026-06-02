@@ -56,6 +56,7 @@ const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then
 const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
 
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
+import { NewDayBanner } from "@/components/dashboard/NewDayBanner";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
@@ -848,7 +849,17 @@ const IndexDashboard = () => {
         )}
         
         <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
-        
+
+        {!isGuestMode && currentHotelId && (
+          <div className="mt-6">
+            <NewDayBanner
+              hotelId={currentHotelId}
+              roomsEmpty={rooms.length === 0}
+              onStarted={refetchRooms}
+            />
+          </div>
+        )}
+
         <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
         <div className="space-y-6 mt-6">
           {/* Overview Tab */}
