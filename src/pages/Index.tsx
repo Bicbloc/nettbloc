@@ -56,6 +56,7 @@ const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then
 const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
 
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
+import { NewDayBanner } from "@/components/dashboard/NewDayBanner";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
