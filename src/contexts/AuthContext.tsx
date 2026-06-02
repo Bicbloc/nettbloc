@@ -112,14 +112,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       (event, currentSession) => {
         if (!mounted) return;
 
-        // Ne pas traiter INITIAL_SESSION ici - on laisse getSession() gérer
-        // la restauration initiale pour éviter les race conditions
+        // INITIAL_SESSION fires reliably even when getSession() stalls on the
+        // auth lock (WebView / multi-tab). Use it to restore + unblock the app.
         if (event === 'INITIAL_SESSION') {
-          // Si getSession a déjà restauré la session, ignorer
           if (sessionRestoredFromGetSession) return;
-          // Sinon, mettre à jour l'état mais NE PAS marquer comme initialisé
+          sessionRestoredFromGetSession = true;
+          clearTimeout(safetyTimeout);
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
+          setLoading(false);
+          setIsInitialized(true);
+          if (currentSession) startTokenRefresh();
           return;
         }
 
@@ -159,6 +162,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
+        // Si INITIAL_SESSION a déjà restauré la session, ne pas écraser
+        if (sessionRestoredFromGetSession) return;
         
         sessionRestoredFromGetSession = true;
         
@@ -175,7 +180,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (err) {
         console.error('❌ getSession exception:', err);
-        if (mounted) {
+        if (mounted && !sessionRestoredFromGetSession) {
           sessionRestoredFromGetSession = true;
           setSession(null);
           setUser(null);
