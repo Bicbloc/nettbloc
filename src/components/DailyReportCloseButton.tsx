@@ -14,9 +14,18 @@ import { createNotification } from '@/services/notificationService';
 interface DailyReportCloseButtonProps {
   hotelId: string;
   onReportClosed?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
-export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportCloseButtonProps) {
+export function DailyReportCloseButton({ hotelId, onReportClosed, open: controlledOpen, onOpenChange, hideTrigger }: DailyReportCloseButtonProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [isClosing, setIsClosing] = useState(false);
   const [closingStep, setClosingStep] = useState('');
 
