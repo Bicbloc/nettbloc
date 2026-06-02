@@ -242,28 +242,52 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     }
   };
 
+  // Chambres détectées qui ne sont PAS encore dans le registre permanent
+  const getNewPreviewRooms = (): PreviewRoom[] =>
+    (previewRooms || []).filter(r => !registryNumbers.has(normalizeRoomNumber(r.roomNumber)));
+
   const importRooms = async () => {
     if (!hotelId) return;
+    const newRooms = getNewPreviewRooms();
+    if (newRooms.length === 0) {
+      toast({ title: 'Aucune nouvelle chambre', description: 'Toutes les chambres sont déjà dans le registre.' });
+      return;
+    }
     setImporting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('pms-sync', {
-        body: { hotel_id: hotelId, action: 'import' },
-      });
+      const { error } = await supabase
+        .from('hotel_rooms_registry')
+        .insert(
+          newRooms.map(room => ({
+            hotel_id: hotelId,
+            room_number: room.roomNumber,
+            floor: room.floor,
+            room_type: room.roomType,
+            source: 'pms',
+            imported_from: config.pms_type,
+            is_active: true,
+            space_category: 'room',
+          })) as any
+        );
 
       if (error) {
         toast({ title: 'Erreur', description: "L'import n'a pas pu être effectué.", variant: 'destructive' });
         return;
       }
 
-      if (data?.success) {
-        setImported(true);
-        toast({
-          title: '✅ Chambres enregistrées',
-          description: `${data.rooms_synced ?? previewRooms?.length ?? 0} chambres ajoutées au registre.`,
-        });
-        loadConfig();
-      } else {
-        toast({ title: '❌ Échec', description: data?.error || 'Import impossible', variant: 'destructive' });
+      setImported(true);
+      setRegistryNumbers(prev => {
+        const next = new Set(prev);
+        newRooms.forEach(r => next.add(normalizeRoomNumber(r.roomNumber)));
+        return next;
+      });
+      toast({
+        title: '✅ Chambres enregistrées',
+        description: `${newRooms.length} nouvelle(s) chambre(s) ajoutée(s) au registre.`,
+      });
+      loadConfig();
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
       }
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Import échoué', variant: 'destructive' });
