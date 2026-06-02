@@ -246,6 +246,13 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
   const getNewPreviewRooms = (): PreviewRoom[] =>
     (previewRooms || []).filter(r => !registryNumbers.has(normalizeRoomNumber(r.roomNumber)));
 
+  // Ouvre l'onglet d'affectation des femmes de chambre sur le tableau de bord
+  const goToAssignment = () => {
+    storageService.saveAdminTab('assignment');
+    window.dispatchEvent(new CustomEvent('navigate-to-assignment'));
+    navigate('/');
+  };
+
   const importRooms = async () => {
     if (!hotelId) return;
     const newRooms = getNewPreviewRooms();
