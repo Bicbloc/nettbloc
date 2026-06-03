@@ -515,21 +515,25 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
   const tooltipStyle = useMemo<React.CSSProperties>(() => {
     const CARD_W = 380;
     const GAP = 16;
-    const MAX_H = "calc(100vh - 24px)";
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
     if (!rect) {
-      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
+      // Carte centrée : limiter à la hauteur de l'écran
+      return {
+        top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: "calc(100vh - 24px)",
+      };
     }
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
     // Privilégier le côté droit (menu à gauche), sinon à gauche
     let left = rect.left + rect.width + GAP;
     if (left + CARD_W > vw - 12) {
       left = Math.max(12, rect.left - CARD_W - GAP);
     }
     let top = rect.top;
-    top = Math.min(top, vh - 320);
-    top = Math.max(12, top);
-    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
+    top = Math.max(12, Math.min(top, vh - 120));
+    // Hauteur dispo réellement sous "top" → empêche tout dépassement bas de page
+    const maxHeight = Math.max(160, vh - top - 12);
+    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight };
   }, [rect]);
 
   const content = useMemo(() => {
