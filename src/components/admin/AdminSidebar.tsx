@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Hotel, Monitor, Key, UserPlus, AlertTriangle,
   Database, CreditCard, Gift, Smartphone, FileText, Bell, Activity,
-  Megaphone, Settings, Mail, User, UserCheck, Cpu, LogIn,
+  Megaphone, Settings, Mail, User, UserCheck, Cpu, LogIn, Contact,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -12,7 +12,7 @@ import {
 export type AdminSection =
   | 'dashboard' | 'users' | 'establishments' | 'housekeepers' | 'governesses'
   | 'sessions' | 'connections' | 'api-usage' | 'access-codes' | 'housekeeper-requests'
-  | 'hotels' | 'incidents' | 'training'
+  | 'hotels' | 'incidents' | 'training' | 'crm'
   | 'plans' | 'promos' | 'phone-orders' | 'invoices'
   | 'tickets' | 'audit' | 'legal' | 'banners' | 'system' | 'emails';
 
@@ -48,6 +48,7 @@ const groups: { label: string; items: Item[] }[] = [
     label: 'Établissements',
     items: [
       { id: 'hotels', label: 'Hôtels', icon: Hotel },
+      { id: 'crm', label: 'CRM Clients', icon: Contact },
       { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
       { id: 'training', label: 'IA Training', icon: Database },
     ],

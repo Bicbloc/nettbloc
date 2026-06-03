@@ -31,6 +31,7 @@ import { SystemPanel } from '@/components/admin/SystemPanel';
 import { EmailsPanel } from '@/components/admin/EmailsPanel';
 import { ApiClientsPanel } from '@/components/admin/ApiClientsPanel';
 import { ConnectionsPanel } from '@/components/admin/ConnectionsPanel';
+import { CrmPanel } from '@/components/admin/CrmPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
@@ -44,6 +45,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   'access-codes': 'Codes d\'accès',
   'housekeeper-requests': 'Demandes femmes de chambre',
   'hotels': 'Établissements',
+  'crm': 'CRM Clients',
   'incidents': 'Gestion des incidents',
   'training': 'Entraînement IA',
   'plans': 'Plans & Tarifs',
@@ -127,6 +129,7 @@ const Admin = () => {
       case 'access-codes': return <AccessCodesPanel />;
       case 'housekeeper-requests': return <HousekeeperAccessRequests />;
       case 'hotels': return <HotelsPanel />;
+      case 'crm': return <CrmPanel />;
       case 'incidents': return <IncidentsPanel />;
       case 'training': return <TrainingPanel />;
       case 'plans': return <PricingPlansPanel />;

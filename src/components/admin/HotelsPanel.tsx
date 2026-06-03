@@ -189,7 +189,7 @@ export function HotelsPanel() {
         </CardContent>
       </Card>
 
-      <HotelDetailDrawer hotelId={openHotelId} onClose={() => setOpenHotelId(null)} />
+      <HotelDetailDrawer hotelId={openHotelId} onClose={() => setOpenHotelId(null)} onUpdated={load} />
     </>
   );
 }
