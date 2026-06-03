@@ -239,6 +239,38 @@ export function PricingPlansPanel() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Durée d'essai par défaut
+          </CardTitle>
+          <CardDescription>
+            Appliquée à toute nouvelle inscription. Vous pouvez aussi définir une durée d'essai propre à chaque plan ci-dessous, et ajuster l'essai d'un utilisateur précis depuis la gestion des utilisateurs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="default-trial-days">Jours d'essai</Label>
+              <Input
+                id="default-trial-days"
+                type="number"
+                min="0"
+                value={defaultTrialDays}
+                onChange={e => setDefaultTrialDays(e.target.value)}
+                className="w-32"
+              />
+            </div>
+            <Button onClick={saveDefaultTrialDays} disabled={savingDefault}>
+              {savingDefault ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Enregistrer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Configuration des plans</CardTitle>
           <CardDescription>
             Modifiez les prix et limites de chaque plan. Les changements sont appliqués immédiatement.
