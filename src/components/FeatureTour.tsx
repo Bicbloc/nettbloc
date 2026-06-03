@@ -617,8 +617,35 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             </Button>
           </div>
 
-          <div className="p-4">
+          <div className="p-4 max-h-[60vh] overflow-y-auto">
+            {step.role && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-2.5">
+                <span className="mt-0.5 shrink-0 rounded-md bg-primary/10 text-primary text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">
+                  {lang === "fr" ? "Rôle" : "Role"}
+                </span>
+                <p className="text-xs font-medium text-foreground leading-relaxed">{step.role[lang]}</p>
+              </div>
+            )}
+
             <p className="text-sm text-muted-foreground leading-relaxed">{step.desc[lang]}</p>
+
+            {step.tips && (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-foreground mb-1.5">
+                  {lang === "fr" ? "Comment faire" : "How to"}
+                </p>
+                <ul className="space-y-1.5">
+                  {step.tips[lang].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground leading-relaxed">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold">
+                        {i + 1}
+                      </span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {step.action && (
               <Button
