@@ -137,20 +137,29 @@ export class RoomSyncService {
   }
 
   /**
-   * Pousse le statut de la chambre (propre/sale) vers Apaleo si configuré.
-   * Best-effort : n'interrompt jamais le flux principal en cas d'échec.
+   * Enfile le statut de la chambre (propre/sale) dans la file de synchro PMS,
+   * puis déclenche un traitement immédiat (best-effort). Si l'envoi échoue,
+   * l'entrée reste dans la file et sera retentée automatiquement (backoff).
    */
   private static pushStatusToApaleo(hotelId: string, roomNumber: string, status: string): void {
-    supabase.functions
-      .invoke('apaleo-update-condition', {
-        body: { hotelId, roomNumber, status },
-      })
+    supabase
+      .from('pms_sync_queue')
+      .insert({ hotel_id: hotelId, room_number: roomNumber, status })
       .then(({ error }) => {
         if (error) {
-          console.warn('⚠️ Synchro statut Apaleo échouée:', error.message);
+          console.warn('⚠️ Enfilement synchro PMS échoué:', error.message);
+          return;
         }
-      })
-      .catch((e) => console.warn('⚠️ Synchro statut Apaleo échouée:', e));
+        // Déclencher un traitement immédiat sans bloquer le flux principal
+        supabase.functions
+          .invoke('pms-sync-queue-process', { body: {} })
+          .then(({ error: procError }) => {
+            if (procError) {
+              console.warn('⚠️ Traitement file PMS échoué (sera retenté):', procError.message);
+            }
+          })
+          .catch((e) => console.warn('⚠️ Traitement file PMS échoué (sera retenté):', e));
+      });
   }
 
   /**

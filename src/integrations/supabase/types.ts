@@ -4229,6 +4229,48 @@ export type Database = {
           },
         ]
       }
+      pms_sync_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          hotel_id: string
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_attempt_at: string
+          room_number: string
+          state: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          hotel_id: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          room_number: string
+          state?: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          room_number?: string
+          state?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pricing_config: {
         Row: {
           created_at: string | null
