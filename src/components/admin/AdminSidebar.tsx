@@ -48,6 +48,7 @@ const groups: { label: string; items: Item[] }[] = [
     label: 'Établissements',
     items: [
       { id: 'hotels', label: 'Hôtels', icon: Hotel },
+      { id: 'crm', label: 'CRM Clients', icon: Contact },
       { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
       { id: 'training', label: 'IA Training', icon: Database },
     ],
