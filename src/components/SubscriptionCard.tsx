@@ -271,7 +271,7 @@ export function SubscriptionCard() {
                   <Zap className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span className="font-medium">
-                  {isPremium ? 'Plan Confort' : 'Plan Découverte'}
+                  {`Plan ${PLAN_CONFIGS[plan]?.displayName || plan}`}
                 </span>
               </div>
               {subscription_end && isPremium && (
