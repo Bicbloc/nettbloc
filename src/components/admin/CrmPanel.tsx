@@ -163,6 +163,7 @@ export function CrmPanel() {
                   <TableHead className="text-right">Total dépensé</TableHead>
                   <TableHead className="text-center">Personnel</TableHead>
                   <TableHead className="text-center">Chambres</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
