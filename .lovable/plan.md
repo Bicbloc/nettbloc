@@ -1,47 +1,35 @@
-# Problème
+## Objectif
 
-L'interface femme de chambre perd parfois la connexion temps réel, et l'établissement met du temps à voir qu'une chambre a été commencée ou nettoyée. Aujourd'hui les données ne se chargent **qu'au montage** de la page (`loadRoomsFromDatabase` dans `Index.tsx`). Tout le reste passe par le temps réel Supabase (`RealtimeManager`). Donc dès qu'un événement temps réel est manqué (déconnexion Wi‑Fi, mise en veille du téléphone, canal `CLOSED`/`TIMED_OUT`), la mise à jour n'arrive jamais — il faut rafraîchir la page manuellement.
+Créer une **Politique de confidentialité** complète en français et en anglais, stockée dans la table `legal_pages` (gérée depuis l'admin et affichée sur `/legal/<slug>`).
 
-Il n'existe aucun **filet de sécurité (fallback)** qui recharge les chambres quand le temps réel est indisponible ou après une reconnexion.
+## Constat
 
-# Solution
+- La table `legal_pages` contient déjà uniquement les CGV (`slug = cgv`, en FR et EN).
+- Aucune page de confidentialité n'existe encore.
+- Le format de contenu est du Markdown (titres `##`, listes `-`, gras `**`), rendu par `LegalPage.tsx`.
 
-Ajouter un mécanisme de rechargement de secours côté établissement **et** côté femme de chambre, sans toucher à la logique métier :
+## Ce qui sera fait
 
-```text
-Temps réel OK ──────────────► mises à jour instantanées (inchangé)
-       │
-       │  perte de connexion / événement manqué
-       ▼
-Polling de secours (toutes ~20s) ─► recharge les chambres depuis la base
-       │
-Reconnexion détectée ───────────► rechargement immédiat (rattrapage)
-```
+1. **Insérer 2 lignes** dans `legal_pages` (opération de données, pas de migration) :
+   - `slug = privacy`, `language = fr`, `title = Politique de confidentialité`
+   - `slug = privacy`, `language = en`, `title = Privacy Policy`
+2. **Contenu rédigé** adapté à nettobloc (RGPD), couvrant :
+   - Responsable du traitement (bicbloc, contact `support@bicbloc.eu`)
+   - Données collectées (compte établissement, personnel, chambres, données de paiement via GoCardless/Stripe)
+   - Finalités du traitement et bases légales
+   - Sous-traitants / services tiers (Supabase, GoCardless, Stripe, Resend)
+   - Durée de conservation
+   - Droits des utilisateurs (accès, rectification, suppression, portabilité, opposition)
+   - Cookies et stockage local
+   - Sécurité des données et transferts
+   - Coordonnées de contact
 
-## 1. Rendre le chargement réutilisable (établissement)
-Dans `src/pages/Index.tsx`, extraire le contenu de `loadRoomsFromDatabase` (lignes ~491‑561) dans une fonction `refetchRooms` mémoïsée (`useCallback`) afin de pouvoir l'appeler à la demande, pas seulement au montage.
+## Détails techniques
 
-## 2. Polling de secours + rattrapage à la reconnexion
-Ajouter un `useEffect` qui :
-- déclenche `refetchRooms()` à intervalle régulier (~20 s) **uniquement** quand `isImporting`/`isAssigning` sont à `false` (pour ne pas écraser une opération en cours, comme déjà prévu dans le code).
-- s'abonne à `realtimeManager.onConnectionStatusChange` : lorsqu'on repasse en `SUBSCRIBED` ou `ONLINE` après une coupure, appeler immédiatement `refetchRooms()` pour rattraper les événements manqués.
-- se met en pause quand l'onglet est caché et relance un refetch au retour (`visibilitychange`), pour les téléphones mis en veille.
+- Insertion via le tool d'insertion de données (`INSERT INTO legal_pages ...`), pas de changement de schéma.
+- La page sera accessible immédiatement sur `/legal/privacy` et éditable depuis le panneau admin « Pages légales ».
+- Le contenu reprend la terminologie et le branding existants (nettobloc, domaine `nettobloc.bicbloc.eu`, contact `support@bicbloc.eu`).
 
-## 3. Même filet côté femme de chambre
-Appliquer le même principe dans le composant de travail de la femme de chambre (`HousekeeperWorkSimple.tsx` / hook associé) : un refetch périodique léger de ses chambres + un refetch au retour de connexion, pour que son interface ne reste pas bloquée sur un état périmé quand elle perd le réseau.
+## À confirmer éventuellement
 
-## 4. Indicateur de connexion (léger)
-Réutiliser l'état déjà exposé par `useRealtimeSync` (`isConnected`, `consecutiveFailures`) pour afficher un petit badge « Reconnexion… » lorsque le temps réel est coupé, afin que l'utilisateur sache que l'app rattrape les données. (Optionnel mais recommandé.)
-
-# Détails techniques
-
-- Aucune migration base de données nécessaire ; on réutilise les requêtes existantes sur `rooms` et `assignments`.
-- Le polling utilise un intervalle de secours (≈20 s) volontairement plus lent que le temps réel pour limiter la charge ; le temps réel reste la voie principale et instantanée.
-- Garde-fous conservés : pas de refetch pendant `isImporting`/`isAssigning` pour éviter les courses d'écriture (déjà documenté lignes 562‑565 d'`Index.tsx`).
-- Le refetch fusionne `rooms` + `assignments` exactement comme `loadRoomsFromDatabase` actuel, en préservant `lastCleanedAt` et le tri « plus récente d'abord » déjà en place.
-- Nettoyage systématique des `setInterval` et des abonnements `onConnectionStatusChange` au démontage.
-
-# Fichiers concernés
-- `src/pages/Index.tsx` — extraction `refetchRooms`, polling de secours, rattrapage à la reconnexion.
-- `src/components/HousekeeperWorkSimple.tsx` (et/ou son hook) — même filet côté femme de chambre.
-- (Optionnel) petit badge de statut de connexion réutilisant `useRealtimeSync`.
+- Le `slug` proposé est `privacy` ; je peux utiliser `privacy-policy` ou `confidentialite` si tu préfères.
