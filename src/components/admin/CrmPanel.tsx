@@ -33,6 +33,7 @@ export function CrmPanel() {
   const [rows, setRows] = useState<CrmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<CrmRow | null>(null);
 
   const load = async () => {
     setLoading(true);
