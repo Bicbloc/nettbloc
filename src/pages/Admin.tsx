@@ -129,6 +129,7 @@ const Admin = () => {
       case 'access-codes': return <AccessCodesPanel />;
       case 'housekeeper-requests': return <HousekeeperAccessRequests />;
       case 'hotels': return <HotelsPanel />;
+      case 'crm': return <CrmPanel />;
       case 'incidents': return <IncidentsPanel />;
       case 'training': return <TrainingPanel />;
       case 'plans': return <PricingPlansPanel />;
