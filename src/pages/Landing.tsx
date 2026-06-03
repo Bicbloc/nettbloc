@@ -712,8 +712,8 @@ const Landing = () => {
             <div>
               <h4 className="font-semibold mb-3">Legal</h4>
               <div className="space-y-2">
-                <a href="https://nettobloc.bicbloc.eu/legal/mentions-legales" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.legal}</a>
-                <a href="https://nettobloc.bicbloc.eu/legal/politique-de-confidentialite" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.privacy}</a>
+                <a href="/legal/cgv" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.legal}</a>
+                <a href="/legal/privacy" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.privacy}</a>
               </div>
             </div>
           </div>
