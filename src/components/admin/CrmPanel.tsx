@@ -60,6 +60,7 @@ export function CrmPanel() {
         const paid = hInvoices.filter(i => i.status === 'paid');
         return {
           hotelId: h.id,
+          userId: h.user_id || null,
           name: h.name,
           hotel_code: h.hotel_code || '',
           email: h.email || '',
