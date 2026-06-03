@@ -176,7 +176,7 @@ export function CrmPanel() {
                       </TableRow>
                     ))
                   : filtered.map(r => (
-                      <TableRow key={r.hotelId}>
+                      <TableRow key={r.hotelId} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelected(r)}>
                         <TableCell>
                           <div className="font-medium">{r.name}</div>
                           <Badge variant="outline" className="mt-1">{r.hotel_code || '—'}</Badge>
@@ -196,10 +196,11 @@ export function CrmPanel() {
                           <Badge variant={r.staff_count > 0 ? 'default' : 'secondary'}>{r.staff_count}</Badge>
                         </TableCell>
                         <TableCell className="text-center">{r.rooms_count}</TableCell>
+                        <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                       </TableRow>
                     ))}
                 {!loading && filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Aucun client trouvé</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun client trouvé</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
