@@ -36,21 +36,60 @@ export function PricingPlansPanel() {
     price_monthly: string;
     max_rooms: string;
     display_name: string;
-  }>({ price_monthly: "", max_rooms: "", display_name: "" });
+    trial_days: string;
+  }>({ price_monthly: "", max_rooms: "", display_name: "", trial_days: "" });
   const [saving, setSaving] = useState(false);
+
+  // Global default trial days
+  const [defaultTrialDays, setDefaultTrialDays] = useState<string>("30");
+  const [savingDefault, setSavingDefault] = useState(false);
+
+  useEffect(() => {
+    const loadDefault = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "default_trial_days")
+        .maybeSingle();
+      if (data?.value !== undefined && data?.value !== null) {
+        setDefaultTrialDays(String(data.value));
+      }
+    };
+    loadDefault();
+  }, []);
+
+  const saveDefaultTrialDays = async () => {
+    const days = parseInt(defaultTrialDays, 10);
+    if (isNaN(days) || days < 0) {
+      toast({ variant: "destructive", title: "Erreur", description: "La durée doit être un nombre positif." });
+      return;
+    }
+    setSavingDefault(true);
+    try {
+      const { error } = await supabase.rpc("set_default_trial_days", { p_days: days });
+      if (error) throw error;
+      toast({ title: "Durée d'essai par défaut mise à jour", description: `${days} jours pour les nouvelles inscriptions.` });
+    } catch (e) {
+      console.error("Error setting default trial days:", e);
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de modifier la durée d'essai par défaut." });
+    } finally {
+      setSavingDefault(false);
+    }
+  };
 
   const startEdit = (plan: PricingConfigRow) => {
     setEditingPlan(plan.plan_name);
     setEditForm({
       price_monthly: plan.price_monthly.toString(),
       max_rooms: plan.max_rooms === null ? "" : plan.max_rooms.toString(),
-      display_name: PLAN_DISPLAY_NAMES[plan.plan_name] || plan.plan_name
+      display_name: PLAN_DISPLAY_NAMES[plan.plan_name] || plan.plan_name,
+      trial_days: plan.trial_days?.toString() ?? "30"
     });
   };
 
   const cancelEdit = () => {
     setEditingPlan(null);
-    setEditForm({ price_monthly: "", max_rooms: "", display_name: "" });
+    setEditForm({ price_monthly: "", max_rooms: "", display_name: "", trial_days: "" });
   };
 
   const saveEdit = async (planName: string) => {
