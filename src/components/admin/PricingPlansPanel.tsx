@@ -366,6 +366,25 @@ export function PricingPlansPanel() {
                         )}
                       </TableCell>
                       <TableCell>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={editForm.trial_days}
+                            onChange={e => setEditForm(f => ({ ...f, trial_days: e.target.value }))}
+                            className="w-20 h-8"
+                            min="0"
+                          />
+                        ) : (
+                          <span>
+                            {plan.trial_days > 0 ? (
+                              `${plan.trial_days} j`
+                            ) : (
+                              <Badge variant="secondary">Aucun</Badge>
+                            )}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={plan.is_active}
