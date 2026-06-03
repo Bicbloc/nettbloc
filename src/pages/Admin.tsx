@@ -31,6 +31,7 @@ import { SystemPanel } from '@/components/admin/SystemPanel';
 import { EmailsPanel } from '@/components/admin/EmailsPanel';
 import { ApiClientsPanel } from '@/components/admin/ApiClientsPanel';
 import { ConnectionsPanel } from '@/components/admin/ConnectionsPanel';
+import { CrmPanel } from '@/components/admin/CrmPanel';
 
 const SECTION_TITLES: Record<AdminSection, string> = {
   'dashboard': 'Tableau de bord',
