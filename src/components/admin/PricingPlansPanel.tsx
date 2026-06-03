@@ -294,6 +294,7 @@ export function PricingPlansPanel() {
                   <TableHead>Plan</TableHead>
                   <TableHead>Prix mensuel (HT)</TableHead>
                   <TableHead>Limite chambres</TableHead>
+                  <TableHead>Essai (jours)</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
