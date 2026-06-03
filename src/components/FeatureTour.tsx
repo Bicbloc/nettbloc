@@ -683,7 +683,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 p-4 border-t">
+          <div className="flex items-center justify-between gap-2 p-4 border-t shrink-0">
             <Button variant="ghost" size="sm" onClick={finish}>
               {lang === "fr" ? "Passer" : "Skip"}
             </Button>
