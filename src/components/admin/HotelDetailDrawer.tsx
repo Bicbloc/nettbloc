@@ -32,9 +32,33 @@ interface Detail {
   sessions: any[];
 }
 
-export function HotelDetailDrawer({ hotelId, onClose }: Props) {
+export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
+  const { toast } = useToast();
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const saveHotel = async () => {
+    if (!hotelId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('hotels')
+      .update({ name: editName.trim(), phone: editPhone.trim() || null })
+      .eq('id', hotelId);
+    setSaving(false);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erreur', description: error.message });
+      return;
+    }
+    setData(d => d ? { ...d, hotel: { ...d.hotel, name: editName.trim(), phone: editPhone.trim() || null } } : d);
+    setEditing(false);
+    toast({ title: 'Enregistré', description: 'Informations de l\'hôtel mises à jour.' });
+    onUpdated?.();
+  };
+
 
   useEffect(() => {
     if (!hotelId) { setData(null); return; }
