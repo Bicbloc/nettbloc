@@ -86,6 +86,9 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
         technicians: (techRes.data as any[]) || [],
         sessions: (sessionsRes.data as any[]) || [],
       });
+      setEditName(hotelRes.data?.name || '');
+      setEditPhone(hotelRes.data?.phone || '');
+      setEditing(false);
       setLoading(false);
     })();
   }, [hotelId]);
