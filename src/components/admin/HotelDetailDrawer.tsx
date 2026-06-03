@@ -8,13 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar, Pencil, Save, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   hotelId: string | null;
   onClose: () => void;
+  onUpdated?: () => void;
 }
 
 interface Detail {
