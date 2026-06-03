@@ -515,8 +515,9 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
   const tooltipStyle = useMemo<React.CSSProperties>(() => {
     const CARD_W = 380;
     const GAP = 16;
+    const MAX_H = "calc(100vh - 24px)";
     if (!rect) {
-      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
     }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -528,7 +529,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
     let top = rect.top;
     top = Math.min(top, vh - 320);
     top = Math.max(12, top);
-    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)" };
+    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
   }, [rect]);
 
   const content = useMemo(() => {
