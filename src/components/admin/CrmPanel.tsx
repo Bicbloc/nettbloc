@@ -12,6 +12,7 @@ import { CrmDetailDrawer } from './CrmDetailDrawer';
 
 interface CrmRow {
   hotelId: string;
+  userId: string | null;
   name: string;
   hotel_code: string;
   email: string;
