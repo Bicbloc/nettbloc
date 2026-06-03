@@ -207,6 +207,12 @@ export function CrmPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <CrmDetailDrawer
+        hotelId={selected?.hotelId || null}
+        userId={selected?.userId || null}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }
