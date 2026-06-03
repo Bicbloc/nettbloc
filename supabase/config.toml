@@ -30,6 +30,8 @@ project_id = "rarhqnvvbjzfdevnghnz"
     verify_jwt = false
   [functions.apaleo-webhook]
     verify_jwt = false
+  [functions.gocardless-webhook]
+    verify_jwt = false
   [functions.archive-daily-data]
     verify_jwt = false
   [functions.auth-email-hook]
