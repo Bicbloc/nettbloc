@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, CreditCard, Edit2, Save, X, Check, Infinity, Crown, Star, Zap, Sparkles, Building } from "lucide-react";
+import { RefreshCw, CreditCard, Edit2, Save, X, Check, Infinity, Crown, Star, Zap, Sparkles, Building, CalendarClock } from "lucide-react";
 import { usePricingConfig, type PricingConfigRow } from "@/hooks/use-pricing-config";
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
