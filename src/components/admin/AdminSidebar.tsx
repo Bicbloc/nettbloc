@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Hotel, Monitor, Key, UserPlus, AlertTriangle,
   Database, CreditCard, Gift, Smartphone, FileText, Bell, Activity,
-  Megaphone, Settings, Mail, User, UserCheck, Cpu, LogIn,
+  Megaphone, Settings, Mail, User, UserCheck, Cpu, LogIn, Contact,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
