@@ -58,6 +58,8 @@ project_id = "rarhqnvvbjzfdevnghnz"
     verify_jwt = false
   [functions.pms-sync]
     verify_jwt = false
+  [functions.pms-sync-queue-process]
+    verify_jwt = false
   [functions.recognize-incident-item]
     verify_jwt = false
   [functions.send-activation-email]
