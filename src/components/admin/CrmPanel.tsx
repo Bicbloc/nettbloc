@@ -212,6 +212,7 @@ export function CrmPanel() {
         hotelId={selected?.hotelId || null}
         userId={selected?.userId || null}
         onClose={() => setSelected(null)}
+        onUpdated={() => load()}
       />
     </div>
   );
