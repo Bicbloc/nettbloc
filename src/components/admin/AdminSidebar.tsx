@@ -12,7 +12,7 @@ import {
 export type AdminSection =
   | 'dashboard' | 'users' | 'establishments' | 'housekeepers' | 'governesses'
   | 'sessions' | 'connections' | 'api-usage' | 'access-codes' | 'housekeeper-requests'
-  | 'hotels' | 'incidents' | 'training'
+  | 'hotels' | 'incidents' | 'training' | 'crm'
   | 'plans' | 'promos' | 'phone-orders' | 'invoices'
   | 'tickets' | 'audit' | 'legal' | 'banners' | 'system' | 'emails';
 
