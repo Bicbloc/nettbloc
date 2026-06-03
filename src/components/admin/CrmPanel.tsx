@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, Download, Users, FileText, Euro, Building2 } from 'lucide-react';
+import { Search, RefreshCw, Download, Users, FileText, Euro, Building2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CrmDetailDrawer } from './CrmDetailDrawer';
 
 interface CrmRow {
   hotelId: string;
