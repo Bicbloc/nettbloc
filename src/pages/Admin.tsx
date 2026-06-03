@@ -45,6 +45,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   'access-codes': 'Codes d\'accès',
   'housekeeper-requests': 'Demandes femmes de chambre',
   'hotels': 'Établissements',
+  'crm': 'CRM Clients',
   'incidents': 'Gestion des incidents',
   'training': 'Entraînement IA',
   'plans': 'Plans & Tarifs',
