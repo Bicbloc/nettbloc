@@ -19,7 +19,7 @@ export function usePricingConfig() {
     try {
       const { data, error } = await supabase
         .from("pricing_config")
-        .select("plan_name, price_monthly, max_rooms, is_active")
+        .select("plan_name, price_monthly, max_rooms, is_active, trial_days")
         .order("price_monthly", { ascending: true });
 
       if (error) throw error;
@@ -30,6 +30,7 @@ export function usePricingConfig() {
           price_monthly: Number(row.price_monthly),
           max_rooms: row.max_rooms === null ? null : Number(row.max_rooms),
           is_active: Boolean(row.is_active),
+          trial_days: row.trial_days === null || row.trial_days === undefined ? 30 : Number(row.trial_days),
         }))
       );
     } finally {
