@@ -618,7 +618,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             </Button>
           </div>
 
-          <div className="p-4 max-h-[60vh] overflow-y-auto">
+          <div className="p-4 flex-1 min-h-0 overflow-y-auto">
             {step.role && (
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-2.5">
                 <span className="mt-0.5 shrink-0 rounded-md bg-primary/10 text-primary text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">
