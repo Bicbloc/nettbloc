@@ -6,11 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, Download, Users, FileText, Euro, Building2 } from 'lucide-react';
+import { Search, RefreshCw, Download, Users, FileText, Euro, Building2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CrmDetailDrawer } from './CrmDetailDrawer';
 
 interface CrmRow {
   hotelId: string;
+  userId: string | null;
   name: string;
   hotel_code: string;
   email: string;
@@ -31,6 +33,7 @@ export function CrmPanel() {
   const [rows, setRows] = useState<CrmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<CrmRow | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -58,6 +61,7 @@ export function CrmPanel() {
         const paid = hInvoices.filter(i => i.status === 'paid');
         return {
           hotelId: h.id,
+          userId: h.user_id || null,
           name: h.name,
           hotel_code: h.hotel_code || '',
           email: h.email || '',
@@ -159,6 +163,7 @@ export function CrmPanel() {
                   <TableHead className="text-right">Total dépensé</TableHead>
                   <TableHead className="text-center">Personnel</TableHead>
                   <TableHead className="text-center">Chambres</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,7 +176,7 @@ export function CrmPanel() {
                       </TableRow>
                     ))
                   : filtered.map(r => (
-                      <TableRow key={r.hotelId}>
+                      <TableRow key={r.hotelId} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelected(r)}>
                         <TableCell>
                           <div className="font-medium">{r.name}</div>
                           <Badge variant="outline" className="mt-1">{r.hotel_code || '—'}</Badge>
@@ -191,16 +196,23 @@ export function CrmPanel() {
                           <Badge variant={r.staff_count > 0 ? 'default' : 'secondary'}>{r.staff_count}</Badge>
                         </TableCell>
                         <TableCell className="text-center">{r.rooms_count}</TableCell>
+                        <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                       </TableRow>
                     ))}
                 {!loading && filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Aucun client trouvé</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun client trouvé</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      <CrmDetailDrawer
+        hotelId={selected?.hotelId || null}
+        userId={selected?.userId || null}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }
