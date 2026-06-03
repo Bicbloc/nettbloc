@@ -584,7 +584,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
 
         {/* Infobulle / carte d'explication */}
         <div
-          className="absolute rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
+          className="absolute flex flex-col rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-200 pointer-events-auto overflow-hidden"
           style={tooltipStyle}
         >
           {/* Barre de progression en haut */}
