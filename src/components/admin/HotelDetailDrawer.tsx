@@ -119,6 +119,47 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
             </SheetHeader>
 
             <div className="mt-6 space-y-4">
+              {/* Editable hotel info */}
+              <Card>
+                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-sm flex items-center gap-2"><HotelIcon className="h-4 w-4" />Informations de l'hôtel</CardTitle>
+                  {!editing ? (
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4 mr-1" />Modifier
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setEditName(data.hotel?.name || ''); setEditPhone(data.hotel?.phone || ''); }}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" onClick={saveHotel} disabled={saving || !editName.trim()}>
+                        <Save className="h-4 w-4 mr-1" />Enregistrer
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="text-sm space-y-3">
+                  {editing ? (
+                    <>
+                      <div className="space-y-1">
+                        <Label>Nom de l'hôtel</Label>
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Numéro de téléphone</Label>
+                        <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="+33..." />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div><span className="text-muted-foreground">Nom :</span> {data.hotel?.name || '—'}</div>
+                      <div><span className="text-muted-foreground">Téléphone :</span> {data.hotel?.phone || '—'}</div>
+                      <div><span className="text-muted-foreground">Email :</span> {data.hotel?.email || '—'}</div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Owner */}
               <Card>
                 <CardHeader className="pb-2">
