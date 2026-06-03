@@ -595,7 +595,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             />
           </div>
 
-          <div className="flex items-start justify-between gap-3 p-4 border-b">
+          <div className="flex items-start justify-between gap-3 p-4 border-b shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 {step.icon}
