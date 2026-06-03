@@ -98,6 +98,7 @@ export function PricingPlansPanel() {
     
     const newPrice = parseFloat(editForm.price_monthly);
     const newMaxRooms = editForm.max_rooms === "" ? null : parseInt(editForm.max_rooms);
+    const newTrialDays = editForm.trial_days === "" ? 0 : parseInt(editForm.trial_days);
     
     if (isNaN(newPrice) || newPrice < 0) {
       toast({
@@ -119,11 +120,21 @@ export function PricingPlansPanel() {
       return;
     }
 
+    if (isNaN(newTrialDays) || newTrialDays < 0) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "La durée d'essai doit être un nombre positif (0 = aucun essai)."
+      });
+      setSaving(false);
+      return;
+    }
+
     // Optimistic update
     setPlans(current =>
       current.map(p =>
         p.plan_name === planName
-          ? { ...p, price_monthly: newPrice, max_rooms: newMaxRooms }
+          ? { ...p, price_monthly: newPrice, max_rooms: newMaxRooms, trial_days: newTrialDays }
           : p
       )
     );
@@ -133,7 +144,8 @@ export function PricingPlansPanel() {
         .from("pricing_config")
         .update({ 
           price_monthly: newPrice,
-          max_rooms: newMaxRooms
+          max_rooms: newMaxRooms,
+          trial_days: newTrialDays
         })
         .eq("plan_name", planName);
 
