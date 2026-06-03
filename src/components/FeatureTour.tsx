@@ -515,8 +515,9 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
   const tooltipStyle = useMemo<React.CSSProperties>(() => {
     const CARD_W = 380;
     const GAP = 16;
+    const MAX_H = "calc(100vh - 24px)";
     if (!rect) {
-      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
     }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -528,7 +529,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
     let top = rect.top;
     top = Math.min(top, vh - 320);
     top = Math.max(12, top);
-    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)" };
+    return { top, left, width: CARD_W, maxWidth: "calc(100vw - 24px)", maxHeight: MAX_H };
   }, [rect]);
 
   const content = useMemo(() => {
@@ -583,7 +584,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
 
         {/* Infobulle / carte d'explication */}
         <div
-          className="absolute rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
+          className="absolute flex flex-col rounded-2xl border bg-card text-card-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-200 pointer-events-auto overflow-hidden"
           style={tooltipStyle}
         >
           {/* Barre de progression en haut */}
@@ -594,7 +595,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             />
           </div>
 
-          <div className="flex items-start justify-between gap-3 p-4 border-b">
+          <div className="flex items-start justify-between gap-3 p-4 border-b shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 {step.icon}
@@ -617,7 +618,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             </Button>
           </div>
 
-          <div className="p-4 max-h-[60vh] overflow-y-auto">
+          <div className="p-4 flex-1 min-h-0 overflow-y-auto">
             {step.role && (
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-2.5">
                 <span className="mt-0.5 shrink-0 rounded-md bg-primary/10 text-primary text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">
@@ -682,7 +683,7 @@ export function FeatureTour({ isOpen, onTabChange, onClose, initialStep = 0 }: F
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 p-4 border-t">
+          <div className="flex items-center justify-between gap-2 p-4 border-t shrink-0">
             <Button variant="ghost" size="sm" onClick={finish}>
               {lang === "fr" ? "Passer" : "Skip"}
             </Button>
