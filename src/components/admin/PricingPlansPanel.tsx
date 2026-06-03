@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, CreditCard, Edit2, Save, X, Check, Infinity, Crown, Star, Zap, Sparkles, Building } from "lucide-react";
+import { RefreshCw, CreditCard, Edit2, Save, X, Check, Infinity, Crown, Star, Zap, Sparkles, Building, CalendarClock } from "lucide-react";
 import { usePricingConfig, type PricingConfigRow } from "@/hooks/use-pricing-config";
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
@@ -36,21 +36,60 @@ export function PricingPlansPanel() {
     price_monthly: string;
     max_rooms: string;
     display_name: string;
-  }>({ price_monthly: "", max_rooms: "", display_name: "" });
+    trial_days: string;
+  }>({ price_monthly: "", max_rooms: "", display_name: "", trial_days: "" });
   const [saving, setSaving] = useState(false);
+
+  // Global default trial days
+  const [defaultTrialDays, setDefaultTrialDays] = useState<string>("30");
+  const [savingDefault, setSavingDefault] = useState(false);
+
+  useEffect(() => {
+    const loadDefault = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "default_trial_days")
+        .maybeSingle();
+      if (data?.value !== undefined && data?.value !== null) {
+        setDefaultTrialDays(String(data.value));
+      }
+    };
+    loadDefault();
+  }, []);
+
+  const saveDefaultTrialDays = async () => {
+    const days = parseInt(defaultTrialDays, 10);
+    if (isNaN(days) || days < 0) {
+      toast({ variant: "destructive", title: "Erreur", description: "La durée doit être un nombre positif." });
+      return;
+    }
+    setSavingDefault(true);
+    try {
+      const { error } = await supabase.rpc("set_default_trial_days", { p_days: days });
+      if (error) throw error;
+      toast({ title: "Durée d'essai par défaut mise à jour", description: `${days} jours pour les nouvelles inscriptions.` });
+    } catch (e) {
+      console.error("Error setting default trial days:", e);
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de modifier la durée d'essai par défaut." });
+    } finally {
+      setSavingDefault(false);
+    }
+  };
 
   const startEdit = (plan: PricingConfigRow) => {
     setEditingPlan(plan.plan_name);
     setEditForm({
       price_monthly: plan.price_monthly.toString(),
       max_rooms: plan.max_rooms === null ? "" : plan.max_rooms.toString(),
-      display_name: PLAN_DISPLAY_NAMES[plan.plan_name] || plan.plan_name
+      display_name: PLAN_DISPLAY_NAMES[plan.plan_name] || plan.plan_name,
+      trial_days: plan.trial_days?.toString() ?? "30"
     });
   };
 
   const cancelEdit = () => {
     setEditingPlan(null);
-    setEditForm({ price_monthly: "", max_rooms: "", display_name: "" });
+    setEditForm({ price_monthly: "", max_rooms: "", display_name: "", trial_days: "" });
   };
 
   const saveEdit = async (planName: string) => {
@@ -59,6 +98,7 @@ export function PricingPlansPanel() {
     
     const newPrice = parseFloat(editForm.price_monthly);
     const newMaxRooms = editForm.max_rooms === "" ? null : parseInt(editForm.max_rooms);
+    const newTrialDays = editForm.trial_days === "" ? 0 : parseInt(editForm.trial_days);
     
     if (isNaN(newPrice) || newPrice < 0) {
       toast({
@@ -80,11 +120,21 @@ export function PricingPlansPanel() {
       return;
     }
 
+    if (isNaN(newTrialDays) || newTrialDays < 0) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "La durée d'essai doit être un nombre positif (0 = aucun essai)."
+      });
+      setSaving(false);
+      return;
+    }
+
     // Optimistic update
     setPlans(current =>
       current.map(p =>
         p.plan_name === planName
-          ? { ...p, price_monthly: newPrice, max_rooms: newMaxRooms }
+          ? { ...p, price_monthly: newPrice, max_rooms: newMaxRooms, trial_days: newTrialDays }
           : p
       )
     );
@@ -94,7 +144,8 @@ export function PricingPlansPanel() {
         .from("pricing_config")
         .update({ 
           price_monthly: newPrice,
-          max_rooms: newMaxRooms
+          max_rooms: newMaxRooms,
+          trial_days: newTrialDays
         })
         .eq("plan_name", planName);
 
@@ -188,6 +239,38 @@ export function PricingPlansPanel() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Durée d'essai par défaut
+          </CardTitle>
+          <CardDescription>
+            Appliquée à toute nouvelle inscription. Vous pouvez aussi définir une durée d'essai propre à chaque plan ci-dessous, et ajuster l'essai d'un utilisateur précis depuis la gestion des utilisateurs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="default-trial-days">Jours d'essai</Label>
+              <Input
+                id="default-trial-days"
+                type="number"
+                min="0"
+                value={defaultTrialDays}
+                onChange={e => setDefaultTrialDays(e.target.value)}
+                className="w-32"
+              />
+            </div>
+            <Button onClick={saveDefaultTrialDays} disabled={savingDefault}>
+              {savingDefault ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Enregistrer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Configuration des plans</CardTitle>
           <CardDescription>
             Modifiez les prix et limites de chaque plan. Les changements sont appliqués immédiatement.
@@ -211,6 +294,7 @@ export function PricingPlansPanel() {
                   <TableHead>Plan</TableHead>
                   <TableHead>Prix mensuel (HT)</TableHead>
                   <TableHead>Limite chambres</TableHead>
+                  <TableHead>Essai (jours)</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -277,6 +361,25 @@ export function PricingPlansPanel() {
                               </Badge>
                             ) : (
                               `${plan.max_rooms} chambres`
+                            )}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={editForm.trial_days}
+                            onChange={e => setEditForm(f => ({ ...f, trial_days: e.target.value }))}
+                            className="w-20 h-8"
+                            min="0"
+                          />
+                        ) : (
+                          <span>
+                            {plan.trial_days > 0 ? (
+                              `${plan.trial_days} j`
+                            ) : (
+                              <Badge variant="secondary">Aucun</Badge>
                             )}
                           </span>
                         )}

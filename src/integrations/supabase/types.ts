@@ -284,6 +284,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       archived_daily_logs: {
         Row: {
           archive_date: string
@@ -4281,6 +4302,7 @@ export type Database = {
           plan_name: string
           price_monthly: number
           price_yearly: number | null
+          trial_days: number
           updated_at: string | null
         }
         Insert: {
@@ -4292,6 +4314,7 @@ export type Database = {
           plan_name: string
           price_monthly?: number
           price_yearly?: number | null
+          trial_days?: number
           updated_at?: string | null
         }
         Update: {
@@ -4303,6 +4326,7 @@ export type Database = {
           plan_name?: string
           price_monthly?: number
           price_yearly?: number | null
+          trial_days?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -6502,6 +6526,7 @@ export type Database = {
           name: string
         }[]
       }
+      set_default_trial_days: { Args: { p_days: number }; Returns: boolean }
       start_trial_period: { Args: { p_user_id: string }; Returns: string }
       sub_account_has_permission: {
         Args: { p_permission_key: string; p_sub_account_id: string }
