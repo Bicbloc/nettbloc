@@ -138,8 +138,20 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         return;
       }
 
-      // Insérer d'abord les nouvelles entrées, puis supprimer les anciennes
-      // (sécurise contre une suppression réussie suivie d'une insertion échouée).
+      // Supprimer les anciennes entrées de cette tâche, puis réinsérer.
+      // L'ordre supprimer→insérer évite les conflits de contrainte unique
+      // (task_id, linen_type_id). Le cas "vide" est déjà bloqué ci-dessus,
+      // donc une suppression ne peut plus effacer les données sans réinsertion.
+      const { error: deleteError } = await supabase
+        .from('linen_inventory_entries')
+        .delete()
+        .eq('task_id', realTaskId);
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        // Non bloquant : il se peut qu'il n'y ait aucune entrée existante.
+      }
+
       const { error: insertError } = await supabase
         .from('linen_inventory_entries')
         .insert(entriesToInsert);
@@ -149,18 +161,6 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         throw new Error(`Erreur insertion: ${insertError.message}`);
       }
 
-      // Supprimer les anciennes entrées (autres que celles qu'on vient d'insérer)
-      const insertedTypeIds = entriesToInsert.map(e => e.linen_type_id);
-      const { error: deleteError } = await supabase
-        .from('linen_inventory_entries')
-        .delete()
-        .eq('task_id', realTaskId)
-        .not('linen_type_id', 'in', `(${insertedTypeIds.join(',')})`);
-
-      if (deleteError) {
-        console.error('Delete error:', deleteError);
-        // Non bloquant : les nouvelles données sont déjà enregistrées.
-      }
 
 
       // Mark task complete
