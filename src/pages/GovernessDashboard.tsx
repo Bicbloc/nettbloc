@@ -551,7 +551,7 @@ function GovernessDashboardContent() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               {[
                 { value: stats.totalRooms, label: 'Total', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
                 { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
