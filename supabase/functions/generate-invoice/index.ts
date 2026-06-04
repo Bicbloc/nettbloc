@@ -125,7 +125,7 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   const sellerName    = invoice.seller_name || 'BicBloc';
   const sellerSiret   = invoice.seller_siret || '97864605700015';
-  const sellerAddress = invoice.seller_address || '60 RUE FRANCOIS 1ER, 75008 PARIS';
+  const sellerAddress = invoice.seller_address || '60 rue François 1er, 75008 Paris';
   const sellerEmail   = invoice.seller_email || 'support@bicbloc.eu';
 
   // Client: prefer hotel info passed in enriched invoice
