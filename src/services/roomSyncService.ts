@@ -41,10 +41,6 @@ export class RoomSyncService {
         updated_at: new Date().toISOString()
       };
 
-      if (typeof room.cleaningPriority === 'number') {
-        updateData.cleaning_priority = room.cleaningPriority;
-      }
-
       // Ajouter cleaning_type selon cleaningType (normaliser a_blanc→full, recouche→quick)
       if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
         updateData.cleaning_type = 'a_blanc';
