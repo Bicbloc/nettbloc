@@ -304,7 +304,7 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
 
     try {
       // ===== PASS 1 =====
-      const aiResponse = await callAI(systemPrompt, 0.1, quickDetect ? 120 : (liveMode || detectMode) ? 200 : 500, timeout);
+      const aiResponse = await callAI(systemPrompt, 0, quickDetect ? 120 : (liveMode || detectMode) ? 200 : 500, timeout);
 
       // Handle specific error codes
       if (aiResponse.status === 402) {
@@ -353,46 +353,66 @@ JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","pile_height_cm"
         };
       }
 
-      // ===== PASS 2 (CONSENSUS) — only in VALIDATE mode for max accuracy =====
-      // Trigger a second independent pass when:
-      //   - we are in full validation mode AND
-      //   - confidence < 0.92 OR count > 5 (higher counts = more error-prone)
+      // ===== MULTI-PASS CONSENSUS (VALIDATE mode) — best-of-3 majority vote =====
+      // Run extra independent recounts to converge towards 99% reliability.
+      // Triggered whenever the first pass isn't already near-certain.
       const shouldConsensus = !liveMode && !quickDetect && !detectMode && !useRuler
-        && (result.count > 5 || (result.confidence ?? 0) < 0.92)
-        && (result.count > 0);
+        && result.count > 0
+        && (result.count > 3 || (result.confidence ?? 0) < 0.95);
 
       if (shouldConsensus) {
-        try {
-          const consensusPrompt = systemPrompt +
-            `\n\nUNE PREMIÈRE ANALYSE A DONNÉ: count=${result.count}, confidence=${result.confidence}, height=${result.pile_height_cm || '?'}cm.` +
-            `\nRECOMPTE INDÉPENDAMMENT (oublie cette première estimation).` +
-            `\nSi tu trouves le MÊME nombre, augmente "confidence" à 0.95+.` +
-            `\nSi tu trouves un nombre DIFFÉRENT, prends ton nouveau résultat (le plus précis).`;
-          const r2 = await callAI(consensusPrompt, 0.2, 500, 30000);
-          if (r2.ok) {
+        const votes: number[] = [Number(result.count)];
+        const resultsByCount: Record<number, any> = { [result.count]: result };
+
+        const runRecount = async (temp: number) => {
+          try {
+            const consensusPrompt = systemPrompt +
+              `\n\nRECOMPTE INDÉPENDAMMENT depuis zéro (n'utilise aucune estimation précédente).` +
+              `\nApplique le double comptage (ascendant + descendant) et la validation géométrique.`;
+            const r2 = await callAI(consensusPrompt, temp, 500, 30000);
+            if (!r2.ok) return null;
             const d2 = await r2.json();
             logAiUsage(d2, model);
-            const c2 = d2.choices?.[0]?.message?.content || '';
-            const result2 = parseAIResult(c2);
-            if (result2 && typeof result2.count === 'number') {
-              console.log(`[count-linen] Consensus: pass1=${result.count} pass2=${result2.count}`);
-              if (result2.count === result.count) {
-                // Same count → boost confidence
-                result.confidence = Math.max(result.confidence || 0.8, 0.96);
-                result.notes = (result.notes || '') + ' [Consensus: 2 passes identiques]';
-              } else {
-                // Different counts → use pass 2 (independent recount) but note the disagreement
-                const diff = Math.abs(result2.count - result.count);
-                result = {
-                  ...result2,
-                  confidence: Math.min(result2.confidence || 0.7, 0.85),
-                  notes: (result2.notes || '') + ` [Désaccord: pass1=${result.count}, pass2=${result2.count}, écart=${diff}]`,
-                };
-              }
+            const parsed = parseAIResult(d2.choices?.[0]?.message?.content || '');
+            if (parsed && typeof parsed.count === 'number') {
+              votes.push(Number(parsed.count));
+              resultsByCount[parsed.count] = parsed;
+              return parsed;
             }
+          } catch (e) {
+            console.warn('[count-linen] Recount failed:', (e as Error).message);
           }
-        } catch (e) {
-          console.warn('[count-linen] Consensus pass failed:', (e as Error).message);
+          return null;
+        };
+
+        // Two more independent passes (deterministic + slight variation)
+        await runRecount(0);
+        // Only run the 3rd pass if the first two disagree (saves time when they agree)
+        if (votes[0] !== votes[1]) {
+          await runRecount(0.15);
+        }
+
+        // Tally votes → pick the majority count
+        const tally: Record<number, number> = {};
+        for (const v of votes) tally[v] = (tally[v] || 0) + 1;
+        let bestCount = votes[0];
+        let bestVotes = 0;
+        for (const [c, n] of Object.entries(tally)) {
+          if (n > bestVotes) { bestVotes = n; bestCount = Number(c); }
+        }
+
+        console.log(`[count-linen] Consensus votes=${JSON.stringify(votes)} → ${bestCount} (${bestVotes}/${votes.length})`);
+
+        const chosen = resultsByCount[bestCount] || result;
+        if (bestVotes === votes.length) {
+          // Unanimous → maximum confidence
+          result = { ...chosen, confidence: 0.99, notes: (chosen.notes || '') + ` [Consensus unanime ${votes.length} passes]` };
+        } else if (bestVotes >= 2) {
+          // Majority agreement
+          result = { ...chosen, confidence: Math.max(0.9, chosen.confidence || 0.9), notes: (chosen.notes || '') + ` [Majorité ${bestVotes}/${votes.length}: ${bestCount}]` };
+        } else {
+          // No agreement → keep first pass but flag uncertainty
+          result = { ...result, confidence: Math.min(result.confidence || 0.7, 0.8), notes: (result.notes || '') + ` [Désaccord: passes=${votes.join(',')}]` };
         }
       }
 
