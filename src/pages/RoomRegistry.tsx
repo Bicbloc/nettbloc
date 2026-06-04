@@ -17,7 +17,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3, Layers } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3, Layers, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
@@ -25,7 +25,7 @@ import { BulkEquipmentDialog } from '@/components/equipment/BulkEquipmentDialog'
 import { SpaceActivityLog } from '@/components/SpaceActivityLog';
 import { FloorPlanView } from '@/components/registry/FloorPlanView';
 import { FloorPlanGrid } from '@/components/registry/FloorPlanGrid';
-import { formatFloorLabel } from '@/utils/floorUtils';
+import { formatFloorLabel, deduceFloorFromRoomNumber } from '@/utils/floorUtils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
