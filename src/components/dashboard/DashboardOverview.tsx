@@ -3,10 +3,12 @@
  * Extrait de Index.tsx pour modularité
  */
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Layers, UserIcon } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar, Layers, UserIcon, ChevronDown } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
