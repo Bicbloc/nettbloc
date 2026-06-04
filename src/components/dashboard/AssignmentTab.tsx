@@ -208,6 +208,8 @@ export function AssignmentTab({
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.length}
         housekeeperNames={housekeeperNames}
+        hotelId={currentHotelId}
+        onRequestInspection={() => setShowInspectionDialog(true)}
         onAddHousekeeper={() => {
           setIsRedistributionDialogOpen(false);
           setShowInviteDialog(true);
