@@ -15,6 +15,7 @@ interface LinenQuickInventoryProps {
   hotelId: string;
   onClose: () => void;
   embedded?: boolean;
+  assignedToId?: string;
 }
 
 export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
@@ -22,6 +23,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   hotelId,
   onClose,
   embedded = false,
+  assignedToId,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -50,14 +52,20 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { creatingTaskRef.current = false; return; }
+        const assigneeId = assignedToId || user?.id;
+        const creatorId = user?.id || assignedToId;
+
+        if (!assigneeId || !creatorId) {
+          creatingTaskRef.current = false;
+          return;
+        }
 
         const { data: newTask, error } = await supabase
           .from('linen_inventory_tasks')
           .insert({
             hotel_id: hotelId,
-            assigned_to: user.id,
-            assigned_by: user.id,
+            assigned_to: assigneeId,
+            assigned_by: creatorId,
             status: 'in_progress',
             task_date: new Date().toISOString().split('T')[0],
             started_at: new Date().toISOString()
@@ -77,7 +85,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
     };
 
     ensureRealTask();
-  }, [initialTaskId, hotelId, isTemporaryTask, realTaskId]);
+  }, [initialTaskId, hotelId, isTemporaryTask, realTaskId, assignedToId]);
 
   // Fetch linen types
   const { data: linenTypes = [] } = useQuery({
