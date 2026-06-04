@@ -300,7 +300,10 @@ function TechnicianWorkContent() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     storageService.clearHotel();
-    localStorage.clear();
+    // Ne nettoyer que les clés du technicien (ne pas effacer les autres portails)
+    localStorage.removeItem('technicianProfile');
+    localStorage.removeItem('lastSelectedHotelId');
+    localStorage.removeItem('lastSelectedHotelName');
     navigate('/technician/login');
   };
 
