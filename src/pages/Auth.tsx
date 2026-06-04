@@ -236,16 +236,12 @@ const Auth = () => {
         </div>
         <div className="w-full max-w-sm space-y-6">
           {/* Logo */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center p-3 bg-primary rounded-2xl mb-2">
-              <Building className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <h1 className="text-2xl font-bold">
-              {language === 'en' ? 'Nettobloc — Simplified hotel management' : 'Nettobloc — Gestion hôtelière simplifiée'}
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              {language === 'en' ? 'Simplified hotel management' : 'Gestion hôtelière simplifiée'}
-            </p>
+          <div className="text-center">
+            <img
+              src="/Nettobloc.png"
+              alt="Nettobloc"
+              className="mx-auto h-16 w-auto object-contain"
+            />
           </div>
 
           {/* Options */}
