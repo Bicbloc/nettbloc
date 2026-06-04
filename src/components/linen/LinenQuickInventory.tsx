@@ -303,9 +303,9 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
                   <ScanLine className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">Scannez chaque type séparément</p>
+                  <p className="font-semibold">Pour commencer : appuyez sur « Scanner »</p>
                   <p className="text-sm text-muted-foreground">
-                    Le résultat s’enregistre sur la carte du linge et reste visible jusqu’à l’envoi final.
+                    Scannez chaque type de linge ci-dessous. Le bouton « Enregistrer » en bas s’activera dès le premier scan.
                   </p>
                 </div>
               </div>
