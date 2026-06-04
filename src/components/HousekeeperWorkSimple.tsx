@@ -958,13 +958,23 @@ const HousekeeperWorkContent: React.FC = () => {
         .in('status', ['pending', 'in_progress']);
       
       if (linenTasks && linenTasks.length > 0) {
-          const normalizedHousekeeperName = normalizeName(housekeeperName);
-        const myTask = linenTasks.find((t: any) => 
-          t.assigned_to === housekeeperName || 
-          t.assigned_to === housekeeperId ||
+        const normalizedHousekeeperName = normalizeName(housekeeperName);
+        const possibleAssigneeIds = [
+          housekeeperProfile?.id,
+          housekeeper?.id,
+          housekeeper?.access_code,
+          housekeeper?.user_id,
+        ].filter(Boolean);
+
+        const myTask = linenTasks.find((t: any) =>
+          possibleAssigneeIds.includes(t.assigned_to) ||
+          t.assigned_to === housekeeperName ||
           normalizeName(t.assigned_to) === normalizedHousekeeperName
         );
-          setActiveLinenTask(myTask?.id || null);
+
+        setActiveLinenTask(myTask?.id || null);
+      } else {
+        setActiveLinenTask(null);
       }
       
     } catch (error) {
