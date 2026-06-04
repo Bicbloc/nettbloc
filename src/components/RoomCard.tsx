@@ -398,7 +398,8 @@ export function RoomCard({
                   e.stopPropagation();
                   onUpdate({
                     ...room,
-                    status: 'ready-to-clean'
+                     status: 'ready-to-clean',
+                     cleaningType: 'a_blanc'
                   });
                   toast({
                     description: `${t.rooms.room} ${room.number} - ${t.rooms.readyToClean}`
