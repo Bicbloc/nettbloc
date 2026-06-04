@@ -336,7 +336,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   };
 
   const handleCapturePhoto = async () => {
-    const imageData = captureFrameDataUrl(0.85);
+    // High-resolution capture for precise final counting
+    const imageData = captureFrameDataUrl(0.92, 1600);
     if (!imageData) return;
     
     setCapturedPhoto(imageData);
