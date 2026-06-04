@@ -315,7 +315,13 @@ const HousekeeperWorkContent: React.FC = () => {
         }
 
         if (!session) {
-          navigate('/housekeeper/auth');
+          const cachedProfile = storageService.getHousekeeperProfile();
+          if (cachedProfile) {
+            setHousekeeperProfile(cachedProfile);
+            setIsAuthChecked(true);
+          } else {
+            navigate('/housekeeper/auth');
+          }
           return;
         }
         
@@ -327,11 +333,23 @@ const HousekeeperWorkContent: React.FC = () => {
           .maybeSingle();
         
         if (error || !profile) {
-          navigate('/housekeeper/signup');
+          const cachedProfile = storageService.getHousekeeperProfile();
+          if (cachedProfile) {
+            setHousekeeperProfile(cachedProfile);
+            setIsAuthChecked(true);
+          } else {
+            navigate('/housekeeper/signup');
+          }
           return;
         }
         
         setHousekeeperProfile(profile);
+        storageService.saveHousekeeperProfile({
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          currentHotelId: storageService.getHotelId() || hotelIdFromUrl || undefined,
+        });
         
         // Vérifier qu'un hôtel est sélectionné
         const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
@@ -343,7 +361,13 @@ const HousekeeperWorkContent: React.FC = () => {
         setIsAuthChecked(true);
       } catch (error) {
         console.error('❌ Erreur vérification auth:', error);
-        navigate('/housekeeper/auth');
+        const cachedProfile = storageService.getHousekeeperProfile();
+        if (cachedProfile) {
+          setHousekeeperProfile(cachedProfile);
+          setIsAuthChecked(true);
+        } else {
+          navigate('/housekeeper/auth');
+        }
       }
     };
     
