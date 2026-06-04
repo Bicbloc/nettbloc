@@ -218,7 +218,46 @@ export function RedistributionDialog({
               ))}
             </RadioGroup>
           </div>
+
+          {/* Étape Inventaire du linge */}
+          {hotelId && (
+            <div className="space-y-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                Inventaire du linge
+              </h4>
+              <InventoryAssignmentCard hotelId={hotelId} />
+            </div>
+          )}
+
+          {/* Étape Inspection gouvernante */}
+          {onRequestInspection && (
+            <div className="space-y-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4 text-primary" />
+                Inspection gouvernante
+              </h4>
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <CardDescription className="text-sm">
+                    Demander une inspection des chambres par la gouvernante
+                  </CardDescription>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onClose();
+                      onRequestInspection();
+                    }}
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Demander
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
+
 
         <DialogFooter className="flex gap-2">
           <Button variant="outline" onClick={onClose}>
