@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Camera, Save, CheckCircle, ArrowLeft, Package } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Camera, Save, CheckCircle, ArrowLeft, Package, Sparkles, ScanLine, Check, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -206,109 +207,133 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-muted/30 flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
-        <div className="px-4 pt-4 pb-3">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="h-10 w-10 shrink-0 text-primary-foreground hover:bg-primary-foreground/15"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold truncate flex items-center gap-2">
-                <Package className="h-5 w-5" /> Inventaire Linge
-              </h1>
-              <p className="text-xs text-primary-foreground/80">
-                Scannez chaque type de linge avec l'appareil photo
-              </p>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-4 pb-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onClose}
+            className="h-11 w-11 shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
 
-          {/* Progress + stats */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
-              <p className="text-2xl font-extrabold leading-none">{totalItems}</p>
-              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Pièces</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="gap-1">
+                <Package className="h-3.5 w-3.5" />
+                Inventaire
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                Femme de chambre
+              </Badge>
             </div>
-            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
-              <p className="text-2xl font-extrabold leading-none">{totalScanned}/{linenTypes.length}</p>
-              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Scannés</p>
-            </div>
-            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
-              <p className="text-2xl font-extrabold leading-none">{progress}%</p>
-              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Avancé</p>
-            </div>
+            <h1 className="mt-2 text-xl font-bold leading-tight">Inventaire linge</h1>
+            <p className="text-sm text-muted-foreground">
+              Un affichage plus clair, type par type, pensé pour mobile.
+            </p>
           </div>
-          <div className="mt-3 h-2 rounded-full bg-primary-foreground/20 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary-foreground transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+        </div>
+
+        <div className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-3 px-4 pb-4">
+          <Card className="border bg-card px-3 py-3">
+            <p className="text-[11px] font-medium uppercase text-muted-foreground">Pièces</p>
+            <p className="mt-1 text-2xl font-bold">{totalItems}</p>
+          </Card>
+          <Card className="border bg-card px-3 py-3">
+            <p className="text-[11px] font-medium uppercase text-muted-foreground">Types faits</p>
+            <p className="mt-1 text-2xl font-bold">{totalScanned}/{linenTypes.length}</p>
+          </Card>
+          <Card className="border bg-card px-3 py-3">
+            <p className="text-[11px] font-medium uppercase text-muted-foreground">Progression</p>
+            <p className="mt-1 text-2xl font-bold">{progress}%</p>
+          </Card>
+        </div>
+
+        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+          <Progress value={progress} className="h-2.5" />
         </div>
       </div>
 
-      {/* Linen types list */}
-      <div className="flex-1 overflow-y-auto p-4 pb-32">
-        <div className="grid gap-3 max-w-2xl mx-auto">
+      <div className="flex-1 overflow-y-auto pb-28">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-4">
+          {linenTypes.length > 0 && (
+            <Card className="border bg-muted/40 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ScanLine className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Scannez chaque type séparément</p>
+                  <p className="text-sm text-muted-foreground">
+                    Le résultat s’enregistre sur la carte du linge et reste visible jusqu’à l’envoi final.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {linenTypes.map(type => {
             const entry = entries[type.id];
             const count = entry?.quantity_clean || 0;
             const done = !!entry;
+            const confidence = Math.round((entry?.ai_confidence || 0) * 100);
 
             return (
               <Card
                 key={type.id}
                 className={cn(
-                  "p-4 transition-all duration-200 border-2",
-                  done
-                    ? "border-primary/40 bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/30"
+                  'overflow-hidden border transition-all',
+                  done ? 'border-primary/30 bg-primary/5' : 'bg-card'
                 )}
               >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={cn(
-                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl",
-                      done ? "bg-primary/10" : "bg-muted"
-                    )}
-                  >
+                <div className="flex items-center gap-4 p-4">
+                  <div className={cn(
+                    'flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-3xl border',
+                    done ? 'border-primary/20 bg-primary/10' : 'border-border bg-muted'
+                  )}>
                     {getLinenIcon(type.category)}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold truncate">{type.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold">{type.name}</h3>
                       {done && (
-                        <Badge variant="secondary" className="shrink-0 gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          {Math.round((entry.ai_confidence || 0) * 100)}%
+                        <Badge variant="secondary" className="gap-1">
+                          <Check className="h-3.5 w-3.5" />
+                          Compté
+                        </Badge>
+                      )}
+                      {done && confidence > 0 && (
+                        <Badge variant="outline" className="gap-1">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          {confidence}%
                         </Badge>
                       )}
                     </div>
-                    {count > 0 ? (
-                      <p className="text-2xl font-bold text-primary leading-tight">
-                        {count} <span className="text-sm font-medium text-muted-foreground">pièces</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Pas encore compté</p>
-                    )}
-                  </div>
 
-                  <Button
-                    onClick={() => setActiveScanType(type.id)}
-                    variant={done ? "outline" : "default"}
-                    size="lg"
-                    className="h-12 px-4 shrink-0"
-                  >
-                    <Camera className="h-5 w-5 sm:mr-2" />
-                    <span className="hidden sm:inline">{done ? 'Rescanner' : 'Scanner'}</span>
-                  </Button>
+                    <div className="mt-2 flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-3xl font-bold leading-none">{count}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {done ? 'pièces détectées' : 'pas encore scanné'}
+                        </p>
+                      </div>
+
+                      <Button
+                        onClick={() => setActiveScanType(type.id)}
+                        variant={done ? 'outline' : 'default'}
+                        size="lg"
+                        className="h-12 shrink-0 gap-2 px-4"
+                      >
+                        <Camera className="h-4 w-4" />
+                        <span>{done ? 'Rescanner' : 'Scanner'}</span>
+                        <ChevronRight className="h-4 w-4 opacity-70" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Card>
             );
@@ -316,27 +341,31 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
           {linenTypes.length === 0 && (
             <Card className="p-8 text-center text-muted-foreground">
-              <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p className="text-lg mb-1 font-medium">Aucun type de linge configuré</p>
-              <p className="text-sm">Contactez l'administrateur</p>
+              <Package className="mx-auto mb-3 h-10 w-10 opacity-40" />
+              <p className="text-lg font-medium">Aucun type de linge configuré</p>
+              <p className="mt-1 text-sm">Contactez l’établissement</p>
             </Card>
           )}
         </div>
       </div>
 
-      {/* Fixed bottom save button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t shadow-lg">
-        <div className="max-w-2xl mx-auto">
+      <div className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Prêt à enregistrer</p>
+            <p className="text-xs text-muted-foreground">
+              {totalScanned > 0 ? `${totalScanned} type(s) scanné(s) • ${totalItems} pièces` : 'Commencez par scanner un type de linge'}
+            </p>
+          </div>
+
           <Button
             onClick={handleSave}
             disabled={isSaving || totalScanned === 0 || !realTaskId}
             size="lg"
-            className="w-full h-14 text-lg shadow-md"
+            className="h-12 min-w-[150px] gap-2"
           >
-            <Save className="h-5 w-5 mr-2" />
-            {isSaving ? "Enregistrement..." :
-             !realTaskId ? "Initialisation..." :
-             `Enregistrer (${totalItems} pièces)`}
+            <Save className="h-4 w-4" />
+            {isSaving ? 'Enregistrement...' : !realTaskId ? 'Initialisation...' : 'Enregistrer'}
           </Button>
         </div>
       </div>
