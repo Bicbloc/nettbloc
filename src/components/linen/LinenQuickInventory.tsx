@@ -240,7 +240,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
     <div className={cn(
       'flex flex-col bg-background',
       embedded
-        ? 'relative flex-1 min-h-0 overflow-hidden'
+        ? 'relative'
         : 'fixed inset-0 z-50'
     )}>
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
@@ -294,7 +294,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className={cn(embedded ? 'pb-24' : 'flex-1 overflow-y-auto pb-24')}>
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-4">
           {linenTypes.length > 0 && (
             <Card className="border bg-muted/40 p-4">
