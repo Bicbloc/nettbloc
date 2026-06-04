@@ -14,6 +14,7 @@ import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 import { validateEmailForUserType } from '@/services/userTypeValidationService';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
