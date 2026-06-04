@@ -14,6 +14,7 @@ import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 import { validateEmailForUserType } from '@/services/userTypeValidationService';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
@@ -230,6 +231,9 @@ const Auth = () => {
   if (mode === 'select') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
         <div className="w-full max-w-sm space-y-6">
           {/* Logo */}
           <div className="text-center space-y-2">
@@ -422,10 +426,11 @@ const Auth = () => {
               <Button variant="ghost" size="icon" onClick={goBack} className="h-8 w-8">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-lg">{config.title}</CardTitle>
                 <CardDescription className="text-sm">{config.subtitle}</CardDescription>
               </div>
+              <LanguageSwitcher />
             </div>
           </CardHeader>
           <CardContent>
