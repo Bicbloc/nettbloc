@@ -154,6 +154,43 @@ const RoomRegistry = () => {
     },
   });
 
+  const autoOrganizeMutation = useMutation({
+    mutationFn: async () => {
+      const all = rooms || [];
+      // On ne met à jour que les chambres dont l'étage déduit diffère de l'actuel
+      const updates = all
+        .map((r) => ({ id: r.id, floor: deduceFloorFromRoomNumber(r.room_number) }))
+        .filter((u) => u.floor !== null && u.floor !== undefined);
+
+      const toUpdate = updates.filter((u) => {
+        const current = all.find((r) => r.id === u.id);
+        return current && current.floor !== u.floor;
+      });
+
+      for (const u of toUpdate) {
+        const { error } = await supabase
+          .from('hotel_rooms_registry')
+          .update({ floor: u.floor, updated_at: new Date().toISOString() })
+          .eq('id', u.id);
+        if (error) throw error;
+      }
+
+      return toUpdate.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
+      toast({
+        title: 'Étages réorganisés',
+        description: count > 0
+          ? `${count} chambre(s) mise(s) à jour automatiquement`
+          : 'Tous les étages étaient déjà corrects',
+      });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: 'Impossible de réorganiser les étages', variant: 'destructive' });
+    },
+  });
+
   const filteredRooms = useMemo(() => {
     let result = rooms || [];
     if (categoryFilter !== 'all') {
