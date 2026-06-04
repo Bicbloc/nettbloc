@@ -133,38 +133,36 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       
       setProfile(mappedProfile);
 
-      // Load active hotel session (use technician_profile_id column if exists, fallback to profile id match)
-      const { data: sessionData } = await supabase
-        .from('hotel_access_sessions')
-        .select(`
-          id,
-          hotel_id,
-          access_code,
-          is_active,
-          hotels (name)
-        `)
-        .or(`housekeeper_profile_id.eq.${userId},access_code.ilike.${userId.substring(0, 8)}%`)
-        .eq('is_active', true)
-        .maybeSingle();
+      // Charger les hôtels approuvés du technicien (les techniciens n'utilisent
+      // PAS hotel_access_sessions, qui est réservé aux femmes de chambre).
+      const { data: approvedHotels } = await supabase
+        .rpc('get_approved_hotels_for_technician' as any, {
+          p_technician_profile_id: mappedProfile.id
+        });
 
-      if (sessionData) {
+      const hotelsArray = (approvedHotels as Array<{ hotel_id: string; hotel_name: string; hotel_code: string }> | null) || [];
+
+      if (hotelsArray.length > 0) {
+        // Préférer l'hôtel sélectionné en local, sinon le premier approuvé.
+        const storedHotelId = storageService.getHotelId?.() || localStorage.getItem('lastSelectedHotelId');
+        const selected = hotelsArray.find(h => h.hotel_id === storedHotelId) || hotelsArray[0];
+
         const hotelSession = {
-          id: sessionData.id,
-          hotel_id: sessionData.hotel_id,
-          hotel_name: (sessionData.hotels as any)?.name,
-          is_active: sessionData.is_active,
-          access_code: sessionData.access_code
+          id: selected.hotel_id,
+          hotel_id: selected.hotel_id,
+          hotel_name: selected.hotel_name,
+          is_active: true,
+          access_code: selected.hotel_code || ''
         };
         setCurrentHotelSession(hotelSession);
-        
-        // Sync with storageService
-        if (sessionData.hotel_id) {
-          storageService.saveHotel({
-            id: sessionData.hotel_id,
-            name: hotelSession.hotel_name || '',
-            code: ''
-          });
-        }
+
+        storageService.saveHotel({
+          id: selected.hotel_id,
+          name: selected.hotel_name || '',
+          code: selected.hotel_code || ''
+        });
+      } else {
+        setCurrentHotelSession(null);
       }
     } catch (error) {
       console.error('Error loading technician profile:', error);
