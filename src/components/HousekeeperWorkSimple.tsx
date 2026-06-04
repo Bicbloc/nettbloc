@@ -587,7 +587,7 @@ const HousekeeperWorkContent: React.FC = () => {
 
 
 
-  const loadWorkData = async () => {
+  const loadWorkData = async (background = false) => {
     try {
       setIsRefreshing(true);
       
