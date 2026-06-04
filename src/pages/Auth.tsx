@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
