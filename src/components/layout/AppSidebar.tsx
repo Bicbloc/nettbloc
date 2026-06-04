@@ -103,7 +103,7 @@ export function AppSidebar({
         >
           {item.icon}
           {count > 0 && (
-            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center animate-pulse">
               {count > 99 ? '99+' : count}
             </span>
           )}
