@@ -326,6 +326,13 @@ function HousekeeperHotelsContent() {
   const handleSelectHotel = (hotel: any) => {
     
     try {
+      storageService.saveActivePortal('housekeeper');
+      storageService.saveHousekeeperHotel({
+        id: hotel.id,
+        name: hotel.name,
+        code: hotel.hotel_code,
+      });
+
       // 1. SAUVEGARDER D'ABORD le nouvel hôtel (avant de nettoyer)
       storageService.saveHotel({
         id: hotel.id,
@@ -373,6 +380,7 @@ function HousekeeperHotelsContent() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    storageService.clearHousekeeperHotel();
     storageService.clearHotel();
     localStorage.clear();
     navigate('/housekeeper/auth');
