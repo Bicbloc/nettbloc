@@ -335,14 +335,12 @@ const Auth = () => {
 
           <p className="text-center text-xs text-muted-foreground pt-4">
             {language === 'en' ? 'By continuing, you accept our ' : 'En continuant, vous acceptez nos '}
-            <a 
-              href="https://nettobloc.bicbloc.eu/legal/cgv" 
-              target="_blank" 
-              rel="noopener noreferrer"
+            <Link
+              to="/legal/cgv"
               className="text-primary hover:underline font-medium"
             >
               {language === 'en' ? 'terms and conditions' : 'conditions générales de vente'}
-            </a>
+            </Link>
           </p>
         </div>
       </div>
