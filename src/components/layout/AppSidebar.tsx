@@ -128,7 +128,7 @@ export function AppSidebar({
         {item.icon}
         <span className="flex-1 truncate">{item.label}</span>
         {count > 0 && (
-          <Badge className="bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0 h-5 min-w-5 flex items-center justify-center">
+          <Badge className="bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0 h-5 min-w-5 flex items-center justify-center animate-pulse">
             {count > 99 ? '99+' : count}
           </Badge>
         )}
