@@ -192,11 +192,23 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
                     <UserCheck className="h-4 w-4 text-primary" />
                     <span className="font-medium">{hk?.name || "Femme de chambre"}</span>
                   </div>
-                  <Badge
-                    className={`${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
-                  >
-                    {STATUS_LABELS[task.status] || task.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={`${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
+                    >
+                      {STATUS_LABELS[task.status] || task.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeMutation.mutate(task.id)}
+                      disabled={removeMutation.isPending}
+                      title="Retirer l'inventaire"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               );
             })}
