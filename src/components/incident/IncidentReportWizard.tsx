@@ -751,12 +751,18 @@ export function IncidentReportWizard({
       <DialogContent 
         className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0"
         onInteractOutside={(e) => {
-          // Prevent dialog from closing when camera/file picker opens on mobile
-          if (isAnalyzing || currentStep === 'analysis') {
-            e.preventDefault();
-          }
+          // Never close on outside interaction: the native camera/file picker
+          // fires stray pointer/focus events when returning to the app, which
+          // would otherwise close the wizard mid-flow. Closing is explicit only.
+          e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
+          e.preventDefault();
+        }}
+        onFocusOutside={(e) => {
+          e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
           if (isAnalyzing || currentStep === 'analysis') {
             e.preventDefault();
           }

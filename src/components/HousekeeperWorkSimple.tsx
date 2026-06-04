@@ -76,7 +76,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
 
   // Ref pour accéder à loadWorkData dans le callback
-  const loadWorkDataRef = useRef<() => void>(() => {});
+  const loadWorkDataRef = useRef<(background?: boolean) => void>(() => {});
 
   // Fonction pour ajouter au journal d'activité
   const addToActivityLog = useCallback((message: string, type: ActivityLogEntry['type'] = 'info') => {
@@ -303,8 +303,18 @@ const HousekeeperWorkContent: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        // Sur un rafraîchissement à froid (surtout en WebView mobile), le SDK
+        // Supabase peut ne pas avoir fini de réhydrater le token depuis le
+        // stockage. getSession() renverrait alors null à tort et éjecterait la
+        // femme de chambre. On réessaie quelques fois avant d'abandonner.
+        let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+          if (session) break;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
         if (!session) {
           navigate('/housekeeper/auth');
           return;
@@ -457,7 +467,7 @@ const HousekeeperWorkContent: React.FC = () => {
     if (table === 'assignments') {
       if (eventType === 'INSERT') {
         if (isForMe(newRecord)) {
-          loadWorkDataRef.current();
+          loadWorkDataRef.current(true);
           addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
           dispatchStaffNotification('🆕 Nouvelle chambre', 'Une chambre vous a été assignée par le responsable');
           setNewRoomsCount(prev => prev + 1);
@@ -465,7 +475,7 @@ const HousekeeperWorkContent: React.FC = () => {
         }
       } else if (eventType === 'UPDATE') {
         if (isForMe(newRecord) || isForMe(oldRecord)) {
-          loadWorkDataRef.current();
+          loadWorkDataRef.current(true);
           addToActivityLog(`🔄 Assignation mise à jour`, 'info');
         }
       } else if (eventType === 'DELETE') {
@@ -558,21 +568,21 @@ const HousekeeperWorkContent: React.FC = () => {
     // Polling de secours toutes les 25s (le temps réel reste prioritaire)
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     }, 25000);
 
     // Rattrapage immédiat au retour de connexion temps réel
     const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
       if (status === 'SUBSCRIBED' || status === 'ONLINE') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     });
 
     // Rattrapage au retour de l'onglet (téléphone mis en veille)
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -587,7 +597,7 @@ const HousekeeperWorkContent: React.FC = () => {
 
 
 
-  const loadWorkData = async () => {
+  const loadWorkData = async (background = false) => {
     try {
       setIsRefreshing(true);
       
@@ -625,6 +635,13 @@ const HousekeeperWorkContent: React.FC = () => {
 
       if (hotelError) {
         console.error('❌ Erreur RPC get_hotel_for_housekeeper:', hotelError);
+        // Lors d'un rafraîchissement en arrière-plan (retour caméra, réveil du
+        // téléphone, reconnexion temps réel), une erreur réseau transitoire ne
+        // doit JAMAIS éjecter la femme de chambre de l'établissement ni effacer
+        // ses données. On garde l'état actuel et on réessaiera plus tard.
+        if (background) {
+          return;
+        }
         toast({
           title: "Erreur",
           description: "Impossible de charger l'hôtel",
@@ -646,6 +663,10 @@ const HousekeeperWorkContent: React.FC = () => {
           .single();
         
         if (!fallbackHotel) {
+          // Idem: ne pas éjecter lors d'un rafraîchissement en arrière-plan
+          if (background) {
+            return;
+          }
           toast({
             title: "Erreur",
             description: "Hôtel non trouvé ou accès non autorisé",
@@ -795,15 +816,25 @@ const HousekeeperWorkContent: React.FC = () => {
       const recoucheCount = extractedRooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'stayover' || r.cleaning_type === 'Recouche').length;
       const otherCount = extractedRooms.length - aBlancCount - recoucheCount;
       
+      // Protection contre la perte de données : lors d'un rafraîchissement en
+      // arrière-plan, si la requête revient vide (RLS transitoire, réveil du
+      // téléphone, retour caméra) alors qu'on avait déjà des chambres, on
+      // ignore ce résultat vide pour ne pas effacer le travail en cours.
+      if (background && extractedRooms.length === 0 && rooms.length > 0) {
+        return;
+      }
+
       setAssignments(uniqueAssignments);
       setRooms(extractedRooms);
       
-      // Sauvegarder dans le cache
-      localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
-        assignments: uniqueAssignments,
-        rooms: extractedRooms,
-        timestamp: Date.now()
-      }));
+      // Sauvegarder dans le cache (seulement si on a des données réelles)
+      if (extractedRooms.length > 0) {
+        localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
+          assignments: uniqueAssignments,
+          rooms: extractedRooms,
+          timestamp: Date.now()
+        }));
+      }
 
       // Charger les tâches d'inventaire linge
       const today = new Date().toISOString().split('T')[0];
