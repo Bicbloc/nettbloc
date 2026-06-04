@@ -100,6 +100,7 @@ export function IncidentReportWizard({
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{
     category: string;
     item: string;
@@ -612,7 +613,7 @@ export function IncidentReportWizard({
 
       return incident;
     },
-    onSuccess: (incident) => {
+      onSuccess: (incident) => {
       // Log to activity journal
       supabase.from("daily_action_logs").insert({
         hotel_id: hotelId,
@@ -638,10 +639,12 @@ export function IncidentReportWizard({
         title: "✅ Incident signalé",
         description: "L'incident a été enregistré avec succès",
       });
+      setIsSubmitting(false);
       setIsOpen(false);
       onSuccess?.();
     },
     onError: (error: any) => {
+      setIsSubmitting(false);
       toast({
         title: "Erreur",
         description: error.message,
@@ -739,7 +742,13 @@ export function IncidentReportWizard({
   const StepIcon = stepConfig.icon;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open && (isAnalyzing || isSubmitting)) return;
+        setIsOpen(open);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm" className="gap-2">
@@ -1164,11 +1173,14 @@ export function IncidentReportWizard({
             </Button>
             {currentStep === 'confirm' ? (
               <Button 
-                onClick={() => createIncidentMutation.mutate(form.getValues())}
-                disabled={createIncidentMutation.isPending}
+                onClick={() => {
+                  setIsSubmitting(true);
+                  createIncidentMutation.mutate(form.getValues());
+                }}
+                disabled={createIncidentMutation.isPending || isSubmitting}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
-                {createIncidentMutation.isPending ? (
+                {createIncidentMutation.isPending || isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4 mr-2" />
