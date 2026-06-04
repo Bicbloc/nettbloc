@@ -653,6 +653,10 @@ const HousekeeperWorkContent: React.FC = () => {
           .single();
         
         if (!fallbackHotel) {
+          // Idem: ne pas éjecter lors d'un rafraîchissement en arrière-plan
+          if (background) {
+            return;
+          }
           toast({
             title: "Erreur",
             description: "Hôtel non trouvé ou accès non autorisé",
