@@ -232,59 +232,59 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
     <div className={cn(
       'flex flex-col bg-background',
       embedded
-        ? 'relative flex-1 min-h-0 overflow-hidden rounded-[1.5rem] border'
+        ? 'relative flex-1 min-h-0 overflow-hidden'
         : 'fixed inset-0 z-50'
     )}>
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-4 pb-3">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-3 pb-2">
           <Button
             variant="outline"
             size="icon"
             onClick={onClose}
-            className="h-11 w-11 shrink-0"
+            className="h-10 w-10 shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1">
+              <Badge variant="secondary" className="gap-1 text-[11px]">
                 <Package className="h-3.5 w-3.5" />
                 Inventaire
               </Badge>
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className="gap-1 text-[11px]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Femme de chambre
               </Badge>
             </div>
-            <h1 className="mt-2 text-xl font-bold leading-tight">Inventaire linge</h1>
-            <p className="text-sm text-muted-foreground">
-              Un affichage plus clair, type par type, pensé pour mobile.
+            <h1 className="mt-1 text-lg font-semibold leading-tight">Inventaire linge</h1>
+            <p className="text-xs text-muted-foreground">
+              Vue compacte, type par type.
             </p>
           </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-3 px-4 pb-4">
-          <Card className="border bg-card px-3 py-3">
+        <div className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-2 px-4 pb-3">
+          <Card className="border bg-card px-3 py-2">
             <p className="text-[11px] font-medium uppercase text-muted-foreground">Pièces</p>
-            <p className="mt-1 text-2xl font-bold">{totalItems}</p>
+            <p className="mt-1 text-xl font-bold">{totalItems}</p>
           </Card>
-          <Card className="border bg-card px-3 py-3">
+          <Card className="border bg-card px-3 py-2">
             <p className="text-[11px] font-medium uppercase text-muted-foreground">Types faits</p>
-            <p className="mt-1 text-2xl font-bold">{totalScanned}/{linenTypes.length}</p>
+            <p className="mt-1 text-xl font-bold">{totalScanned}/{linenTypes.length}</p>
           </Card>
-          <Card className="border bg-card px-3 py-3">
+          <Card className="border bg-card px-3 py-2">
             <p className="text-[11px] font-medium uppercase text-muted-foreground">Progression</p>
-            <p className="mt-1 text-2xl font-bold">{progress}%</p>
+            <p className="mt-1 text-xl font-bold">{progress}%</p>
           </Card>
         </div>
 
-        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-          <Progress value={progress} className="h-2.5" />
+        <div className="mx-auto w-full max-w-3xl px-4 pb-3">
+          <Progress value={progress} className="h-2" />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-28">
+      <div className="flex-1 overflow-y-auto pb-24">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-4">
           {linenTypes.length > 0 && (
             <Card className="border bg-muted/40 p-4">
