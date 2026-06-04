@@ -1,0 +1,1 @@
+ALTER TABLE public.invoices ALTER COLUMN seller_address SET DEFAULT '60 rue François 1er, 75008 Paris';
