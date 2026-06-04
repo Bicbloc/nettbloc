@@ -467,6 +467,8 @@ const IndexDashboard = () => {
               normalizedCleaningType = 'a_blanc';
             } else if (newRecord.cleaning_type === 'quick' || newRecord.cleaning_type === 'recouche') {
               normalizedCleaningType = 'recouche';
+            } else if (newRecord.status === 'checkout' || newRecord.status === 'ready-to-clean') {
+              normalizedCleaningType = 'a_blanc';
             }
             // IMPORTANT: Préserver assignedTo pour éviter désassignation
             return { 
