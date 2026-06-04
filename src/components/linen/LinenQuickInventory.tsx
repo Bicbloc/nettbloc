@@ -14,12 +14,14 @@ interface LinenQuickInventoryProps {
   taskId: string;
   hotelId: string;
   onClose: () => void;
+  embedded?: boolean;
 }
 
 export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   taskId: initialTaskId,
   hotelId,
   onClose,
+  embedded = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -207,7 +209,12 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className={cn(
+      'flex flex-col bg-background',
+      embedded
+        ? 'relative min-h-[70dvh] overflow-hidden rounded-[1.5rem] border'
+        : 'fixed inset-0 z-50'
+    )}>
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-4 pb-3">
           <Button

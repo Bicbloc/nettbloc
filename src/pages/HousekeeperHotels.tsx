@@ -146,10 +146,10 @@ function HousekeeperHotelsContent() {
         console.error('Profile load error:', profileError);
         toast({
           variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de charger votre profil."
+          title: "Erreur réseau",
+          description: "Impossible de charger votre profil pour le moment. Réessayez dans quelques secondes."
         });
-        navigate('/housekeeper/auth');
+        setIsLoading(false);
         return;
       }
 
@@ -333,14 +333,13 @@ function HousekeeperHotelsContent() {
         code: hotel.hotel_code,
       });
       
-      // 2. Sauvegarder le profil housekeeper avec les infos hôtel
-      localStorage.setItem('housekeeperProfile', JSON.stringify({
+      // 2. Sauvegarder le profil housekeeper dans le storage unifié
+      storageService.saveHousekeeperProfile({
         id: profile.id,
         name: profile.name,
         email: profile.email,
-        isAuthenticated: true,
-        currentHotelId: hotel.id // Backup additionnel
-      }));
+        currentHotelId: hotel.id
+      });
 
       // 3. Sauvegarde redondante pour récupération
       localStorage.setItem('lastSelectedHotelId', hotel.id);

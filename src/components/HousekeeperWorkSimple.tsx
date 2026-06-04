@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info, ArrowUpRight, BedDouble, ScanLine, ShieldCheck } from 'lucide-react';
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
@@ -56,7 +56,6 @@ const HousekeeperWorkContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
   const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
-  const [showLinenInventory, setShowLinenInventory] = useState(false);
   const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -109,7 +108,7 @@ const HousekeeperWorkContent: React.FC = () => {
     return null;
   };
   
-  const hotelId = getHotelId();
+  const hotelId = getHotelId() || storageService.recoverHotelId();
   const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
 
   // Charger/sauvegarder le pointage
@@ -316,7 +315,13 @@ const HousekeeperWorkContent: React.FC = () => {
         }
 
         if (!session) {
-          navigate('/housekeeper/auth');
+          const cachedProfile = storageService.getHousekeeperProfile();
+          if (cachedProfile) {
+            setHousekeeperProfile(cachedProfile);
+            setIsAuthChecked(true);
+          } else {
+            navigate('/housekeeper/auth');
+          }
           return;
         }
         
@@ -328,11 +333,23 @@ const HousekeeperWorkContent: React.FC = () => {
           .maybeSingle();
         
         if (error || !profile) {
-          navigate('/housekeeper/signup');
+          const cachedProfile = storageService.getHousekeeperProfile();
+          if (cachedProfile) {
+            setHousekeeperProfile(cachedProfile);
+            setIsAuthChecked(true);
+          } else {
+            navigate('/housekeeper/signup');
+          }
           return;
         }
         
         setHousekeeperProfile(profile);
+        storageService.saveHousekeeperProfile({
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          currentHotelId: storageService.getHotelId() || hotelIdFromUrl || undefined,
+        });
         
         // Vérifier qu'un hôtel est sélectionné
         const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
@@ -344,7 +361,13 @@ const HousekeeperWorkContent: React.FC = () => {
         setIsAuthChecked(true);
       } catch (error) {
         console.error('❌ Erreur vérification auth:', error);
-        navigate('/housekeeper/auth');
+        const cachedProfile = storageService.getHousekeeperProfile();
+        if (cachedProfile) {
+          setHousekeeperProfile(cachedProfile);
+          setIsAuthChecked(true);
+        } else {
+          navigate('/housekeeper/auth');
+        }
       }
     };
     
@@ -492,9 +515,10 @@ const HousekeeperWorkContent: React.FC = () => {
     if (table === 'rooms') {
       if (eventType === 'UPDATE') {
         const isMyRoom = rooms.some(r => r.id === newRecord.id);
+        const isTrackedCheckout = newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout';
         
         // Notification si chambre devient disponible (checkout)
-        if ((newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout') && 
+        if (isTrackedCheckout && 
             oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           dispatchStaffNotification('🚪 Client sorti', `Chambre ${newRecord.room_number} prête à nettoyer`);
@@ -519,7 +543,7 @@ const HousekeeperWorkContent: React.FC = () => {
             return { 
               ...r, 
               status: newRecord.status,
-              cleaning_type: newRecord.cleaning_type,
+              cleaning_type: newRecord.cleaning_type || (isTrackedCheckout ? 'a_blanc' : r.cleaning_type),
               notes: newRecord.notes || r.notes,
               cleaning_priority: newRecord.cleaning_priority || r.cleaning_priority
             };
@@ -528,6 +552,12 @@ const HousekeeperWorkContent: React.FC = () => {
           if (newRecord.status !== oldRecord?.status) {
             addToActivityLog(`🔄 Chambre ${newRecord.room_number} mise à jour: ${newRecord.status}`, 'info');
           }
+        }
+
+        if (!isMyRoom && isTrackedCheckout) {
+          // Rattrapage fiable: une chambre libérée doit apparaître tout de suite
+          // même si l'assignation ou le cache local ne sont pas encore alignés.
+          loadWorkDataRef.current(true);
         }
       } else if (eventType === 'DELETE') {
         // Chambre supprimée (clôture journée)
@@ -813,7 +843,7 @@ const HousekeeperWorkContent: React.FC = () => {
           status: a.rooms.status || 'needs-cleaning',
           notes: a.rooms.notes,
           cleaning_priority: a.rooms.cleaning_priority || 5,
-          cleaning_type: a.rooms.cleaning_type,
+          cleaning_type: a.rooms.cleaning_type || ((a.rooms.status === 'ready-to-clean' || a.rooms.status === 'checkout') ? 'a_blanc' : undefined),
           is_twin: a.rooms.is_twin || false
         }));
 
@@ -830,14 +860,40 @@ const HousekeeperWorkContent: React.FC = () => {
         return;
       }
 
+      const normalizedRooms = extractedRooms.map((room) => ({
+        ...room,
+        cleaning_type: room.cleaning_type || ((room.status === 'ready-to-clean' || room.status === 'checkout') ? 'a_blanc' : room.cleaning_type)
+      }));
+
       setAssignments(uniqueAssignments);
-      setRooms(extractedRooms);
+      setRooms(normalizedRooms);
+
+      const { data: checkoutRooms } = await supabase
+        .from('rooms')
+        .select('id, room_number, status, notes, cleaning_priority, cleaning_type, is_twin')
+        .eq('hotel_id', hotelId)
+        .in('status', ['ready-to-clean', 'checkout'])
+        .order('updated_at', { ascending: false });
+
+      const fallbackCheckoutRooms: Room[] = (checkoutRooms || []).map((room: any) => ({
+        id: room.id,
+        room_number: room.room_number,
+        status: room.status,
+        notes: room.notes,
+        cleaning_priority: room.cleaning_priority || 5,
+        cleaning_type: room.cleaning_type || 'a_blanc',
+        is_twin: room.is_twin || false,
+      }));
+
+      setAvailableRooms(
+        fallbackCheckoutRooms.filter(room => !normalizedRooms.some(existing => existing.id === room.id))
+      );
       
       // Sauvegarder dans le cache (seulement si on a des données réelles)
-      if (extractedRooms.length > 0) {
+      if (normalizedRooms.length > 0) {
         localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
           assignments: uniqueAssignments,
-          rooms: extractedRooms,
+          rooms: normalizedRooms,
           timestamp: Date.now()
         }));
       }
@@ -1158,7 +1214,7 @@ const HousekeeperWorkContent: React.FC = () => {
             </div>
 
             {/* Liste des chambres */}
-            {sortedRooms.length === 0 ? (
+            {sortedRooms.length === 0 && availableRooms.length === 0 ? (
               <Card className="p-8 text-center">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold text-lg mb-2">
@@ -1173,6 +1229,39 @@ const HousekeeperWorkContent: React.FC = () => {
               </Card>
             ) : (
               <div className="space-y-3">
+                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length > 0 && (
+                  <Card className="border-warning/30 bg-warning/10 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">Clients sortis détectés</p>
+                        <p className="text-sm text-muted-foreground">
+                          Ces chambres viennent d’être libérées et remontent en direct.
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="bg-background text-foreground">
+                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length}
+                      </Badge>
+                    </div>
+                  </Card>
+                )}
+
+                {availableRooms
+                  .filter(room => !rooms.some(existing => existing.id === room.id))
+                  .map(room => (
+                    <RoomCardEnhanced
+                      key={`checkout-${room.id}`}
+                      room={{
+                        ...room,
+                        cleaning_type: room.cleaning_type || 'a_blanc',
+                      }}
+                      hotelId={hotelId || ''}
+                      housekeeperName={housekeeperName}
+                      onUpdateStatus={handleRoomStatusChange}
+                      onUnassign={(roomId, roomNumber) => {
+                      }}
+                    />
+                  ))}
+
                 {sortedRooms.map(room => (
                   <RoomCardEnhanced
                     key={room.id}
@@ -1238,50 +1327,95 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <LinenQuickInventory
-            taskId={activeLinenTask || `manual_${Date.now()}`}
-            hotelId={hotelId}
-            onClose={() => {
-              setActiveLinenTask(null);
-              setActiveTab('rooms');
-              toast({
-                title: "✅ Inventaire terminé",
-                description: "Merci pour votre travail!"
-              });
-            }}
-          />
-        )}
-
-        {/* Chambres disponibles (client sorti) */}
-        {activeTab === 'rooms' && availableRooms.length > 0 && (
-          <Card className="border-warning/30 bg-warning/10 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning-foreground">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">Clients sortis détectés</p>
-                    <p className="text-sm text-muted-foreground">
-                      {availableRooms.length} chambre(s) viennent d'être libérées
+          <div className="space-y-4 pb-24">
+            <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+              <div className="bg-gradient-to-r from-primary to-info px-5 py-5 text-primary-foreground">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-background/15 px-3 py-1 text-xs font-medium">
+                      <ScanLine className="h-3.5 w-3.5" />
+                      Inventaire linge
+                    </div>
+                    <h2 className="text-2xl font-bold leading-tight">Une vue plus claire pour compter sans se perdre</h2>
+                    <p className="max-w-md text-sm text-primary-foreground/85">
+                      Lancez le scan, vérifiez les types déjà comptés et revenez aux chambres sans quitter votre session.
                     </p>
                   </div>
-                  <Button size="sm" onClick={() => loadWorkData(true)}>
-                    Voir la liste
-                  </Button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {availableRooms.map(room => (
-                    <Badge key={room.id} variant="secondary" className="bg-background">
-                      {room.room_number}
-                    </Badge>
-                  ))}
+                  <div className="grid min-w-[132px] gap-2 text-right text-sm">
+                    <div className="rounded-2xl bg-background/15 px-3 py-2">
+                      <p className="text-[11px] uppercase text-primary-foreground/70">Hôtel</p>
+                      <p className="truncate font-semibold">{hotel?.name || 'En cours'}</p>
+                    </div>
+                    <div className="rounded-2xl bg-background/15 px-3 py-2">
+                      <p className="text-[11px] uppercase text-primary-foreground/70">Session</p>
+                      <p className="font-semibold">{housekeeperName}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+
+              <div className="grid grid-cols-2 gap-3 border-t bg-muted/30 p-4 sm:grid-cols-4">
+                <div className="rounded-2xl border bg-background p-4">
+                  <p className="text-xs uppercase text-muted-foreground">Chambres</p>
+                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">{totalRooms}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">assignées aujourd’hui</p>
+                </div>
+                <div className="rounded-2xl border bg-background p-4">
+                  <p className="text-xs uppercase text-muted-foreground">À blanc</p>
+                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
+                    <LogOut className="h-4 w-4 text-destructive" />
+                    {rooms.filter(r => r.status === 'ready-to-clean' || r.status === 'checkout' || r.cleaning_type === 'a_blanc' || r.cleaning_type === 'full').length}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">clients sortis ou départs</p>
+                </div>
+                <div className="rounded-2xl border bg-background p-4">
+                  <p className="text-xs uppercase text-muted-foreground">Recouches</p>
+                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
+                    <BedDouble className="h-4 w-4 text-info" />
+                    {rooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'recouche' || r.cleaning_type === 'stayover').length}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">à suivre pendant le service</p>
+                </div>
+                <div className="rounded-2xl border bg-background p-4">
+                  <p className="text-xs uppercase text-muted-foreground">Synchronisation</p>
+                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
+                    <ShieldCheck className="h-4 w-4 text-success" />
+                    {isConnected ? 'Live' : 'Pause'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">statuts et scan</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border bg-card p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">Zone de comptage</h3>
+                  <p className="text-sm text-muted-foreground">Scannez chaque type puis enregistrez en bas d’écran.</p>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setActiveTab('rooms')}>
+                  <ArrowUpRight className="h-4 w-4" />
+                  Retour chambres
+                </Button>
+              </div>
+
+              <LinenQuickInventory
+                taskId={activeLinenTask || `manual_${Date.now()}`}
+                hotelId={hotelId}
+                embedded
+                onClose={() => {
+                  setActiveLinenTask(null);
+                  setActiveTab('rooms');
+                  toast({
+                    title: "✅ Inventaire terminé",
+                    description: "Merci pour votre travail!"
+                  });
+                }}
+              />
+            </section>
+          </div>
         )}
+
       </div>
       </div>
     </div>
