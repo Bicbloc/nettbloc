@@ -660,14 +660,14 @@ function GovernessDashboardContent() {
                         <h2 className="font-semibold">Inventaire du linge</h2>
                         <p className="text-xs text-muted-foreground">Scanner et compter le linge</p>
                       </div>
-                      <Button onClick={() => setShowLinenScanner(true)} className="rounded-xl">
+                      <Button onClick={() => { setGovLinenTaskId(`temp-governess-${Date.now()}`); setShowLinenScanner(true); }} className="rounded-xl">
                         <Shirt className="h-4 w-4 mr-2" />
                         Scanner
                       </Button>
                     </div>
                     <div className="p-4">
-                      {showLinenScanner && (
-                        <LinenQuickInventory taskId={`temp-governess-${Date.now()}`} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
+                      {showLinenScanner && govLinenTaskId && (
+                        <LinenQuickInventory taskId={govLinenTaskId} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
                       )}
                     </div>
                   </div>
