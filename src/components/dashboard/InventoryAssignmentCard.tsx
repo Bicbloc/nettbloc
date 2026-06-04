@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ClipboardList, UserCheck, Plus } from "lucide-react";
+import { ClipboardList, UserCheck, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -143,6 +143,24 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
     },
   });
 
+  const removeMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from("linen_inventory_tasks")
+        .delete()
+        .eq("id", taskId);
+      if (error) throw new Error(error.message || "Erreur lors du retrait");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-tasks-today"] });
+      queryClient.invalidateQueries({ queryKey: ["linen-tasks"] });
+      toast.success("Inventaire retiré");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Impossible de retirer l'inventaire");
+    },
+  });
+
   if (!hotelId) return null;
 
   return (
@@ -174,11 +192,23 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
                     <UserCheck className="h-4 w-4 text-primary" />
                     <span className="font-medium">{hk?.name || "Femme de chambre"}</span>
                   </div>
-                  <Badge
-                    className={`${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
-                  >
-                    {STATUS_LABELS[task.status] || task.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={`${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
+                    >
+                      {STATUS_LABELS[task.status] || task.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeMutation.mutate(task.id)}
+                      disabled={removeMutation.isPending}
+                      title="Retirer l'inventaire"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               );
             })}
