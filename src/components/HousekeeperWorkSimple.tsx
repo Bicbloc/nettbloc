@@ -515,9 +515,10 @@ const HousekeeperWorkContent: React.FC = () => {
     if (table === 'rooms') {
       if (eventType === 'UPDATE') {
         const isMyRoom = rooms.some(r => r.id === newRecord.id);
+        const isTrackedCheckout = newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout';
         
         // Notification si chambre devient disponible (checkout)
-        if ((newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout') && 
+        if (isTrackedCheckout && 
             oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           dispatchStaffNotification('🚪 Client sorti', `Chambre ${newRecord.room_number} prête à nettoyer`);
@@ -542,7 +543,7 @@ const HousekeeperWorkContent: React.FC = () => {
             return { 
               ...r, 
               status: newRecord.status,
-              cleaning_type: newRecord.cleaning_type,
+              cleaning_type: newRecord.cleaning_type || (isTrackedCheckout ? 'a_blanc' : r.cleaning_type),
               notes: newRecord.notes || r.notes,
               cleaning_priority: newRecord.cleaning_priority || r.cleaning_priority
             };
@@ -551,6 +552,12 @@ const HousekeeperWorkContent: React.FC = () => {
           if (newRecord.status !== oldRecord?.status) {
             addToActivityLog(`🔄 Chambre ${newRecord.room_number} mise à jour: ${newRecord.status}`, 'info');
           }
+        }
+
+        if (!isMyRoom && isTrackedCheckout) {
+          // Rattrapage fiable: une chambre libérée doit apparaître tout de suite
+          // même si l'assignation ou le cache local ne sont pas encore alignés.
+          loadWorkDataRef.current(true);
         }
       } else if (eventType === 'DELETE') {
         // Chambre supprimée (clôture journée)
