@@ -29,11 +29,10 @@ export class RoomSyncService {
       const previousStatus = existingRoom.status;
 
       // Construire l'objet de mise à jour avec tous les champs pertinents
-      // Ne jamais écraser automatiquement les notes, la priorité ou le statut 'client sorti'
-      // Priority et checkout sont des actions manuelles du client
-      const safeStatus = ['checkout', 'ready-to-clean'].includes(room.status)
-        ? 'needs-cleaning'
-        : room.status;
+      // IMPORTANT: `checkout` / `ready-to-clean` = vrai signal manuel "Client sorti"
+      // et doivent être conservés tels quels. Sinon le bouton côté établissement
+      // semble s'annuler tout seul et la femme de chambre ne reçoit jamais l'info.
+      const safeStatus = room.status;
       
       const updateData: any = {
         status: safeStatus,

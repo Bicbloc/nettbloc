@@ -498,6 +498,7 @@ const HousekeeperWorkContent: React.FC = () => {
             oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           dispatchStaffNotification('🚪 Client sorti', `Chambre ${newRecord.room_number} prête à nettoyer`);
+          loadWorkDataRef.current(true);
           // Si la chambre m'est déjà assignée, elle reste dans la liste principale
           // (le badge "Client sorti" s'affichera grâce au statut mis à jour ci-dessous).
           if (!isMyRoom) {
@@ -1252,20 +1253,32 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {/* Chambres disponibles (client sorti) */}
-        {availableRooms.length > 0 && (
-          <Card className="border-green-200 bg-green-50 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="h-5 w-5 text-green-600" />
-              <span className="font-medium text-green-800">
-                {availableRooms.length} chambre(s) disponible(s)
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {availableRooms.map(room => (
-                <Badge key={room.id} variant="outline" className="bg-white">
-                  {room.room_number}
-                </Badge>
-              ))}
+        {activeTab === 'rooms' && availableRooms.length > 0 && (
+          <Card className="border-warning/30 bg-warning/10 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning-foreground">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Clients sortis détectés</p>
+                    <p className="text-sm text-muted-foreground">
+                      {availableRooms.length} chambre(s) viennent d'être libérées
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => loadWorkData(true)}>
+                    Voir la liste
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {availableRooms.map(room => (
+                    <Badge key={room.id} variant="secondary" className="bg-background">
+                      {room.room_number}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             </div>
           </Card>
         )}
