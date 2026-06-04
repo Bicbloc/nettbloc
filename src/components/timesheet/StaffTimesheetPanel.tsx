@@ -79,7 +79,11 @@ const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }>
   validated: { label: 'Validé', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   modified: { label: 'Modifié', color: 'bg-blue-100 text-blue-800', icon: Edit2 },
   rejected: { label: 'Rejeté', color: 'bg-red-100 text-red-800', icon: XCircle },
+  not_clocked: { label: 'Non pointé', color: 'bg-gray-100 text-gray-700', icon: AlertCircle },
 };
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const normalizeStaffName = (value?: string | null) => (value || '').trim().toLowerCase();
 
 export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   const { toast } = useToast();
