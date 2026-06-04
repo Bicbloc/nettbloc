@@ -231,6 +231,9 @@ const Auth = () => {
   if (mode === 'select') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
         <div className="w-full max-w-sm space-y-6">
           {/* Logo */}
           <div className="text-center space-y-2">
