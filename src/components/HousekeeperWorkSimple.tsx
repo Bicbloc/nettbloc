@@ -867,6 +867,27 @@ const HousekeeperWorkContent: React.FC = () => {
 
       setAssignments(uniqueAssignments);
       setRooms(normalizedRooms);
+
+      const { data: checkoutRooms } = await supabase
+        .from('rooms')
+        .select('id, room_number, status, notes, cleaning_priority, cleaning_type, is_twin')
+        .eq('hotel_id', hotelId)
+        .in('status', ['ready-to-clean', 'checkout'])
+        .order('updated_at', { ascending: false });
+
+      const fallbackCheckoutRooms: Room[] = (checkoutRooms || []).map((room: any) => ({
+        id: room.id,
+        room_number: room.room_number,
+        status: room.status,
+        notes: room.notes,
+        cleaning_priority: room.cleaning_priority || 5,
+        cleaning_type: room.cleaning_type || 'a_blanc',
+        is_twin: room.is_twin || false,
+      }));
+
+      setAvailableRooms(
+        fallbackCheckoutRooms.filter(room => !normalizedRooms.some(existing => existing.id === room.id))
+      );
       
       // Sauvegarder dans le cache (seulement si on a des données réelles)
       if (normalizedRooms.length > 0) {
