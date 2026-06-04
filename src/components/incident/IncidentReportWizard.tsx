@@ -131,6 +131,7 @@ export function IncidentReportWizard({
   // Reset on close
   useEffect(() => {
     if (!isOpen) {
+      setIsSubmitting(false);
       setCurrentStep('photo');
       setSelectedImage(null);
       setImagePreview(null);
