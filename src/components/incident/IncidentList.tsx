@@ -38,6 +38,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<File[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>(defaultFilterStatus);
+  useEffect(() => { setFilterStatus(defaultFilterStatus); }, [defaultFilterStatus]);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [editingIncident, setEditingIncident] = useState<any | null>(null);
