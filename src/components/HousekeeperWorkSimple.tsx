@@ -76,7 +76,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
 
   // Ref pour accéder à loadWorkData dans le callback
-  const loadWorkDataRef = useRef<() => void>(() => {});
+  const loadWorkDataRef = useRef<(background?: boolean) => void>(() => {});
 
   // Fonction pour ajouter au journal d'activité
   const addToActivityLog = useCallback((message: string, type: ActivityLogEntry['type'] = 'info') => {
