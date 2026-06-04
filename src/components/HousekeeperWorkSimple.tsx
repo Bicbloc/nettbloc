@@ -1036,6 +1036,24 @@ const HousekeeperWorkContent: React.FC = () => {
     }
   };
 
+  // Retirer une chambre de la vue de la femme de chambre (la masquer localement).
+  const handleUnassignRoom = (roomId: string, roomNumber: string) => {
+    setDismissedRoomIds(prev => {
+      const next = new Set(prev);
+      next.add(roomId);
+      return next;
+    });
+    setRooms(prev => prev.filter(r => r.id !== roomId));
+    setAvailableRooms(prev => prev.filter(r => r.id !== roomId));
+    addToActivityLog(`➖ Chambre ${roomNumber} masquée de votre liste`, 'info');
+    toast({
+      title: "Chambre retirée",
+      description: `Chambre ${roomNumber} masquée de votre liste`,
+    });
+  };
+
+
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     storageService.clearHousekeeperProfile();
