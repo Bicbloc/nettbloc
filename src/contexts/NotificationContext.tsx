@@ -1,5 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
+import { useActionJournal } from '@/hooks/use-action-journal';
 
 interface NotificationContextValue {
   notifications: Notification[];
@@ -19,12 +20,27 @@ interface NotificationProviderProps {
 }
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
-  // UN SEUL appel au hook useNotifications - toute l'app utilisera cette instance
-  // Le hook récupère automatiquement le hotelId depuis localStorage/sessionStorage
-  const notificationState = useNotifications();
+  // Journal des actions complet (table daily_action_logs) = source d'affichage
+  // pour le bell/journal : chambres, affectations, incidents, nettoyage, etc.
+  const journal = useActionJournal();
+
+  // Hook historique conservé pour addNotification (écritures dans `notifications`)
+  // toujours utilisées par certains composants (StaffNotificationBanner...).
+  const legacy = useNotifications();
+
+  const value: NotificationContextValue = {
+    notifications: journal.notifications,
+    loading: journal.loading,
+    hasUnread: journal.hasUnread,
+    addNotification: legacy.addNotification,
+    markAsRead: journal.markAsRead,
+    markAllAsRead: journal.markAllAsRead,
+    clearNotifications: journal.clearNotifications,
+    refreshNotifications: journal.refreshNotifications,
+  };
 
   return (
-    <NotificationContext.Provider value={notificationState}>
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );
