@@ -822,7 +822,6 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           <TableCell className="whitespace-nowrap">
                             {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
                           </TableCell>
-                          <TableCell>{/* removed dup */}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">
