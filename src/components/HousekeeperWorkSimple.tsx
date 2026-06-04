@@ -303,8 +303,18 @@ const HousekeeperWorkContent: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        // Sur un rafraîchissement à froid (surtout en WebView mobile), le SDK
+        // Supabase peut ne pas avoir fini de réhydrater le token depuis le
+        // stockage. getSession() renverrait alors null à tort et éjecterait la
+        // femme de chambre. On réessaie quelques fois avant d'abandonner.
+        let session = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+          if (session) break;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
         if (!session) {
           navigate('/housekeeper/auth');
           return;
