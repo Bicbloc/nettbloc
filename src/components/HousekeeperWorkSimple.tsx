@@ -1366,78 +1366,52 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-4 overflow-hidden pb-2">
-            <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-              <div className="bg-gradient-to-r from-primary to-info px-5 py-5 text-primary-foreground">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-background/15 px-3 py-1 text-xs font-medium">
+          <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden pb-2">
+            <section className="sticky top-0 z-10 mb-3 overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="gap-1">
                       <ScanLine className="h-3.5 w-3.5" />
                       Inventaire linge
-                    </div>
-                    <h2 className="text-2xl font-bold leading-tight">Une vue plus claire pour compter sans se perdre</h2>
-                    <p className="max-w-md text-sm text-primary-foreground/85">
-                      Lancez le scan, vérifiez les types déjà comptés et revenez aux chambres sans quitter votre session.
-                    </p>
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {isConnected ? 'Live' : 'Pause'}
+                    </Badge>
                   </div>
-                  <div className="grid min-w-[132px] gap-2 text-right text-sm">
-                    <div className="rounded-2xl bg-background/15 px-3 py-2">
-                      <p className="text-[11px] uppercase text-primary-foreground/70">Hôtel</p>
-                      <p className="truncate font-semibold">{hotel?.name || 'En cours'}</p>
-                    </div>
-                    <div className="rounded-2xl bg-background/15 px-3 py-2">
-                      <p className="text-[11px] uppercase text-primary-foreground/70">Session</p>
-                      <p className="font-semibold">{housekeeperName}</p>
-                    </div>
-                  </div>
+                  <h2 className="mt-2 text-lg font-semibold leading-tight">Comptage rapide</h2>
+                  <p className="text-xs text-muted-foreground">En-tête fixe, vue compacte et scan sans perte de place.</p>
                 </div>
+                <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => setActiveTab('rooms')}>
+                  <ArrowUpRight className="h-4 w-4" />
+                  Retour
+                </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 border-t bg-muted/30 p-4 sm:grid-cols-4">
-                <div className="rounded-2xl border bg-background p-4">
-                  <p className="text-xs uppercase text-muted-foreground">Chambres</p>
-                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">{totalRooms}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">assignées aujourd’hui</p>
+              <div className="grid grid-cols-3 gap-2 bg-background px-4 py-3">
+                <div className="rounded-xl border bg-muted/20 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">Chambres</p>
+                  <p className="mt-1 text-lg font-bold">{totalRooms}</p>
                 </div>
-                <div className="rounded-2xl border bg-background p-4">
-                  <p className="text-xs uppercase text-muted-foreground">À blanc</p>
-                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
-                    <LogOut className="h-4 w-4 text-destructive" />
+                <div className="rounded-xl border bg-muted/20 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">À blanc</p>
+                  <p className="mt-1 flex items-center gap-1 text-lg font-bold">
+                    <LogOut className="h-3.5 w-3.5 text-destructive" />
                     {rooms.filter(r => r.status === 'ready-to-clean' || r.status === 'checkout' || r.cleaning_type === 'a_blanc' || r.cleaning_type === 'full').length}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">clients sortis ou départs</p>
                 </div>
-                <div className="rounded-2xl border bg-background p-4">
-                  <p className="text-xs uppercase text-muted-foreground">Recouches</p>
-                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
-                    <BedDouble className="h-4 w-4 text-info" />
+                <div className="rounded-xl border bg-muted/20 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">Recouches</p>
+                  <p className="mt-1 flex items-center gap-1 text-lg font-bold">
+                    <BedDouble className="h-3.5 w-3.5 text-info" />
                     {rooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'recouche' || r.cleaning_type === 'stayover').length}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">à suivre pendant le service</p>
-                </div>
-                <div className="rounded-2xl border bg-background p-4">
-                  <p className="text-xs uppercase text-muted-foreground">Synchronisation</p>
-                  <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
-                    <ShieldCheck className="h-4 w-4 text-success" />
-                    {isConnected ? 'Live' : 'Pause'}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">statuts et scan</p>
                 </div>
               </div>
             </section>
 
-            <section className="min-h-0 flex-1 overflow-hidden rounded-3xl border bg-card p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold">Zone de comptage</h3>
-                  <p className="text-sm text-muted-foreground">Scannez chaque type puis enregistrez en bas d’écran.</p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setActiveTab('rooms')}>
-                  <ArrowUpRight className="h-4 w-4" />
-                  Retour chambres
-                </Button>
-              </div>
-
+            <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border bg-card shadow-sm">
               <LinenQuickInventory
                 taskId={activeLinenTask || 'manual_session'}
                 hotelId={hotelId}
