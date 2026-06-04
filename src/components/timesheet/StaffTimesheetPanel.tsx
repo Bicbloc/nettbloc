@@ -805,7 +805,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {timesheets.map(ts => {
+                    {mergedTimesheets.map(ts => {
+                      const isVirtual = ts.id.startsWith('virtual-');
                       const isActive = !ts.end_time && !!ts.start_time;
                       const effectiveStatus = isActive ? 'active' : ts.status;
                       const statusInfo = STATUS_LABELS[effectiveStatus] || STATUS_LABELS.pending;
