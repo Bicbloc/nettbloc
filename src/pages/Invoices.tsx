@@ -186,7 +186,7 @@ const InvoicesContent = () => {
         <CardContent className="text-sm text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground">BicBloc</p>
           <p>SIRET : 97864605700015</p>
-          <p>60 RUE FRANCOIS IER, 75008 PARIS</p>
+          <p>60 rue François 1er, 75008 Paris</p>
           <p>Email : support@bicbloc.eu</p>
         </CardContent>
       </Card>
