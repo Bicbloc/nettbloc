@@ -625,6 +625,13 @@ const HousekeeperWorkContent: React.FC = () => {
 
       if (hotelError) {
         console.error('❌ Erreur RPC get_hotel_for_housekeeper:', hotelError);
+        // Lors d'un rafraîchissement en arrière-plan (retour caméra, réveil du
+        // téléphone, reconnexion temps réel), une erreur réseau transitoire ne
+        // doit JAMAIS éjecter la femme de chambre de l'établissement ni effacer
+        // ses données. On garde l'état actuel et on réessaiera plus tard.
+        if (background) {
+          return;
+        }
         toast({
           title: "Erreur",
           description: "Impossible de charger l'hôtel",
