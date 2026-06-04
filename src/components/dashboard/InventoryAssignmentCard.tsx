@@ -78,10 +78,17 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
     },
   });
 
+  // Prioriser les profils (dont l'id correspond à celui utilisé par l'interface
+  // femme de chambre) pour éviter les attributions invisibles côté employé.
   const allHousekeepers = [
-    ...housekeepers.map((h: any) => ({ id: h.id, name: h.name })),
-    ...housekeeperProfiles.map((h: any) => ({ id: h.id, name: h.name })),
-  ].filter((h, i, arr) => arr.findIndex((x) => x.id === h.id) === i);
+    ...housekeeperProfiles.map((h: any) => ({ id: h.id, name: h.name, source: "profile" as const })),
+    ...housekeepers.map((h: any) => ({ id: h.id, name: h.name, source: "local" as const })),
+  ].filter(
+    (h, i, arr) =>
+      arr.findIndex(
+        (x) => (x.name || "").trim().toLowerCase() === (h.name || "").trim().toLowerCase()
+      ) === i
+  );
 
   // Tâche d'inventaire du jour
   const { data: tasks = [] } = useQuery({
