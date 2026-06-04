@@ -741,12 +741,28 @@ export function IncidentReportWizard({
 
   const stepConfig = getStepConfig();
   const StepIcon = stepConfig.icon;
+  const hasUnsavedProgress = Boolean(
+    selectedImage ||
+    imagePreview ||
+    selectedCategoryId ||
+    form.watch('location_reference') ||
+    form.watch('item_id') ||
+    form.watch('type_id') ||
+    form.watch('title') ||
+    form.watch('description') ||
+    form.watch('assigned_to_role_id')
+  );
+
+  const handleExplicitClose = () => {
+    if (isAnalyzing || isSubmitting) return;
+    setIsOpen(false);
+  };
 
   return (
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open && (isAnalyzing || isSubmitting)) return;
+        if (!open && ((isAnalyzing || isSubmitting) || hasUnsavedProgress)) return;
         setIsOpen(open);
       }}
     >
@@ -759,7 +775,7 @@ export function IncidentReportWizard({
         )}
       </DialogTrigger>
       <DialogContent 
-        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0"
+        className="flex max-h-[85vh] w-[95vw] max-w-md flex-col overflow-hidden p-0 [&>button]:hidden"
         onInteractOutside={(e) => {
           // Never close on outside interaction: the native camera/file picker
           // fires stray pointer/focus events when returning to the app, which
@@ -779,14 +795,19 @@ export function IncidentReportWizard({
         }}
       >
         {/* Header compact */}
-        <div className="p-4 border-b bg-muted/30">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <StepIcon className="h-5 w-5 text-primary" />
-              {stepConfig.title}
-            </DialogTitle>
-            <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
-          </DialogHeader>
+        <div className="border-b bg-muted/30 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <DialogHeader className="pb-2 text-left">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <StepIcon className="h-5 w-5 text-primary" />
+                {stepConfig.title}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
+            </DialogHeader>
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={handleExplicitClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
           <Progress value={getStepProgress()} className="h-1.5 mt-3" />
           <p className="text-xs text-muted-foreground mt-1 text-right">
             Étape {getStepIndex() + 1} / {STEPS.length}
