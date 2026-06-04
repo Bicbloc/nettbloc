@@ -636,11 +636,13 @@ const HousekeeperWorkContent: React.FC = () => {
 
   const loadWorkData = async (background = false) => {
     try {
-      setIsRefreshing(true);
+      if (!background) setIsRefreshing(true);
       
-      // Cache rapide
-      const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-      const cachedData = localStorage.getItem(cachedKey);
+      // Cache rapide (uniquement avec un profil valide pour éviter un décalage de clé)
+      const cachedKey = housekeeperProfile?.id
+        ? `assignments_${hotelId}_${housekeeperProfile.id}`
+        : null;
+      const cachedData = cachedKey ? localStorage.getItem(cachedKey) : null;
       if (cachedData && rooms.length === 0) {
         try {
           const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
