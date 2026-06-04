@@ -591,6 +591,31 @@ const HousekeeperWorkContent: React.FC = () => {
         }
       }
     }
+
+    if (table === 'linen_inventory_tasks') {
+      const isAssignedToMe = (record: any) => {
+        if (!record) return false;
+        return (
+          record.assigned_to === housekeeperProfile?.id ||
+          normalizeName(record.assigned_to) === normalizedMyName
+        );
+      };
+
+      if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        if (isAssignedToMe(newRecord) || isAssignedToMe(oldRecord)) {
+          loadWorkDataRef.current(true);
+          if (isAssignedToMe(newRecord) && ['pending', 'in_progress'].includes(newRecord.status)) {
+            addToActivityLog(`🧺 Inventaire linge attribué`, 'info');
+            dispatchStaffNotification('🧺 Inventaire linge', 'Une tâche d’inventaire vous a été attribuée');
+          }
+        }
+      }
+
+      if (eventType === 'DELETE' && isAssignedToMe(oldRecord)) {
+        setActiveLinenTask(null);
+        loadWorkDataRef.current(true);
+      }
+    }
     
     // Écouter les suppressions massives (clôture journée) via daily_reports
     if (table === 'daily_reports') {
@@ -616,7 +641,7 @@ const HousekeeperWorkContent: React.FC = () => {
   // Synchronisation en temps réel - écouter TOUTES les tables pertinentes
   const { isConnected } = useRealtimeSync({
     hotelId: hotelId || undefined,
-    tables: ['assignments', 'rooms', 'daily_reports', 'notifications'],
+    tables: ['assignments', 'rooms', 'daily_reports', 'notifications', 'linen_inventory_tasks'],
     onUpdate: handleRealtimeUpdate
   });
 
@@ -1205,7 +1230,7 @@ const HousekeeperWorkContent: React.FC = () => {
             }
           }}
           onInventoryOpen={() => {
-            if (!activeLinenTask) setActiveLinenTask(`temp_${Date.now()}`);
+            return;
           }}
         />
 
@@ -1387,19 +1412,30 @@ const HousekeeperWorkContent: React.FC = () => {
             </section>
 
             <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <LinenQuickInventory
-                taskId={activeLinenTask || 'manual_session'}
-                hotelId={hotelId}
-                embedded
-                onClose={() => {
-                  setActiveLinenTask(null);
-                  setActiveTab('rooms');
-                  toast({
-                    title: "✅ Inventaire terminé",
-                    description: "Merci pour votre travail!"
-                  });
-                }}
-              />
+              {activeLinenTask ? (
+                <LinenQuickInventory
+                  taskId={activeLinenTask}
+                  hotelId={hotelId}
+                  embedded
+                  onClose={() => {
+                    setActiveLinenTask(null);
+                    setActiveTab('rooms');
+                    toast({
+                      title: "✅ Inventaire terminé",
+                      description: "Merci pour votre travail!"
+                    });
+                  }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center">
+                  <div className="max-w-sm space-y-2">
+                    <p className="text-base font-semibold">Aucun inventaire attribué</p>
+                    <p className="text-sm text-muted-foreground">
+                      Dès qu’un responsable vous assigne une tâche, elle apparaîtra ici automatiquement.
+                    </p>
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         )}
