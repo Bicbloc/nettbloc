@@ -558,21 +558,21 @@ const HousekeeperWorkContent: React.FC = () => {
     // Polling de secours toutes les 25s (le temps réel reste prioritaire)
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     }, 25000);
 
     // Rattrapage immédiat au retour de connexion temps réel
     const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
       if (status === 'SUBSCRIBED' || status === 'ONLINE') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     });
 
     // Rattrapage au retour de l'onglet (téléphone mis en veille)
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        loadWorkData();
+        loadWorkDataRef.current(true);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
