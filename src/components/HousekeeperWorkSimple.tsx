@@ -1193,7 +1193,7 @@ const HousekeeperWorkContent: React.FC = () => {
             </div>
 
             {/* Liste des chambres */}
-            {sortedRooms.length === 0 ? (
+            {sortedRooms.length === 0 && availableRooms.length === 0 ? (
               <Card className="p-8 text-center">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold text-lg mb-2">
@@ -1208,6 +1208,39 @@ const HousekeeperWorkContent: React.FC = () => {
               </Card>
             ) : (
               <div className="space-y-3">
+                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length > 0 && (
+                  <Card className="border-warning/30 bg-warning/10 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">Clients sortis détectés</p>
+                        <p className="text-sm text-muted-foreground">
+                          Ces chambres viennent d’être libérées et remontent en direct.
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="bg-background text-foreground">
+                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length}
+                      </Badge>
+                    </div>
+                  </Card>
+                )}
+
+                {availableRooms
+                  .filter(room => !rooms.some(existing => existing.id === room.id))
+                  .map(room => (
+                    <RoomCardEnhanced
+                      key={`checkout-${room.id}`}
+                      room={{
+                        ...room,
+                        cleaning_type: room.cleaning_type || 'a_blanc',
+                      }}
+                      hotelId={hotelId || ''}
+                      housekeeperName={housekeeperName}
+                      onUpdateStatus={handleRoomStatusChange}
+                      onUnassign={(roomId, roomNumber) => {
+                      }}
+                    />
+                  ))}
+
                 {sortedRooms.map(room => (
                   <RoomCardEnhanced
                     key={room.id}
@@ -1361,36 +1394,6 @@ const HousekeeperWorkContent: React.FC = () => {
           </div>
         )}
 
-        {/* Chambres disponibles (client sorti) */}
-        {activeTab === 'rooms' && availableRooms.length > 0 && (
-          <Card className="border-warning/30 bg-warning/10 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning-foreground">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">Clients sortis détectés</p>
-                    <p className="text-sm text-muted-foreground">
-                      {availableRooms.length} chambre(s) viennent d'être libérées
-                    </p>
-                  </div>
-                  <Button size="sm" onClick={() => loadWorkData(true)}>
-                    Voir la liste
-                  </Button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {availableRooms.map(room => (
-                    <Badge key={room.id} variant="secondary" className="bg-background">
-                      {room.room_number}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
       </div>
       </div>
     </div>
