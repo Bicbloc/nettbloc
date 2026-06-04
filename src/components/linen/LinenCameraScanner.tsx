@@ -272,12 +272,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setIsStreaming(false);
   };
 
-  const captureFrameDataUrl = (quality = 0.75) => {
+  // maxW: live preview uses smaller frames for speed, final capture uses
+  // higher resolution for maximum counting accuracy.
+  const captureFrameDataUrl = (quality = 0.75, maxW = 800) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return null;
 
-    const maxW = 800;
     const ratio = video.videoWidth / video.videoHeight;
     const w = Math.min(maxW, video.videoWidth);
     const h = Math.round(w / ratio);
