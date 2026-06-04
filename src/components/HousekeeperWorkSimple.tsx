@@ -60,6 +60,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+  const [dismissedRoomIds, setDismissedRoomIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
