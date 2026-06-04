@@ -139,30 +139,41 @@ export function DashboardOverview({
       {/* Active Users Panel - sous les deux colonnes */}
       <ActiveUsersPanel />
       
-      {/* Section Personnel - Design amélioré */}
-      <Card className="border-border/50 bg-gradient-to-br from-card to-card/80">
-        <CardHeader className="border-b border-border/50">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-success/10 text-success">
-                <UserIcon className="h-5 w-5" />
+      {/* Section Personnel - réductible */}
+      <Collapsible open={staffOpen} onOpenChange={setStaffOpen}>
+        <Card className="border-border/50 bg-gradient-to-br from-card to-card/80">
+          <CollapsibleTrigger className="w-full text-left">
+            <CardHeader className={staffOpen ? "border-b border-border/50" : ""}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-success/10 text-success">
+                    <UserIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">Personnel</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      Gérez vos femmes de chambre et leurs codes d'accès
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="w-fit text-xs px-3 py-1">
+                    {housekeeperNames.length} membre{housekeeperNames.length > 1 ? 's' : ''}
+                  </Badge>
+                  <ChevronDown
+                    className={`h-5 w-5 text-muted-foreground transition-transform duration-300 ${staffOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-lg font-semibold">Personnel</CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Gérez vos femmes de chambre et leurs codes d'accès
-                </CardDescription>
-              </div>
-            </div>
-            <Badge variant="outline" className="w-fit text-xs px-3 py-1">
-              {housekeeperNames.length} membre{housekeeperNames.length > 1 ? 's' : ''}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <HousekeeperManagement />
-        </CardContent>
-      </Card>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-6">
+              <HousekeeperManagement />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }
