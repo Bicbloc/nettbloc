@@ -426,10 +426,11 @@ const Auth = () => {
               <Button variant="ghost" size="icon" onClick={goBack} className="h-8 w-8">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-lg">{config.title}</CardTitle>
                 <CardDescription className="text-sm">{config.subtitle}</CardDescription>
               </div>
+              <LanguageSwitcher />
             </div>
           </CardHeader>
           <CardContent>
