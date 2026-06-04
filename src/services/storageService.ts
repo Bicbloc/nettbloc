@@ -191,6 +191,24 @@ class StorageService {
     localStorage.removeItem('selectedHotelId'); // Backward compat
   }
 
+  saveHousekeeperHotel(hotel: { id: string; name?: string; code?: string }): void {
+    if (!hotel.id || !this.isValidUUID(hotel.id)) return;
+    localStorage.setItem('nettobloc_hk_hotel_id', hotel.id);
+    if (hotel.name) localStorage.setItem('nettobloc_hk_hotel_name', hotel.name);
+    if (hotel.code) localStorage.setItem('nettobloc_hk_hotel_code', hotel.code);
+  }
+
+  getHousekeeperHotelId(): string | null {
+    const id = localStorage.getItem('nettobloc_hk_hotel_id');
+    return id && this.isValidUUID(id) ? id : null;
+  }
+
+  clearHousekeeperHotel(): void {
+    localStorage.removeItem('nettobloc_hk_hotel_id');
+    localStorage.removeItem('nettobloc_hk_hotel_name');
+    localStorage.removeItem('nettobloc_hk_hotel_code');
+  }
+
   // ============ ACTIVE PORTAL ============
 
   saveActivePortal(portal: AppPortal): void {
@@ -352,6 +370,13 @@ class StorageService {
     // 1. Essayer la méthode standard
     const standard = this.getHotelId();
     if (standard) return standard;
+
+    // 1b. Hôtel verrouillé côté femme de chambre
+    const housekeeperHotelId = this.getHousekeeperHotelId();
+    if (housekeeperHotelId) {
+      this.saveHotel({ id: housekeeperHotelId, name: '', code: '' });
+      return housekeeperHotelId;
+    }
 
     // 2. Essayer les clés legacy (peut encore exister)
     const legacyKeys = ['selectedHotelId', 'currentHotelId', 'hotelId', 'lastSelectedHotelId'];
