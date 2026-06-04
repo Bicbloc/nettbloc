@@ -16,6 +16,11 @@ interface IncidentListProps {
   hotelId: string;
   defaultFilterStatus?: string;
   sortByPriority?: boolean;
+  /** Masque l'en-tête interne (utile quand le parent affiche déjà un titre) */
+  hideHeading?: boolean;
+  /** Identité de l'acteur pour le journal d'activité */
+  actorName?: string;
+  actorType?: string;
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
