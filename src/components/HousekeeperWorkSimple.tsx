@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info, ArrowUpRight, BedDouble, ScanLine, ShieldCheck } from 'lucide-react';
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
@@ -56,7 +56,6 @@ const HousekeeperWorkContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
   const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
-  const [showLinenInventory, setShowLinenInventory] = useState(false);
   const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -109,7 +108,7 @@ const HousekeeperWorkContent: React.FC = () => {
     return null;
   };
   
-  const hotelId = getHotelId();
+  const hotelId = getHotelId() || storageService.recoverHotelId();
   const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
 
   // Charger/sauvegarder le pointage
