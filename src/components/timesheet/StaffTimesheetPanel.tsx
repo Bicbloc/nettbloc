@@ -816,11 +816,13 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                       return (
                         <TableRow key={ts.id} className={
                           isActive ? 'bg-emerald-50/50' : 
+                          isVirtual ? 'bg-muted/30' :
                           ts.status === 'pending' ? 'bg-yellow-50/50' : ''
                         }>
                           <TableCell className="whitespace-nowrap">
                             {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
                           </TableCell>
+                          <TableCell>{/* removed dup */}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">
