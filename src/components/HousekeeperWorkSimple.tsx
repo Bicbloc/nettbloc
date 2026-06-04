@@ -107,10 +107,13 @@ const HousekeeperWorkContent: React.FC = () => {
   const getHotelId = (): string | null => {
     // 1. URL en priorité
     if (hotelIdFromUrl && hotelIdFromUrl.length >= 30) return hotelIdFromUrl;
-    // 2. storageService unifié
+    // 2. Hôtel explicitement choisi côté femme de chambre
+    const lockedHousekeeperHotelId = storageService.getHousekeeperHotelId();
+    if (lockedHousekeeperHotelId && lockedHousekeeperHotelId.length >= 30) return lockedHousekeeperHotelId;
+    // 3. storageService unifié
     const storedId = storageService.getHotelId();
     if (storedId && storedId.length >= 30) return storedId;
-    // 3. Profil housekeeper
+    // 4. Profil housekeeper
     if (housekeeperProfile?.currentHotelId && housekeeperProfile.currentHotelId.length >= 30) {
       return housekeeperProfile.currentHotelId;
     }
@@ -352,20 +355,24 @@ const HousekeeperWorkContent: React.FC = () => {
           return;
         }
         
+        const lockedHousekeeperHotelId = storageService.getHousekeeperHotelId() || hotelIdFromUrl || undefined;
+
         setHousekeeperProfile(profile);
         storageService.saveHousekeeperProfile({
           id: profile.id,
           name: profile.name,
           email: profile.email,
-          currentHotelId: storageService.getHotelId() || hotelIdFromUrl || undefined,
+          currentHotelId: lockedHousekeeperHotelId || storageService.getHotelId() || undefined,
         });
         
         // Vérifier qu'un hôtel est sélectionné
-        const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
+        const currentHotelId = lockedHousekeeperHotelId || storageService.getHotelId();
         if (!currentHotelId || currentHotelId.length < 30) {
           navigate('/housekeeper/hotels');
           return;
         }
+
+        storageService.saveHousekeeperHotel({ id: currentHotelId });
         
         setIsAuthChecked(true);
       } catch (error) {
@@ -1067,6 +1074,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     storageService.clearHousekeeperProfile();
+    storageService.clearHousekeeperHotel();
     storageService.clearHotel();
     localStorage.removeItem(`assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`);
     navigate('/housekeeper/auth');
