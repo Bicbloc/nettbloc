@@ -9,6 +9,7 @@ import { UserPlus, Mail, Lock, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { validateEmailForUserType } from '@/services/userTypeValidationService';
 import { APP_ORIGIN } from '@/constants/appUrl';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HousekeeperSignup() {
   const [name, setName] = useState('');
@@ -19,6 +20,8 @@ export default function HousekeeperSignup() {
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language } = useLanguage();
+  const isEn = language === 'en';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,17 +30,33 @@ export default function HousekeeperSignup() {
     const trimmedName = name.trim();
 
     if (!trimmedName || !normalizedEmail || !password) {
-      toast({ variant: 'destructive', title: 'Champs requis', description: 'Veuillez remplir tous les champs' });
+      toast({
+        variant: 'destructive',
+        title: isEn ? 'Required fields' : 'Champs requis',
+        description: isEn ? 'Please fill in all fields' : 'Veuillez remplir tous les champs',
+      });
       return;
     }
 
     if (password.length < 6) {
-      toast({ variant: 'destructive', title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 6 caractères' });
+      toast({
+        variant: 'destructive',
+        title: isEn ? 'Password too short' : 'Mot de passe trop court',
+        description: isEn
+          ? 'Password must be at least 6 characters'
+          : 'Le mot de passe doit contenir au moins 6 caractères',
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      toast({ variant: 'destructive', title: 'Mots de passe différents', description: 'Les mots de passe ne correspondent pas' });
+      toast({
+        variant: 'destructive',
+        title: isEn ? 'Passwords do not match' : 'Mots de passe différents',
+        description: isEn
+          ? 'The passwords do not match'
+          : 'Les mots de passe ne correspondent pas',
+      });
       return;
     }
 
@@ -46,9 +65,20 @@ export default function HousekeeperSignup() {
     try {
       const validation = await validateEmailForUserType(normalizedEmail, 'housekeeper');
       if (!validation.isValid) {
-        toast({ variant: 'destructive', title: 'Email déjà utilisé', description: validation.error || 'Cette adresse est déjà associée à un autre type de compte.' });
+        toast({
+          variant: 'destructive',
+          title: isEn ? 'Email already used' : 'Email déjà utilisé',
+          description: validation.error || (isEn
+            ? 'This address is already linked to another account type.'
+            : 'Cette adresse est déjà associée à un autre type de compte.'),
+        });
         if (validation.existingType) {
-          toast({ title: 'Redirection', description: `Connectez-vous sur ${validation.existingType === 'establishment' ? "l'interface Établissement" : "l'interface appropriée"}.` });
+          toast({
+            title: isEn ? 'Redirection' : 'Redirection',
+            description: isEn
+              ? `Log in on ${validation.existingType === 'establishment' ? 'the Establishment interface' : 'the appropriate interface'}.`
+              : `Connectez-vous sur ${validation.existingType === 'establishment' ? "l'interface Établissement" : "l'interface appropriée"}.`,
+          });
         }
         setIsLoading(false);
         return;
@@ -64,10 +94,12 @@ export default function HousekeeperSignup() {
       });
 
       if (authError) throw authError;
-      if (!authData.user) throw new Error('Erreur lors de la création du compte');
+      if (!authData.user) throw new Error(isEn ? 'Error creating account' : 'Erreur lors de la création du compte');
 
       if (authData.user.identities && authData.user.identities.length === 0) {
-        throw new Error('Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.');
+        throw new Error(isEn
+          ? 'An account already exists with this email. Log in or use another address.'
+          : 'Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.');
       }
 
       if (authData.session) {
@@ -89,7 +121,12 @@ export default function HousekeeperSignup() {
           console.error('Erreur création profil housekeeper:', profileError);
         }
 
-        toast({ title: 'Inscription réussie ! 🎉', description: 'Connectez-vous avec votre email et ajoutez le code de votre hôtel' });
+        toast({
+          title: isEn ? 'Sign-up successful! 🎉' : 'Inscription réussie ! 🎉',
+          description: isEn
+            ? 'Log in with your email and add your hotel code'
+            : 'Connectez-vous avec votre email et ajoutez le code de votre hôtel',
+        });
         navigate('/housekeeper/hotels');
         return;
       }
@@ -98,7 +135,11 @@ export default function HousekeeperSignup() {
       setEmail(normalizedEmail);
     } catch (error: any) {
       console.error('Erreur inscription:', error);
-      toast({ variant: 'destructive', title: "Erreur d'inscription", description: error.message || 'Une erreur est survenue' });
+      toast({
+        variant: 'destructive',
+        title: isEn ? 'Sign-up error' : "Erreur d'inscription",
+        description: error.message || (isEn ? 'An error occurred' : 'Une erreur est survenue'),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -116,8 +157,12 @@ export default function HousekeeperSignup() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
               <Mail className="h-10 w-10 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Vérifiez votre email</h1>
-            <p className="text-white/80">Un lien d'activation vous a été envoyé</p>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              {isEn ? 'Check your email' : 'Vérifiez votre email'}
+            </h1>
+            <p className="text-white/80">
+              {isEn ? 'An activation link has been sent to you' : "Un lien d'activation vous a été envoyé"}
+            </p>
           </div>
 
           <Card className="bg-white/95 backdrop-blur-sm shadow-2xl border-0">
@@ -127,18 +172,25 @@ export default function HousekeeperSignup() {
                   <Mail className="h-8 w-8 text-primary" />
                 </div>
                 <p className="text-base font-medium">
-                  Un email a été envoyé à <span className="font-bold text-primary">{email}</span>
+                  {isEn ? 'An email has been sent to' : 'Un email a été envoyé à'}{' '}
+                  <span className="font-bold text-primary">{email}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Cliquez sur le lien dans l'email pour activer votre compte femme de chambre.
+                  {isEn
+                    ? 'Click the link in the email to activate your housekeeper account.'
+                    : 'Cliquez sur le lien dans l\'email pour activer votre compte femme de chambre.'}
                 </p>
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm text-foreground">
-                  <strong>💡 Astuce :</strong> si vous ne trouvez pas l'email, vérifiez aussi votre dossier <strong>Spam</strong> ou <strong>Indésirables</strong>.
+                  {isEn ? (
+                    <><strong>💡 Tip:</strong> if you can't find the email, also check your <strong>Spam</strong> or <strong>Junk</strong> folder.</>
+                  ) : (
+                    <><strong>💡 Astuce :</strong> si vous ne trouvez pas l'email, vérifiez aussi votre dossier <strong>Spam</strong> ou <strong>Indésirables</strong>.</>
+                  )}
                 </div>
               </div>
 
               <Button variant="outline" className="w-full" onClick={() => navigate('/housekeeper/auth')}>
-                Retour à la connexion
+                {isEn ? 'Back to login' : 'Retour à la connexion'}
               </Button>
             </CardContent>
           </Card>
@@ -168,8 +220,14 @@ export default function HousekeeperSignup() {
               <UserPlus className="h-12 w-12 text-white" />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Créer un compte</h1>
-          <p className="text-white/80 text-sm sm:text-base">Inscrivez-vous pour gérer vos services dans plusieurs hôtels</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
+            {isEn ? 'Create an account' : 'Créer un compte'}
+          </h1>
+          <p className="text-white/80 text-sm sm:text-base">
+            {isEn
+              ? 'Sign up to manage your services across multiple hotels'
+              : 'Inscrivez-vous pour gérer vos services dans plusieurs hôtels'}
+          </p>
         </div>
 
         <Card className="bg-white/95 backdrop-blur-sm shadow-2xl border-0">
@@ -178,15 +236,15 @@ export default function HousekeeperSignup() {
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2 font-medium">
                   <User className="h-4 w-4 text-violet-600" />
-                  Nom complet
+                  {isEn ? 'Full name' : 'Nom complet'}
                 </Label>
-                <Input id="name" type="text" placeholder="Marie Dupont" value={name} onChange={(e) => setName(e.target.value)} className="h-12 bg-slate-50 border-slate-200 text-base" required />
+                <Input id="name" type="text" placeholder={isEn ? 'Marie Dupont' : 'Marie Dupont'} value={name} onChange={(e) => setName(e.target.value)} className="h-12 bg-slate-50 border-slate-200 text-base" required />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center gap-2 font-medium">
                   <Mail className="h-4 w-4 text-violet-600" />
-                  Email
+                  {isEn ? 'Email' : 'Email'}
                 </Label>
                 <Input id="email" type="email" placeholder="marie@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 bg-slate-50 border-slate-200 text-base" required />
               </div>
@@ -194,34 +252,36 @@ export default function HousekeeperSignup() {
               <div className="space-y-2">
                 <Label htmlFor="password" className="flex items-center gap-2 font-medium">
                   <Lock className="h-4 w-4 text-violet-600" />
-                  Mot de passe
+                  {isEn ? 'Password' : 'Mot de passe'}
                 </Label>
                 <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 bg-slate-50 border-slate-200 text-base" required />
-                <p className="text-xs text-muted-foreground">Minimum 6 caractères</p>
+                <p className="text-xs text-muted-foreground">
+                  {isEn ? 'Minimum 6 characters' : 'Minimum 6 caractères'}
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="flex items-center gap-2 font-medium">
                   <Lock className="h-4 w-4 text-violet-600" />
-                  Confirmer le mot de passe
+                  {isEn ? 'Confirm password' : 'Confirmer le mot de passe'}
                 </Label>
                 <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-12 bg-slate-50 border-slate-200 text-base" required />
               </div>
 
               <Button type="submit" className="w-full h-12 text-base bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg" disabled={isLoading}>
                 {isLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Création du compte...</>
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />{isEn ? 'Creating account...' : 'Création du compte...'}</>
                 ) : (
-                  <><UserPlus className="h-4 w-4 mr-2" />S'inscrire</>
+                  <><UserPlus className="h-4 w-4 mr-2" />{isEn ? 'Sign up' : "S'inscrire"}</>
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Vous avez déjà un compte ?{' '}
+                {isEn ? 'Already have an account?' : 'Vous avez déjà un compte ?'}{' '}
                 <Link to="/housekeeper/auth" className="text-violet-600 hover:underline font-medium">
-                  Se connecter
+                  {isEn ? 'Log in' : 'Se connecter'}
                 </Link>
               </p>
             </div>
