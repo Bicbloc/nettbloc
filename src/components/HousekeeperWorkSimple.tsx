@@ -497,12 +497,17 @@ const HousekeeperWorkContent: React.FC = () => {
         if ((newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout') && 
             oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
-          setAvailableRooms(prev => {
-            if (!prev.find(r => r.id === newRecord.id)) {
-              return [...prev, newRecord];
-            }
-            return prev;
-          });
+          dispatchStaffNotification('🚪 Client sorti', `Chambre ${newRecord.room_number} prête à nettoyer`);
+          // Si la chambre m'est déjà assignée, elle reste dans la liste principale
+          // (le badge "Client sorti" s'affichera grâce au statut mis à jour ci-dessous).
+          if (!isMyRoom) {
+            setAvailableRooms(prev => {
+              if (!prev.find(r => r.id === newRecord.id)) {
+                return [...prev, newRecord];
+              }
+              return prev;
+            });
+          }
         }
         
         // Mise à jour locale si c'est ma chambre - SYNCHRONISATION COMPLÈTE
@@ -1232,36 +1237,18 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <div className="space-y-4">
-            {/* Header inventaire */}
-            <Card className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-orange-500 text-white">
-                  <Package className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Inventaire Linge</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Scannez chaque type de linge avec l'appareil photo
-                  </p>
-                </div>
-              </div>
-            </Card>
-            
-            {/* Composant inventaire avec scan */}
-            <LinenQuickInventory
-              taskId={activeLinenTask || `manual_${Date.now()}`}
-              hotelId={hotelId}
-              onClose={() => {
-                setActiveLinenTask(null);
-                setActiveTab('rooms');
-                toast({
-                  title: "✅ Inventaire terminé",
-                  description: "Merci pour votre travail!"
-                });
-              }}
-            />
-          </div>
+          <LinenQuickInventory
+            taskId={activeLinenTask || `manual_${Date.now()}`}
+            hotelId={hotelId}
+            onClose={() => {
+              setActiveLinenTask(null);
+              setActiveTab('rooms');
+              toast({
+                title: "✅ Inventaire terminé",
+                description: "Merci pour votre travail!"
+              });
+            }}
+          />
         )}
 
         {/* Chambres disponibles (client sorti) */}

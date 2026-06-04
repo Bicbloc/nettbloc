@@ -301,7 +301,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 )}
                 
                 {/* Client sorti badge */}
-                {(room.is_checkout || isFullCleaning(room.cleaning_type) || room.status === 'checkout') && (
+                {(room.is_checkout || isFullCleaning(room.cleaning_type) || room.status === 'checkout' || room.status === 'ready-to-clean') && (
                   <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs gap-1">
                     <LogOut className="h-3 w-3" />
                     Client sorti
