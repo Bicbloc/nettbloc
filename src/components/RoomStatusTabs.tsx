@@ -154,7 +154,7 @@ export function calculateRoomCounts<T extends { status?: string; cleaning_type?:
       const type = getCleaningType(r);
       const isDirtyStatus = ['dirty', 'needs_cleaning', 'assigned', 'pending'].includes(status);
       const isCheckoutLikeStatus = status === 'checkout' || status === 'ready_to_clean';
-      return isDirtyStatus && isFullType(type) && !isCheckoutLikeStatus;
+      return isCheckoutLikeStatus || (isDirtyStatus && isFullType(type));
     }).length,
     stayover: rooms.filter(r => isQuickType(getCleaningType(r))).length,
     checkout: rooms.filter(r => {
