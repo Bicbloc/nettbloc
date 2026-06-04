@@ -173,6 +173,72 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
     },
   });
 
+  // Femmes de chambre affectées pour la journée sélectionnée (vue Jour uniquement).
+  // Permet d'afficher une ligne même si la personne n'a pas pointé via son interface.
+  const { data: assignedHousekeepers = [] } = useQuery({
+    queryKey: ["assigned-housekeepers-timesheet", hotelId, format(selectedDate, 'yyyy-MM-dd')],
+    enabled: viewMode === 'day' && !!hotelId,
+    queryFn: async () => {
+      const dayStart = format(selectedDate, 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('housekeeper_name, housekeeper_id, assigned_at')
+        .eq('hotel_id', hotelId)
+        .gte('assigned_at', `${dayStart}T00:00:00`)
+        .lte('assigned_at', `${dayStart}T23:59:59.999`);
+      if (error) throw error;
+      const seen = new Map<string, { housekeeper_name: string; housekeeper_id: string | null }>();
+      (data || []).forEach((a: any) => {
+        const key = normalizeStaffName(a.housekeeper_name);
+        if (a.housekeeper_name && !seen.has(key)) {
+          seen.set(key, { housekeeper_name: a.housekeeper_name, housekeeper_id: a.housekeeper_id });
+        }
+      });
+      return Array.from(seen.values());
+    },
+  });
+
+  // Liste affichée = pointages réels + lignes virtuelles pour les FdC affectées non pointées
+  const mergedTimesheets: Timesheet[] = (() => {
+    const base = timesheets ? [...timesheets] : [];
+    if (viewMode !== 'day') return base;
+    if (staffFilter !== 'all' && staffFilter !== 'housekeeper') return base;
+
+    const workDate = format(selectedDate, 'yyyy-MM-dd');
+    const existingNames = new Set(
+      base
+        .filter((t) => t.staff_type === 'housekeeper')
+        .map((t) => normalizeStaffName(t.staff_name))
+    );
+
+    const placeholders = assignedHousekeepers
+      .filter((a) => !existingNames.has(normalizeStaffName(a.housekeeper_name)))
+      .map((a) => ({
+        id: `virtual-${normalizeStaffName(a.housekeeper_name)}`,
+        staff_type: 'housekeeper',
+        staff_name: a.housekeeper_name,
+        work_date: workDate,
+        start_time: null,
+        end_time: null,
+        break_minutes: 0,
+        rooms_cleaned: 0,
+        rooms_recouche: 0,
+        rooms_depart: 0,
+        rooms_inspected: 0,
+        notes: null,
+        status: 'not_clocked',
+        validated_at: null,
+        validated_by_name: null,
+        modified_at: null,
+        modified_by_name: null,
+        original_start_time: null,
+        original_end_time: null,
+        _housekeeper_id: a.housekeeper_id,
+      })) as any[];
+
+    return [...base, ...placeholders];
+  })();
+
   // Calculate totals
   const calculateTotals = () => {
     if (!timesheets) return { totalHours: 0, totalRooms: 0, totalRecouche: 0, totalDepart: 0 };
