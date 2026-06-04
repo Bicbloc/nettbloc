@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
@@ -335,14 +335,12 @@ const Auth = () => {
 
           <p className="text-center text-xs text-muted-foreground pt-4">
             {language === 'en' ? 'By continuing, you accept our ' : 'En continuant, vous acceptez nos '}
-            <a 
-              href="https://nettobloc.bicbloc.eu/legal/cgv" 
-              target="_blank" 
-              rel="noopener noreferrer"
+            <Link
+              to="/legal/cgv"
               className="text-primary hover:underline font-medium"
             >
               {language === 'en' ? 'terms and conditions' : 'conditions générales de vente'}
-            </a>
+            </Link>
           </p>
         </div>
       </div>
