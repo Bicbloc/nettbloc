@@ -806,15 +806,25 @@ const HousekeeperWorkContent: React.FC = () => {
       const recoucheCount = extractedRooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'stayover' || r.cleaning_type === 'Recouche').length;
       const otherCount = extractedRooms.length - aBlancCount - recoucheCount;
       
+      // Protection contre la perte de données : lors d'un rafraîchissement en
+      // arrière-plan, si la requête revient vide (RLS transitoire, réveil du
+      // téléphone, retour caméra) alors qu'on avait déjà des chambres, on
+      // ignore ce résultat vide pour ne pas effacer le travail en cours.
+      if (background && extractedRooms.length === 0 && rooms.length > 0) {
+        return;
+      }
+
       setAssignments(uniqueAssignments);
       setRooms(extractedRooms);
       
-      // Sauvegarder dans le cache
-      localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
-        assignments: uniqueAssignments,
-        rooms: extractedRooms,
-        timestamp: Date.now()
-      }));
+      // Sauvegarder dans le cache (seulement si on a des données réelles)
+      if (extractedRooms.length > 0) {
+        localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
+          assignments: uniqueAssignments,
+          rooms: extractedRooms,
+          timestamp: Date.now()
+        }));
+      }
 
       // Charger les tâches d'inventaire linge
       const today = new Date().toISOString().split('T')[0];
