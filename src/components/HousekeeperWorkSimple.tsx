@@ -61,15 +61,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [dismissedRoomIds, setDismissedRoomIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTabState] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
-  // Garantit un identifiant de tâche d'inventaire stable pour éviter de créer
-  // une nouvelle tâche en base à chaque rendu/ouverture de l'onglet.
-  const setActiveTab = useCallback((tab: 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan') => {
-    if (tab === 'inventory') {
-      setActiveLinenTask(prev => prev || `manual_${Date.now()}`);
-    }
-    setActiveTabState(tab);
-  }, []);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [hasNewInstructions, setHasNewInstructions] = useState(false);
@@ -448,8 +440,21 @@ const HousekeeperWorkContent: React.FC = () => {
         const pendingManual = (manualTasks || []).filter(t => 
           !t.assigned_to_name || t.assigned_to_name === housekeeperProfile?.name
         ).length;
-        
-        setPendingTasksCount(pendingTemplates + pendingManual);
+
+        const { data: linenTasks } = await supabase
+          .from('linen_inventory_tasks')
+          .select('id, assigned_to, status')
+          .eq('hotel_id', hotelId)
+          .eq('task_date', today)
+          .in('status', ['pending', 'in_progress']);
+
+        const myInventoryTask = (linenTasks || []).find((task: any) =>
+          task.assigned_to === housekeeperProfile?.id ||
+          normalizeName(task.assigned_to) === normalizeName(housekeeperProfile?.name)
+        );
+
+        setActiveLinenTask(myInventoryTask?.id || null);
+        setPendingTasksCount(pendingTemplates + pendingManual + (myInventoryTask ? 1 : 0));
       }
       
       // Charger les instructions
@@ -934,9 +939,7 @@ const HousekeeperWorkContent: React.FC = () => {
           t.assigned_to === housekeeperId ||
           normalizeName(t.assigned_to) === normalizedHousekeeperName
         );
-        if (myTask) {
-          setActiveLinenTask(myTask.id);
-        }
+          setActiveLinenTask(myTask?.id || null);
       }
       
     } catch (error) {
