@@ -240,7 +240,7 @@ const Auth = () => {
             <img
               src="/Nettobloc.png"
               alt="Nettobloc"
-              className="mx-auto h-16 w-auto object-contain"
+              className="mx-auto h-80 w-auto object-contain"
             />
           </div>
 
