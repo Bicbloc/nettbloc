@@ -33,7 +33,9 @@ export function RedistributionDialog({
   housekeeperCount,
   roomCount,
   housekeeperNames,
-  onAddHousekeeper
+  onAddHousekeeper,
+  hotelId,
+  onRequestInspection
 }: RedistributionDialogProps) {
   const [selectedMethod, setSelectedMethod] = useState<RedistributionMethod>('floor');
   const [selectedHousekeepers, setSelectedHousekeepers] = useState<string[]>([]);
