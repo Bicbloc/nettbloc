@@ -232,7 +232,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
     <div className={cn(
       'flex flex-col bg-background',
       embedded
-        ? 'relative min-h-[70dvh] overflow-hidden rounded-[1.5rem] border'
+        ? 'relative flex-1 min-h-0 overflow-hidden rounded-[1.5rem] border'
         : 'fixed inset-0 z-50'
     )}>
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
