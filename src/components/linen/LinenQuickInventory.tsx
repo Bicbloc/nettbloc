@@ -205,67 +205,118 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
-      {/* Header with prominent close button */}
-      <div className="sticky top-0 bg-background border-b z-10 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-10 w-10 shrink-0">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate">📦 Inventaire Linge</h1>
-            <p className="text-xs text-muted-foreground">
-              {totalItems > 0 ? `${totalItems} pièces • ${totalScanned} type(s)` : 'Scannez le linge'}
-            </p>
+    <div className="fixed inset-0 z-50 bg-muted/30 flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-10 w-10 shrink-0 text-primary-foreground hover:bg-primary-foreground/15"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold truncate flex items-center gap-2">
+                <Package className="h-5 w-5" /> Inventaire Linge
+              </h1>
+              <p className="text-xs text-primary-foreground/80">
+                Scannez chaque type de linge avec l'appareil photo
+              </p>
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-10 w-10 shrink-0 text-muted-foreground">
-            <X className="h-5 w-5" />
-          </Button>
+
+          {/* Progress + stats */}
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
+              <p className="text-2xl font-extrabold leading-none">{totalItems}</p>
+              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Pièces</p>
+            </div>
+            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
+              <p className="text-2xl font-extrabold leading-none">{totalScanned}/{linenTypes.length}</p>
+              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Scannés</p>
+            </div>
+            <div className="rounded-xl bg-primary-foreground/15 backdrop-blur-sm px-3 py-2 text-center">
+              <p className="text-2xl font-extrabold leading-none">{progress}%</p>
+              <p className="text-[10px] uppercase tracking-wide text-primary-foreground/80 mt-1">Avancé</p>
+            </div>
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-primary-foreground/20 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary-foreground transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
       </div>
 
       {/* Linen types list */}
-      <div className="flex-1 overflow-y-auto p-4 pb-28">
-        <div className="space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 pb-32">
+        <div className="grid gap-3 max-w-2xl mx-auto">
           {linenTypes.map(type => {
             const entry = entries[type.id];
             const count = entry?.quantity_clean || 0;
+            const done = !!entry;
 
             return (
-              <Card key={type.id} className="p-4">
+              <Card
+                key={type.id}
+                className={cn(
+                  "p-4 transition-all duration-200 border-2",
+                  done
+                    ? "border-primary/40 bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/30"
+                )}
+              >
                 <div className="flex items-center gap-4">
-                  <span className="text-3xl">{getLinenIcon(type.category)}</span>
+                  <div
+                    className={cn(
+                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl",
+                      done ? "bg-primary/10" : "bg-muted"
+                    )}
+                  >
+                    {getLinenIcon(type.category)}
+                  </div>
+
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold truncate">{type.name}</h3>
-                      {entry && (
-                        <Badge variant="secondary" className="shrink-0">
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                      {done && (
+                        <Badge variant="secondary" className="shrink-0 gap-1">
+                          <CheckCircle className="h-3 w-3" />
                           {Math.round((entry.ai_confidence || 0) * 100)}%
                         </Badge>
                       )}
                     </div>
-                    {count > 0 && (
-                      <p className="text-2xl font-bold text-primary">{count} pièces</p>
+                    {count > 0 ? (
+                      <p className="text-2xl font-bold text-primary leading-tight">
+                        {count} <span className="text-sm font-medium text-muted-foreground">pièces</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Pas encore compté</p>
                     )}
                   </div>
+
                   <Button
                     onClick={() => setActiveScanType(type.id)}
-                    variant={count > 0 ? "outline" : "default"}
+                    variant={done ? "outline" : "default"}
                     size="lg"
                     className="h-12 px-4 shrink-0"
                   >
-                    <Camera className="h-5 w-5 mr-2" />
-                    {count > 0 ? 'Rescanner' : 'Scanner'}
+                    <Camera className="h-5 w-5 sm:mr-2" />
+                    <span className="hidden sm:inline">{done ? 'Rescanner' : 'Scanner'}</span>
                   </Button>
                 </div>
               </Card>
             );
           })}
-          
+
           {linenTypes.length === 0 && (
             <Card className="p-8 text-center text-muted-foreground">
-              <p className="text-lg mb-1">Aucun type de linge configuré</p>
+              <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p className="text-lg mb-1 font-medium">Aucun type de linge configuré</p>
               <p className="text-sm">Contactez l'administrateur</p>
             </Card>
           )}
@@ -273,18 +324,20 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
       </div>
 
       {/* Fixed bottom save button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || totalScanned === 0 || !realTaskId}
-          size="lg"
-          className="w-full h-14 text-lg"
-        >
-          <Save className="h-5 w-5 mr-2" />
-          {isSaving ? "Enregistrement..." : 
-           !realTaskId ? "Initialisation..." :
-           `Enregistrer (${totalItems} pièces)`}
-        </Button>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t shadow-lg">
+        <div className="max-w-2xl mx-auto">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || totalScanned === 0 || !realTaskId}
+            size="lg"
+            className="w-full h-14 text-lg shadow-md"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            {isSaving ? "Enregistrement..." :
+             !realTaskId ? "Initialisation..." :
+             `Enregistrer (${totalItems} pièces)`}
+          </Button>
+        </div>
       </div>
     </div>
   );
