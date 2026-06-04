@@ -61,7 +61,15 @@ const HousekeeperWorkContent: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [dismissedRoomIds, setDismissedRoomIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
+  const [activeTab, setActiveTabState] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
+  // Garantit un identifiant de tâche d'inventaire stable pour éviter de créer
+  // une nouvelle tâche en base à chaque rendu/ouverture de l'onglet.
+  const setActiveTab = useCallback((tab: 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan') => {
+    if (tab === 'inventory') {
+      setActiveLinenTask(prev => prev || `manual_${Date.now()}`);
+    }
+    setActiveTabState(tab);
+  }, []);
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [hasNewInstructions, setHasNewInstructions] = useState(false);
