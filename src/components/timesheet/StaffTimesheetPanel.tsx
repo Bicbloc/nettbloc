@@ -79,7 +79,11 @@ const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }>
   validated: { label: 'Validé', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   modified: { label: 'Modifié', color: 'bg-blue-100 text-blue-800', icon: Edit2 },
   rejected: { label: 'Rejeté', color: 'bg-red-100 text-red-800', icon: XCircle },
+  not_clocked: { label: 'Non pointé', color: 'bg-gray-100 text-gray-700', icon: AlertCircle },
 };
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const normalizeStaffName = (value?: string | null) => (value || '').trim().toLowerCase();
 
 export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   const { toast } = useToast();
@@ -169,6 +173,72 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
     },
   });
 
+  // Femmes de chambre affectées pour la journée sélectionnée (vue Jour uniquement).
+  // Permet d'afficher une ligne même si la personne n'a pas pointé via son interface.
+  const { data: assignedHousekeepers = [] } = useQuery({
+    queryKey: ["assigned-housekeepers-timesheet", hotelId, format(selectedDate, 'yyyy-MM-dd')],
+    enabled: viewMode === 'day' && !!hotelId,
+    queryFn: async () => {
+      const dayStart = format(selectedDate, 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('housekeeper_name, housekeeper_id, assigned_at')
+        .eq('hotel_id', hotelId)
+        .gte('assigned_at', `${dayStart}T00:00:00`)
+        .lte('assigned_at', `${dayStart}T23:59:59.999`);
+      if (error) throw error;
+      const seen = new Map<string, { housekeeper_name: string; housekeeper_id: string | null }>();
+      (data || []).forEach((a: any) => {
+        const key = normalizeStaffName(a.housekeeper_name);
+        if (a.housekeeper_name && !seen.has(key)) {
+          seen.set(key, { housekeeper_name: a.housekeeper_name, housekeeper_id: a.housekeeper_id });
+        }
+      });
+      return Array.from(seen.values());
+    },
+  });
+
+  // Liste affichée = pointages réels + lignes virtuelles pour les FdC affectées non pointées
+  const mergedTimesheets: Timesheet[] = (() => {
+    const base = timesheets ? [...timesheets] : [];
+    if (viewMode !== 'day') return base;
+    if (staffFilter !== 'all' && staffFilter !== 'housekeeper') return base;
+
+    const workDate = format(selectedDate, 'yyyy-MM-dd');
+    const existingNames = new Set(
+      base
+        .filter((t) => t.staff_type === 'housekeeper')
+        .map((t) => normalizeStaffName(t.staff_name))
+    );
+
+    const placeholders = assignedHousekeepers
+      .filter((a) => !existingNames.has(normalizeStaffName(a.housekeeper_name)))
+      .map((a) => ({
+        id: `virtual-${normalizeStaffName(a.housekeeper_name)}`,
+        staff_type: 'housekeeper',
+        staff_name: a.housekeeper_name,
+        work_date: workDate,
+        start_time: null,
+        end_time: null,
+        break_minutes: 0,
+        rooms_cleaned: 0,
+        rooms_recouche: 0,
+        rooms_depart: 0,
+        rooms_inspected: 0,
+        notes: null,
+        status: 'not_clocked',
+        validated_at: null,
+        validated_by_name: null,
+        modified_at: null,
+        modified_by_name: null,
+        original_start_time: null,
+        original_end_time: null,
+        _housekeeper_id: a.housekeeper_id,
+      })) as any[];
+
+    return [...base, ...placeholders];
+  })();
+
   // Calculate totals
   const calculateTotals = () => {
     if (!timesheets) return { totalHours: 0, totalRooms: 0, totalRecouche: 0, totalDepart: 0 };
@@ -253,26 +323,54 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
         ? new Date(`${workDate}T${editForm.end_time}:00`).toISOString()
         : null;
 
-      const { error } = await supabase
-        .from('staff_timesheets')
-        .update({
-          start_time: startTime,
-          end_time: endTime,
-          break_minutes: editForm.break_minutes,
-          rooms_cleaned: editForm.rooms_cleaned,
-          rooms_recouche: editForm.rooms_recouche,
-          rooms_depart: editForm.rooms_depart,
-          notes: editForm.notes,
-          status: 'modified',
-          modified_at: new Date().toISOString(),
-          modified_by: user.id,
-          modified_by_name: currentUserName || 'Admin',
-          original_start_time: editingTimesheet.original_start_time || editingTimesheet.start_time,
-          original_end_time: editingTimesheet.original_end_time || editingTimesheet.end_time,
-        })
-        .eq('id', editingTimesheet.id);
+      const isVirtual = editingTimesheet.id.startsWith('virtual-');
 
-      if (error) throw error;
+      if (isVirtual) {
+        // Aucune ligne de pointage n'existe encore : on la crée pour la FdC affectée.
+        const housekeeperId = (editingTimesheet as any)._housekeeper_id;
+        const profileId = housekeeperId && UUID_REGEX.test(housekeeperId) ? housekeeperId : null;
+        const { error } = await supabase
+          .from('staff_timesheets')
+          .insert({
+            hotel_id: hotelId,
+            staff_type: editingTimesheet.staff_type,
+            staff_name: editingTimesheet.staff_name,
+            housekeeper_profile_id: profileId,
+            work_date: workDate,
+            start_time: startTime,
+            end_time: endTime,
+            break_minutes: editForm.break_minutes,
+            rooms_cleaned: editForm.rooms_cleaned,
+            rooms_recouche: editForm.rooms_recouche,
+            rooms_depart: editForm.rooms_depart,
+            notes: editForm.notes,
+            status: 'modified',
+            modified_at: new Date().toISOString(),
+            modified_by: user.id,
+            modified_by_name: currentUserName || 'Admin',
+          });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('staff_timesheets')
+          .update({
+            start_time: startTime,
+            end_time: endTime,
+            break_minutes: editForm.break_minutes,
+            rooms_cleaned: editForm.rooms_cleaned,
+            rooms_recouche: editForm.rooms_recouche,
+            rooms_depart: editForm.rooms_depart,
+            notes: editForm.notes,
+            status: 'modified',
+            modified_at: new Date().toISOString(),
+            modified_by: user.id,
+            modified_by_name: currentUserName || 'Admin',
+            original_start_time: editingTimesheet.original_start_time || editingTimesheet.start_time,
+            original_end_time: editingTimesheet.original_end_time || editingTimesheet.end_time,
+          })
+          .eq('id', editingTimesheet.id);
+        if (error) throw error;
+      }
 
       toast({
         title: "Pointage modifié",
@@ -644,7 +742,7 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : timesheets && timesheets.length > 0 ? (
+      ) : mergedTimesheets.length > 0 ? (
         <div className="space-y-4">
           {/* Staff Summary (for week/month view) */}
           {viewMode !== 'day' && staffSummary.length > 0 && (
@@ -707,7 +805,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {timesheets.map(ts => {
+                    {mergedTimesheets.map(ts => {
+                      const isVirtual = ts.id.startsWith('virtual-');
                       const isActive = !ts.end_time && !!ts.start_time;
                       const effectiveStatus = isActive ? 'active' : ts.status;
                       const statusInfo = STATUS_LABELS[effectiveStatus] || STATUS_LABELS.pending;
@@ -717,6 +816,7 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                       return (
                         <TableRow key={ts.id} className={
                           isActive ? 'bg-emerald-50/50' : 
+                          isVirtual ? 'bg-muted/30' :
                           ts.status === 'pending' ? 'bg-yellow-50/50' : ''
                         }>
                           <TableCell className="whitespace-nowrap">
