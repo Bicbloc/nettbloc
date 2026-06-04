@@ -497,12 +497,17 @@ const HousekeeperWorkContent: React.FC = () => {
         if ((newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout') && 
             oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
-          setAvailableRooms(prev => {
-            if (!prev.find(r => r.id === newRecord.id)) {
-              return [...prev, newRecord];
-            }
-            return prev;
-          });
+          dispatchStaffNotification('🚪 Client sorti', `Chambre ${newRecord.room_number} prête à nettoyer`);
+          // Si la chambre m'est déjà assignée, elle reste dans la liste principale
+          // (le badge "Client sorti" s'affichera grâce au statut mis à jour ci-dessous).
+          if (!isMyRoom) {
+            setAvailableRooms(prev => {
+              if (!prev.find(r => r.id === newRecord.id)) {
+                return [...prev, newRecord];
+              }
+              return prev;
+            });
+          }
         }
         
         // Mise à jour locale si c'est ma chambre - SYNCHRONISATION COMPLÈTE
