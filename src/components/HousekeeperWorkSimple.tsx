@@ -107,17 +107,22 @@ const HousekeeperWorkContent: React.FC = () => {
   const getHotelId = (): string | null => {
     // 1. URL en priorité
     if (hotelIdFromUrl && hotelIdFromUrl.length >= 30) return hotelIdFromUrl;
-    // 2. storageService unifié
-    const storedId = storageService.getHotelId();
-    if (storedId && storedId.length >= 30) return storedId;
+    // 2. Hôtel explicitement choisi côté femme de chambre
+    const lockedHousekeeperHotelId = storageService.getHousekeeperHotelId();
+    if (lockedHousekeeperHotelId && lockedHousekeeperHotelId.length >= 30) return lockedHousekeeperHotelId;
     // 3. Profil housekeeper
     if (housekeeperProfile?.currentHotelId && housekeeperProfile.currentHotelId.length >= 30) {
       return housekeeperProfile.currentHotelId;
     }
+    // 4. storageService global seulement si le portail actif est bien femme de chambre
+    if (storageService.getActivePortal() === 'housekeeper') {
+      const storedId = storageService.getHotelId();
+      if (storedId && storedId.length >= 30) return storedId;
+    }
     return null;
   };
   
-  const hotelId = getHotelId() || storageService.recoverHotelId();
+  const hotelId = getHotelId();
   const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
 
   // Charger/sauvegarder le pointage
@@ -352,20 +357,24 @@ const HousekeeperWorkContent: React.FC = () => {
           return;
         }
         
+        const lockedHousekeeperHotelId = storageService.getHousekeeperHotelId() || hotelIdFromUrl || undefined;
+
         setHousekeeperProfile(profile);
         storageService.saveHousekeeperProfile({
           id: profile.id,
           name: profile.name,
           email: profile.email,
-          currentHotelId: storageService.getHotelId() || hotelIdFromUrl || undefined,
+          currentHotelId: lockedHousekeeperHotelId || storageService.getHotelId() || undefined,
         });
         
         // Vérifier qu'un hôtel est sélectionné
-        const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
+        const currentHotelId = lockedHousekeeperHotelId || storageService.getHotelId();
         if (!currentHotelId || currentHotelId.length < 30) {
           navigate('/housekeeper/hotels');
           return;
         }
+
+        storageService.saveHousekeeperHotel({ id: currentHotelId });
         
         setIsAuthChecked(true);
       } catch (error) {
@@ -1067,6 +1076,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     storageService.clearHousekeeperProfile();
+    storageService.clearHousekeeperHotel();
     storageService.clearHotel();
     localStorage.removeItem(`assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`);
     navigate('/housekeeper/auth');
@@ -1356,7 +1366,7 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <div className="space-y-4 pb-24">
+          <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-4 overflow-hidden pb-2">
             <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
               <div className="bg-gradient-to-r from-primary to-info px-5 py-5 text-primary-foreground">
                 <div className="flex items-start justify-between gap-4">
@@ -1416,7 +1426,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-card p-4 shadow-sm">
+            <section className="min-h-0 flex-1 overflow-hidden rounded-3xl border bg-card p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-semibold">Zone de comptage</h3>

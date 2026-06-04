@@ -37,7 +37,6 @@ export class RoomSyncService {
       const updateData: any = {
         status: safeStatus,
         // Ne PAS toucher aux notes - elles sont gérées manuellement par le client
-        cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
         is_twin: room.isTwin || false,
         updated_at: new Date().toISOString()
       };
@@ -54,6 +53,8 @@ export class RoomSyncService {
       // Mettre à jour last_cleaned_at si la chambre est propre
       if (room.status === 'clean') {
         updateData.last_cleaned_at = new Date().toISOString();
+      } else if (room.status === 'ready-to-clean' || room.status === 'checkout') {
+        updateData.cleaning_type = 'a_blanc';
       }
 
       const { error } = await supabase
@@ -113,6 +114,8 @@ export class RoomSyncService {
 
       if (status === 'clean') {
         updateData.last_cleaned_at = new Date().toISOString();
+      } else if (status === 'ready-to-clean' || status === 'checkout') {
+        updateData.cleaning_type = 'a_blanc';
       }
 
       const { error } = await supabase
