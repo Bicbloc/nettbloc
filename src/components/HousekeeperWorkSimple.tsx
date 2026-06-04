@@ -457,7 +457,7 @@ const HousekeeperWorkContent: React.FC = () => {
     if (table === 'assignments') {
       if (eventType === 'INSERT') {
         if (isForMe(newRecord)) {
-          loadWorkDataRef.current();
+          loadWorkDataRef.current(true);
           addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
           dispatchStaffNotification('🆕 Nouvelle chambre', 'Une chambre vous a été assignée par le responsable');
           setNewRoomsCount(prev => prev + 1);
