@@ -596,7 +596,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
               </SelectTrigger>
               <SelectContent>
                 {housekeepers.filter(h => h.is_active).map(h => (
-                  <SelectItem key={h.id} value={h.name}>
+                  <SelectItem key={h.id} value={h.id}>
                     {h.name}
                   </SelectItem>
                 ))}
