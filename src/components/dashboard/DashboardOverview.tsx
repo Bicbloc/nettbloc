@@ -42,14 +42,15 @@ export function DashboardOverview({
   const fullCleaningRooms = rooms.filter(r => r.cleaningType === 'full').length;
   const quickCleaningRooms = rooms.filter(r => r.cleaningType === 'quick').length;
   const twinRooms = rooms.filter(r => r.isTwin).length;
+  const [staffOpen, setStaffOpen] = useState(false);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       {/* Stats Overview Component */}
       <StatsOverview rooms={rooms} housekeeperCount={housekeeperNames.length} />
 
       {/* Grid responsive améliorée */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Actions rapides */}
         <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
           <CardHeader className="pb-3">
