@@ -720,7 +720,7 @@ function GovernessDashboardContent() {
                         </div>
                       </div>
                     </div>
-                    <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+                    <ScrollArea className="h-[60dvh] min-h-[320px] pr-3">
                       <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
                     </ScrollArea>
                   </div>
