@@ -143,6 +143,24 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
     },
   });
 
+  const removeMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from("linen_inventory_tasks")
+        .delete()
+        .eq("id", taskId);
+      if (error) throw new Error(error.message || "Erreur lors du retrait");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-tasks-today"] });
+      queryClient.invalidateQueries({ queryKey: ["linen-tasks"] });
+      toast.success("Inventaire retiré");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Impossible de retirer l'inventaire");
+    },
+  });
+
   if (!hotelId) return null;
 
   return (
