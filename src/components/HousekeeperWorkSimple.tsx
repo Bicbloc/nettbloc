@@ -1250,7 +1250,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </Card>
             ) : (
               <div className="space-y-3">
-                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length > 0 && (
+                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id)).length > 0 && (
                   <Card className="border-warning/30 bg-warning/10 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1260,7 +1260,7 @@ const HousekeeperWorkContent: React.FC = () => {
                         </p>
                       </div>
                       <Badge variant="secondary" className="bg-background text-foreground">
-                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length}
+                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id)).length}
                       </Badge>
                     </div>
                   </Card>
