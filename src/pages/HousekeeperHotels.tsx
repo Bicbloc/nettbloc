@@ -146,10 +146,10 @@ function HousekeeperHotelsContent() {
         console.error('Profile load error:', profileError);
         toast({
           variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de charger votre profil."
+          title: "Erreur réseau",
+          description: "Impossible de charger votre profil pour le moment. Réessayez dans quelques secondes."
         });
-        navigate('/housekeeper/auth');
+        setIsLoading(false);
         return;
       }
 
