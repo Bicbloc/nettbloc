@@ -301,7 +301,11 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const openAssignDialog = (room: Room) => {
     setSelectedRoom(room);
     const existingAssignment = assignments.get(room.id);
-    setSelectedHousekeeper(existingAssignment?.housekeeper_name || '');
+    // Pré-sélectionner par ID (fallback : retrouver l'ID via le nom existant)
+    const existingId = existingAssignment?.housekeeper_id
+      || housekeepers.find(h => h.name === existingAssignment?.housekeeper_name)?.id
+      || '';
+    setSelectedHousekeeper(existingId);
     setAssignDialog(true);
   };
 
