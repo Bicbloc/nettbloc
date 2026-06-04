@@ -25,6 +25,8 @@ import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
 import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
 import { HousekeeperIncidentsList } from './housekeeper/HousekeeperIncidentsList';
 
+const HOUSEKEEPER_TEMP_LINEN_TASK_ID = 'temp-housekeeper-linen-task';
+
 interface Room {
   id: string;
   room_number: string;
@@ -1415,9 +1417,20 @@ const HousekeeperWorkContent: React.FC = () => {
                     {activeLinenTask ? 'Tâche attribuée prête à scanner.' : 'Aucune tâche attribuée pour le moment.'}
                   </p>
                 </div>
-                <Badge variant={isConnected ? 'secondary' : 'outline'}>
-                  {isConnected ? 'Live' : 'Pause'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {!activeLinenTask && housekeeperProfile?.id && (
+                    <Button
+                      onClick={() => setActiveLinenTask(HOUSEKEEPER_TEMP_LINEN_TASK_ID)}
+                      size="sm"
+                      className="shrink-0"
+                    >
+                      Commencer l’inventaire
+                    </Button>
+                  )}
+                  <Badge variant={isConnected ? 'secondary' : 'outline'}>
+                    {isConnected ? 'Live' : 'Pause'}
+                  </Badge>
+                </div>
               </div>
             </section>
 
@@ -1426,6 +1439,7 @@ const HousekeeperWorkContent: React.FC = () => {
                 <LinenQuickInventory
                   taskId={activeLinenTask}
                   hotelId={hotelId}
+                  assignedToId={housekeeperProfile?.id}
                   embedded
                   onClose={() => {
                     setActiveLinenTask(null);
@@ -1441,8 +1455,16 @@ const HousekeeperWorkContent: React.FC = () => {
                   <div className="max-w-sm space-y-2">
                     <p className="text-base font-semibold">Aucun inventaire attribué</p>
                     <p className="text-sm text-muted-foreground">
-                      Dès qu’un responsable vous assigne une tâche, elle apparaîtra ici automatiquement.
+                      Dès qu’un responsable vous assigne une tâche, elle apparaîtra ici automatiquement, ou vous pouvez la démarrer ici.
                     </p>
+                    {housekeeperProfile?.id && (
+                      <Button
+                        onClick={() => setActiveLinenTask(HOUSEKEEPER_TEMP_LINEN_TASK_ID)}
+                        className="mt-2"
+                      >
+                        Commencer l’inventaire
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
