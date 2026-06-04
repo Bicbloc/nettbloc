@@ -323,26 +323,54 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
         ? new Date(`${workDate}T${editForm.end_time}:00`).toISOString()
         : null;
 
-      const { error } = await supabase
-        .from('staff_timesheets')
-        .update({
-          start_time: startTime,
-          end_time: endTime,
-          break_minutes: editForm.break_minutes,
-          rooms_cleaned: editForm.rooms_cleaned,
-          rooms_recouche: editForm.rooms_recouche,
-          rooms_depart: editForm.rooms_depart,
-          notes: editForm.notes,
-          status: 'modified',
-          modified_at: new Date().toISOString(),
-          modified_by: user.id,
-          modified_by_name: currentUserName || 'Admin',
-          original_start_time: editingTimesheet.original_start_time || editingTimesheet.start_time,
-          original_end_time: editingTimesheet.original_end_time || editingTimesheet.end_time,
-        })
-        .eq('id', editingTimesheet.id);
+      const isVirtual = editingTimesheet.id.startsWith('virtual-');
 
-      if (error) throw error;
+      if (isVirtual) {
+        // Aucune ligne de pointage n'existe encore : on la crée pour la FdC affectée.
+        const housekeeperId = (editingTimesheet as any)._housekeeper_id;
+        const profileId = housekeeperId && UUID_REGEX.test(housekeeperId) ? housekeeperId : null;
+        const { error } = await supabase
+          .from('staff_timesheets')
+          .insert({
+            hotel_id: hotelId,
+            staff_type: editingTimesheet.staff_type,
+            staff_name: editingTimesheet.staff_name,
+            housekeeper_profile_id: profileId,
+            work_date: workDate,
+            start_time: startTime,
+            end_time: endTime,
+            break_minutes: editForm.break_minutes,
+            rooms_cleaned: editForm.rooms_cleaned,
+            rooms_recouche: editForm.rooms_recouche,
+            rooms_depart: editForm.rooms_depart,
+            notes: editForm.notes,
+            status: 'modified',
+            modified_at: new Date().toISOString(),
+            modified_by: user.id,
+            modified_by_name: currentUserName || 'Admin',
+          });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('staff_timesheets')
+          .update({
+            start_time: startTime,
+            end_time: endTime,
+            break_minutes: editForm.break_minutes,
+            rooms_cleaned: editForm.rooms_cleaned,
+            rooms_recouche: editForm.rooms_recouche,
+            rooms_depart: editForm.rooms_depart,
+            notes: editForm.notes,
+            status: 'modified',
+            modified_at: new Date().toISOString(),
+            modified_by: user.id,
+            modified_by_name: currentUserName || 'Admin',
+            original_start_time: editingTimesheet.original_start_time || editingTimesheet.start_time,
+            original_end_time: editingTimesheet.original_end_time || editingTimesheet.end_time,
+          })
+          .eq('id', editingTimesheet.id);
+        if (error) throw error;
+      }
 
       toast({
         title: "Pointage modifié",
