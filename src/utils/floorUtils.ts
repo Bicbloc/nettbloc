@@ -7,6 +7,36 @@ export function formatFloorLabel(floor: number | null | undefined): string {
   return `${floor}e`;
 }
 
+/**
+ * Déduit l'étage à partir d'un numéro de chambre.
+ * Exemples: "101" -> 1, "0 12"/"012" -> 0 (RDC), "1203" -> 12,
+ * "RDC 5" -> 0, "B-204" -> 2, "23" -> 2, "5" -> 0.
+ * Retourne null si aucun chiffre exploitable n'est trouvé.
+ */
+export function deduceFloorFromRoomNumber(roomNumber: string | null | undefined): number | null {
+  if (!roomNumber) return null;
+
+  const raw = roomNumber.toString().trim().toLowerCase();
+
+  // Mentions explicites de rez-de-chaussée / sous-sol
+  if (/\b(rdc|rez|ground|gf)\b/.test(raw)) return 0;
+  const ssMatch = raw.match(/(?:ss|sous[\s-]?sol|s)\s*-?\s*(\d+)/);
+  if (ssMatch) return -Math.abs(parseInt(ssMatch[1], 10));
+
+  // On isole le premier groupe de chiffres rencontré (ignore les préfixes type "B-")
+  const digitsMatch = raw.match(/\d+/);
+  if (!digitsMatch) return null;
+
+  const digits = digitsMatch[0];
+
+  // 1 ou 2 chiffres -> RDC par convention (ex: "5", "12" = chambres du RDC)
+  if (digits.length <= 2) return 0;
+  // 3 chiffres -> premier chiffre = étage (ex: "203" -> 2)
+  if (digits.length === 3) return parseInt(digits[0], 10);
+  // 4 chiffres et + -> deux premiers chiffres = étage (ex: "1203" -> 12)
+  return parseInt(digits.slice(0, 2), 10);
+}
+
 export const FLOOR_OPTIONS = [
   { value: '-3', label: 'Sous-sol -3' },
   { value: '-2', label: 'Sous-sol -2' },

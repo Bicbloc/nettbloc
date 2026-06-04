@@ -17,7 +17,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3, Layers } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3, Layers, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
@@ -25,7 +25,7 @@ import { BulkEquipmentDialog } from '@/components/equipment/BulkEquipmentDialog'
 import { SpaceActivityLog } from '@/components/SpaceActivityLog';
 import { FloorPlanView } from '@/components/registry/FloorPlanView';
 import { FloorPlanGrid } from '@/components/registry/FloorPlanGrid';
-import { formatFloorLabel } from '@/utils/floorUtils';
+import { formatFloorLabel, deduceFloorFromRoomNumber } from '@/utils/floorUtils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -154,6 +154,43 @@ const RoomRegistry = () => {
     },
   });
 
+  const autoOrganizeMutation = useMutation({
+    mutationFn: async () => {
+      const all = rooms || [];
+      // On ne met à jour que les chambres dont l'étage déduit diffère de l'actuel
+      const updates = all
+        .map((r) => ({ id: r.id, floor: deduceFloorFromRoomNumber(r.room_number) }))
+        .filter((u) => u.floor !== null && u.floor !== undefined);
+
+      const toUpdate = updates.filter((u) => {
+        const current = all.find((r) => r.id === u.id);
+        return current && current.floor !== u.floor;
+      });
+
+      for (const u of toUpdate) {
+        const { error } = await supabase
+          .from('hotel_rooms_registry')
+          .update({ floor: u.floor, updated_at: new Date().toISOString() })
+          .eq('id', u.id);
+        if (error) throw error;
+      }
+
+      return toUpdate.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
+      toast({
+        title: 'Étages réorganisés',
+        description: count > 0
+          ? `${count} chambre(s) mise(s) à jour automatiquement`
+          : 'Tous les étages étaient déjà corrects',
+      });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: 'Impossible de réorganiser les étages', variant: 'destructive' });
+    },
+  });
+
   const filteredRooms = useMemo(() => {
     let result = rooms || [];
     if (categoryFilter !== 'all') {
@@ -236,6 +273,15 @@ const RoomRegistry = () => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => autoOrganizeMutation.mutate()}
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={!activeHotelId || autoOrganizeMutation.isPending || !(rooms && rooms.length > 0)}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              {autoOrganizeMutation.isPending ? 'Réorganisation...' : 'Déduire les étages'}
+            </Button>
             <Button data-tour="reg-bulk" onClick={() => setIsBulkEquipOpen(true)} variant="outline" className="w-full sm:w-auto" disabled={!activeHotelId}>
               <Layers className="h-4 w-4 mr-2" />
               Équipement en masse
