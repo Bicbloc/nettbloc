@@ -245,35 +245,34 @@ const IndexDashboard = () => {
     notifications
   } = useHousekeeping();
 
-  // Compute notification counts per sidebar tab from unread notifications
+  // Compteurs par onglet basés sur le journal des actions (daily_action_logs)
+  // exposé via le contexte de notifications — afin que le badge "Incidents"
+  // et les autres onglets reflètent les actions réelles non lues.
+  const { notifications: journalNotifications } = useNotificationContext();
   const notificationCounts = useMemo(() => {
-    const unread = (notifications || []).filter(n => !n.is_read);
+    const unread = (journalNotifications || []).filter(n => !n.is_read);
     const counts: Partial<Record<TabValue, number>> = {};
-    
+
     unread.forEach(n => {
-      const type = n.type || '';
-      if (type.includes('cleaning') || type.includes('room-status') || type.includes('remark')) {
-        counts['rooms'] = (counts['rooms'] || 0) + 1;
-      } else if (type.includes('incident')) {
+      const type = (n.type || '').toLowerCase();
+      const text = `${n.title || ''} ${n.description || ''}`.toLowerCase();
+      if (type === 'remark' || text.includes('incident')) {
         counts['incidents'] = (counts['incidents'] || 0) + 1;
-      } else if (type.includes('ticket') || type.includes('task')) {
-        counts['tickets'] = (counts['tickets'] || 0) + 1;
-      } else if (type.includes('staff') || type.includes('access') || type.includes('housekeeper')) {
-        counts['access-codes'] = (counts['access-codes'] || 0) + 1;
-      } else if (type.includes('linen')) {
+      } else if (type === 'assignment') {
+        counts['rooms'] = (counts['rooms'] || 0) + 1;
+      } else if (type.includes('cleaning') || type === 'room-status') {
+        counts['rooms'] = (counts['rooms'] || 0) + 1;
+      } else if (text.includes('linge') || text.includes('linen')) {
         counts['linen'] = (counts['linen'] || 0) + 1;
-      } else if (type.includes('lost')) {
+      } else if (text.includes('objet') || text.includes('lost')) {
         counts['lost-found'] = (counts['lost-found'] || 0) + 1;
-      } else if (type.includes('inspection')) {
-        counts['inspections'] = (counts['inspections'] || 0) + 1;
       } else {
-        // Default: show on overview
         counts['overview'] = (counts['overview'] || 0) + 1;
       }
     });
-    
+
     return counts;
-  }, [notifications]);
+  }, [journalNotifications]);
   
   // hotelId est maintenant fourni par le contexte - pas besoin de useAutoSetup
   // const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
