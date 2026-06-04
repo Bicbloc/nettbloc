@@ -26,7 +26,7 @@ interface InventoryAssignmentCardProps {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "En attente",
+  pending: "Attribué",
   in_progress: "En cours",
   completed: "À valider",
   validated: "Validé ✓",
