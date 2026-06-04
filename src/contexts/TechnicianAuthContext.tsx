@@ -249,6 +249,21 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         throw new Error('Code établissement introuvable. Vérifiez le code auprès de votre responsable.');
       }
 
+      // Empêcher les doublons de demande
+      const { data: existingRequest } = await supabase
+        .from('technician_access_requests')
+        .select('id, status')
+        .eq('technician_profile_id', profile.id)
+        .eq('hotel_id', hotel.id)
+        .maybeSingle();
+
+      if (existingRequest?.status === 'pending') {
+        throw new Error("Une demande d'accès est déjà en attente pour cet établissement");
+      }
+      if (existingRequest?.status === 'approved') {
+        throw new Error("Vous êtes déjà approuvé pour cet établissement");
+      }
+
       const { error: requestError } = await supabase
         .from('technician_access_requests')
         .insert({
