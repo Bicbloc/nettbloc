@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info, ArrowUpRight, BedDouble, ScanLine, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Clock, Home, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info } from 'lucide-react';
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
@@ -61,15 +61,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [dismissedRoomIds, setDismissedRoomIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTabState] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
-  // Garantit un identifiant de tâche d'inventaire stable pour éviter de créer
-  // une nouvelle tâche en base à chaque rendu/ouverture de l'onglet.
-  const setActiveTab = useCallback((tab: 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan') => {
-    if (tab === 'inventory') {
-      setActiveLinenTask(prev => prev || `manual_${Date.now()}`);
-    }
-    setActiveTabState(tab);
-  }, []);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [hasNewInstructions, setHasNewInstructions] = useState(false);
@@ -448,8 +440,21 @@ const HousekeeperWorkContent: React.FC = () => {
         const pendingManual = (manualTasks || []).filter(t => 
           !t.assigned_to_name || t.assigned_to_name === housekeeperProfile?.name
         ).length;
-        
-        setPendingTasksCount(pendingTemplates + pendingManual);
+
+        const { data: linenTasks } = await supabase
+          .from('linen_inventory_tasks')
+          .select('id, assigned_to, status')
+          .eq('hotel_id', hotelId)
+          .eq('task_date', today)
+          .in('status', ['pending', 'in_progress']);
+
+        const myInventoryTask = (linenTasks || []).find((task: any) =>
+          task.assigned_to === housekeeperProfile?.id ||
+          normalizeName(task.assigned_to) === normalizeName(housekeeperProfile?.name)
+        );
+
+        setActiveLinenTask(myInventoryTask?.id || null);
+        setPendingTasksCount(pendingTemplates + pendingManual + (myInventoryTask ? 1 : 0));
       }
       
       // Charger les instructions
@@ -586,6 +591,31 @@ const HousekeeperWorkContent: React.FC = () => {
         }
       }
     }
+
+    if (table === 'linen_inventory_tasks') {
+      const isAssignedToMe = (record: any) => {
+        if (!record) return false;
+        return (
+          record.assigned_to === housekeeperProfile?.id ||
+          normalizeName(record.assigned_to) === normalizedMyName
+        );
+      };
+
+      if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        if (isAssignedToMe(newRecord) || isAssignedToMe(oldRecord)) {
+          loadWorkDataRef.current(true);
+          if (isAssignedToMe(newRecord) && ['pending', 'in_progress'].includes(newRecord.status)) {
+            addToActivityLog(`🧺 Inventaire linge attribué`, 'info');
+            dispatchStaffNotification('🧺 Inventaire linge', 'Une tâche d’inventaire vous a été attribuée');
+          }
+        }
+      }
+
+      if (eventType === 'DELETE' && isAssignedToMe(oldRecord)) {
+        setActiveLinenTask(null);
+        loadWorkDataRef.current(true);
+      }
+    }
     
     // Écouter les suppressions massives (clôture journée) via daily_reports
     if (table === 'daily_reports') {
@@ -611,7 +641,7 @@ const HousekeeperWorkContent: React.FC = () => {
   // Synchronisation en temps réel - écouter TOUTES les tables pertinentes
   const { isConnected } = useRealtimeSync({
     hotelId: hotelId || undefined,
-    tables: ['assignments', 'rooms', 'daily_reports', 'notifications'],
+    tables: ['assignments', 'rooms', 'daily_reports', 'notifications', 'linen_inventory_tasks'],
     onUpdate: handleRealtimeUpdate
   });
 
@@ -920,7 +950,7 @@ const HousekeeperWorkContent: React.FC = () => {
 
       // Charger les tâches d'inventaire linge
       const today = new Date().toISOString().split('T')[0];
-      const { data: linenTasks } = await supabase
+        const { data: linenTasks } = await supabase
         .from('linen_inventory_tasks')
         .select('*')
         .eq('hotel_id', hotelId)
@@ -928,13 +958,13 @@ const HousekeeperWorkContent: React.FC = () => {
         .in('status', ['pending', 'in_progress']);
       
       if (linenTasks && linenTasks.length > 0) {
+          const normalizedHousekeeperName = normalizeName(housekeeperName);
         const myTask = linenTasks.find((t: any) => 
           t.assigned_to === housekeeperName || 
-          t.assigned_to === housekeeperId
+          t.assigned_to === housekeeperId ||
+          normalizeName(t.assigned_to) === normalizedHousekeeperName
         );
-        if (myTask) {
-          setActiveLinenTask(myTask.id);
-        }
+          setActiveLinenTask(myTask?.id || null);
       }
       
     } catch (error) {
@@ -1200,7 +1230,7 @@ const HousekeeperWorkContent: React.FC = () => {
             }
           }}
           onInventoryOpen={() => {
-            if (!activeLinenTask) setActiveLinenTask(`temp_${Date.now()}`);
+            return;
           }}
         />
 
@@ -1367,64 +1397,45 @@ const HousekeeperWorkContent: React.FC = () => {
 
         {activeTab === 'inventory' && hotelId && (
           <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden pb-2">
-            <section className="sticky top-0 z-10 mb-3 overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+            <section className="mb-3 rounded-2xl border bg-card px-4 py-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="gap-1">
-                      <ScanLine className="h-3.5 w-3.5" />
-                      Inventaire linge
-                    </Badge>
-                    <Badge variant="outline" className="gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      {isConnected ? 'Live' : 'Pause'}
-                    </Badge>
-                  </div>
-                  <h2 className="mt-2 text-lg font-semibold leading-tight">Comptage rapide</h2>
-                  <p className="text-xs text-muted-foreground">En-tête fixe, vue compacte et scan sans perte de place.</p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => setActiveTab('rooms')}>
-                  <ArrowUpRight className="h-4 w-4" />
-                  Retour
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 bg-background px-4 py-3">
-                <div className="rounded-xl border bg-muted/20 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">Chambres</p>
-                  <p className="mt-1 text-lg font-bold">{totalRooms}</p>
-                </div>
-                <div className="rounded-xl border bg-muted/20 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">À blanc</p>
-                  <p className="mt-1 flex items-center gap-1 text-lg font-bold">
-                    <LogOut className="h-3.5 w-3.5 text-destructive" />
-                    {rooms.filter(r => r.status === 'ready-to-clean' || r.status === 'checkout' || r.cleaning_type === 'a_blanc' || r.cleaning_type === 'full').length}
+                  <p className="text-sm font-semibold">Inventaire du linge</p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeLinenTask ? 'Tâche attribuée prête à scanner.' : 'Aucune tâche attribuée pour le moment.'}
                   </p>
                 </div>
-                <div className="rounded-xl border bg-muted/20 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">Recouches</p>
-                  <p className="mt-1 flex items-center gap-1 text-lg font-bold">
-                    <BedDouble className="h-3.5 w-3.5 text-info" />
-                    {rooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'recouche' || r.cleaning_type === 'stayover').length}
-                  </p>
-                </div>
+                <Badge variant={isConnected ? 'secondary' : 'outline'}>
+                  {isConnected ? 'Live' : 'Pause'}
+                </Badge>
               </div>
             </section>
 
             <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <LinenQuickInventory
-                taskId={activeLinenTask || 'manual_session'}
-                hotelId={hotelId}
-                embedded
-                onClose={() => {
-                  setActiveLinenTask(null);
-                  setActiveTab('rooms');
-                  toast({
-                    title: "✅ Inventaire terminé",
-                    description: "Merci pour votre travail!"
-                  });
-                }}
-              />
+              {activeLinenTask ? (
+                <LinenQuickInventory
+                  taskId={activeLinenTask}
+                  hotelId={hotelId}
+                  embedded
+                  onClose={() => {
+                    setActiveLinenTask(null);
+                    setActiveTab('rooms');
+                    toast({
+                      title: "✅ Inventaire terminé",
+                      description: "Merci pour votre travail!"
+                    });
+                  }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center">
+                  <div className="max-w-sm space-y-2">
+                    <p className="text-base font-semibold">Aucun inventaire attribué</p>
+                    <p className="text-sm text-muted-foreground">
+                      Dès qu’un responsable vous assigne une tâche, elle apparaîtra ici automatiquement.
+                    </p>
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         )}

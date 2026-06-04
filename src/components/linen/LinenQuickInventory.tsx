@@ -236,33 +236,35 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         : 'fixed inset-0 z-50'
     )}>
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-3 pb-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onClose}
-            className="h-10 w-10 shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+        {!embedded && (
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-3 pb-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onClose}
+              className="h-10 w-10 shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1 text-[11px]">
-                <Package className="h-3.5 w-3.5" />
-                Inventaire
-              </Badge>
-              <Badge variant="outline" className="gap-1 text-[11px]">
-                <Sparkles className="h-3.5 w-3.5" />
-                Femme de chambre
-              </Badge>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="gap-1 text-[11px]">
+                  <Package className="h-3.5 w-3.5" />
+                  Inventaire
+                </Badge>
+                <Badge variant="outline" className="gap-1 text-[11px]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Femme de chambre
+                </Badge>
+              </div>
+              <h1 className="mt-1 text-lg font-semibold leading-tight">Inventaire linge</h1>
+              <p className="text-xs text-muted-foreground">
+                Vue compacte, type par type.
+              </p>
             </div>
-            <h1 className="mt-1 text-lg font-semibold leading-tight">Inventaire linge</h1>
-            <p className="text-xs text-muted-foreground">
-              Vue compacte, type par type.
-            </p>
           </div>
-        </div>
+        )}
 
         <div className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-2 px-4 pb-3">
           <Card className="border bg-card px-3 py-2">

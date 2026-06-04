@@ -41,6 +41,8 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-100 text-red-800",
 };
 
+const normalizeName = (value?: string | null) => (value || "").trim().toLowerCase();
+
 export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProps) {
   const queryClient = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -86,7 +88,7 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
   ].filter(
     (h, i, arr) =>
       arr.findIndex(
-        (x) => (x.name || "").trim().toLowerCase() === (h.name || "").trim().toLowerCase()
+        (x) => normalizeName(x.name) === normalizeName(h.name)
       ) === i
   );
 
@@ -106,6 +108,14 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
       return data || [];
     },
   });
+
+  const uniqueTasks = tasks.filter(
+    (task: any, index, arr) =>
+      arr.findIndex(
+        (candidate: any) =>
+          candidate.task_date === task.task_date && candidate.assigned_to === task.assigned_to
+      ) === index
+  );
 
   const assignMutation = useMutation({
     mutationFn: async () => {
@@ -151,9 +161,9 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {tasks.length > 0 ? (
+        {uniqueTasks.length > 0 ? (
           <div className="space-y-2">
-            {tasks.map((task: any) => {
+            {uniqueTasks.map((task: any) => {
               const hk = allHousekeepers.find((h) => h.id === task.assigned_to);
               return (
                 <div
