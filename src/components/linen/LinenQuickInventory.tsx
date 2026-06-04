@@ -188,6 +188,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
   const totalItems = Object.values(entries).reduce((sum: number, e: any) => sum + (e.quantity_clean || 0), 0);
   const totalScanned = Object.keys(entries).length;
+  const progress = linenTypes.length > 0 ? Math.round((totalScanned / linenTypes.length) * 100) : 0;
 
   // Show scanner when active
   if (activeScanType) {
