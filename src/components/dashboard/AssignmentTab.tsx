@@ -22,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from "@/components/RoomStatusTabs";
 import { SimplifiedRoomList } from "./SimplifiedRoomList";
+import { InventoryAssignmentCard } from "./InventoryAssignmentCard";
 
 interface Housekeeper {
   id: string;
