@@ -213,6 +213,11 @@ export function AssignmentTab({
         }}
       />
 
+      {/* Attribution de l'inventaire du linge */}
+      {currentHotelId && (
+        <InventoryAssignmentCard hotelId={currentHotelId} />
+      )}
+
       {/* Onglets de filtrage par statut */}
       {rooms.length > 0 && housekeeperNames.length > 0 && (
         <RoomStatusTabs
