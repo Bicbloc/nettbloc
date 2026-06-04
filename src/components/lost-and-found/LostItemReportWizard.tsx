@@ -568,7 +568,7 @@ export function LostItemReportWizard({
         )}
       </DialogTrigger>
       <DialogContent
-        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden p-0 [&>button]:hidden"
+        className="flex max-h-[85vh] w-[95vw] max-w-md flex-col overflow-hidden p-0 [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onFocusOutside={(e) => e.preventDefault()}
