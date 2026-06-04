@@ -110,17 +110,19 @@ const HousekeeperWorkContent: React.FC = () => {
     // 2. Hôtel explicitement choisi côté femme de chambre
     const lockedHousekeeperHotelId = storageService.getHousekeeperHotelId();
     if (lockedHousekeeperHotelId && lockedHousekeeperHotelId.length >= 30) return lockedHousekeeperHotelId;
-    // 3. storageService unifié
-    const storedId = storageService.getHotelId();
-    if (storedId && storedId.length >= 30) return storedId;
-    // 4. Profil housekeeper
+    // 3. Profil housekeeper
     if (housekeeperProfile?.currentHotelId && housekeeperProfile.currentHotelId.length >= 30) {
       return housekeeperProfile.currentHotelId;
+    }
+    // 4. storageService global seulement si le portail actif est bien femme de chambre
+    if (storageService.getActivePortal() === 'housekeeper') {
+      const storedId = storageService.getHotelId();
+      if (storedId && storedId.length >= 30) return storedId;
     }
     return null;
   };
   
-  const hotelId = getHotelId() || storageService.recoverHotelId();
+  const hotelId = getHotelId();
   const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
 
   // Charger/sauvegarder le pointage
