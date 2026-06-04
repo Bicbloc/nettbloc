@@ -1408,7 +1408,7 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden pb-2">
+          <div className="flex flex-col pb-2">
             <section className="mb-3 rounded-2xl border bg-card px-4 py-3 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -1434,7 +1434,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
             </section>
 
-            <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <section className="rounded-2xl border bg-card shadow-sm">
               {activeLinenTask ? (
                 <LinenQuickInventory
                   taskId={activeLinenTask}
