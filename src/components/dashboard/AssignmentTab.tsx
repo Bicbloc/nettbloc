@@ -22,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from "@/components/RoomStatusTabs";
 import { SimplifiedRoomList } from "./SimplifiedRoomList";
+import { InventoryAssignmentCard } from "./InventoryAssignmentCard";
 
 interface Housekeeper {
   id: string;
@@ -207,11 +208,18 @@ export function AssignmentTab({
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.length}
         housekeeperNames={housekeeperNames}
+        hotelId={currentHotelId}
+        onRequestInspection={() => setShowInspectionDialog(true)}
         onAddHousekeeper={() => {
           setIsRedistributionDialogOpen(false);
           setShowInviteDialog(true);
         }}
       />
+
+      {/* Attribution de l'inventaire du linge */}
+      {currentHotelId && (
+        <InventoryAssignmentCard hotelId={currentHotelId} />
+      )}
 
       {/* Onglets de filtrage par statut */}
       {rooms.length > 0 && housekeeperNames.length > 0 && (
