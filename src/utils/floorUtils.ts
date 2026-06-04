@@ -31,10 +31,8 @@ export function deduceFloorFromRoomNumber(roomNumber: string | null | undefined)
 
   // 1 ou 2 chiffres -> RDC par convention (ex: "5", "12" = chambres du RDC)
   if (digits.length <= 2) return 0;
-  // 3 chiffres -> premier chiffre = étage (ex: "203" -> 2)
-  if (digits.length === 3) return parseInt(digits[0], 10);
-  // 4 chiffres et + -> deux premiers chiffres = étage (ex: "1203" -> 12)
-  return parseInt(digits.slice(0, 2), 10);
+  // 3 ou 4 chiffres -> le premier chiffre = étage (ex: "203" -> 2, "1203" -> 1)
+  return parseInt(digits[0], 10);
 }
 
 export const FLOOR_OPTIONS = [
