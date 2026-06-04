@@ -1429,7 +1429,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
 
               <LinenQuickInventory
-                taskId={activeLinenTask || `manual_${Date.now()}`}
+                taskId={activeLinenTask || 'manual_session'}
                 hotelId={hotelId}
                 embedded
                 onClose={() => {
