@@ -1381,6 +1381,7 @@ const HousekeeperWorkContent: React.FC = () => {
               <LinenQuickInventory
                 taskId={activeLinenTask || `manual_${Date.now()}`}
                 hotelId={hotelId}
+                embedded
                 onClose={() => {
                   setActiveLinenTask(null);
                   setActiveTab('rooms');
