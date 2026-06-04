@@ -188,8 +188,8 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
         action_type: "incident_status_change",
         description: `Incident "${incident?.title || '?'}" → ${statusLabels[variables.status] || variables.status}`,
         room_number: incident?.location_reference || null,
-        actor_name: 'Admin',
-        actor_type: 'admin',
+        actor_name: actorName,
+        actor_type: actorType,
       }).then(() => {});
 
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
