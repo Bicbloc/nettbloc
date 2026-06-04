@@ -333,14 +333,13 @@ function HousekeeperHotelsContent() {
         code: hotel.hotel_code,
       });
       
-      // 2. Sauvegarder le profil housekeeper avec les infos hôtel
-      localStorage.setItem('housekeeperProfile', JSON.stringify({
+      // 2. Sauvegarder le profil housekeeper dans le storage unifié
+      storageService.saveHousekeeperProfile({
         id: profile.id,
         name: profile.name,
         email: profile.email,
-        isAuthenticated: true,
-        currentHotelId: hotel.id // Backup additionnel
-      }));
+        currentHotelId: hotel.id
+      });
 
       // 3. Sauvegarde redondante pour récupération
       localStorage.setItem('lastSelectedHotelId', hotel.id);
