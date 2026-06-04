@@ -465,7 +465,7 @@ const HousekeeperWorkContent: React.FC = () => {
         }
       } else if (eventType === 'UPDATE') {
         if (isForMe(newRecord) || isForMe(oldRecord)) {
-          loadWorkDataRef.current();
+          loadWorkDataRef.current(true);
           addToActivityLog(`🔄 Assignation mise à jour`, 'info');
         }
       } else if (eventType === 'DELETE') {
