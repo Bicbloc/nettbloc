@@ -36,6 +36,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   const isTemporaryTask = !UUID_REGEX.test(initialTaskId);
 
   // Create real task if temporary
+  const creatingTaskRef = useRef(false);
   useEffect(() => {
     const ensureRealTask = async () => {
       if (!isTemporaryTask) {
@@ -43,9 +44,13 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         return;
       }
 
+      // Empêche la création de plusieurs tâches (re-renders / StrictMode)
+      if (creatingTaskRef.current || realTaskId) return;
+      creatingTaskRef.current = true;
+
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) { creatingTaskRef.current = false; return; }
 
         const { data: newTask, error } = await supabase
           .from('linen_inventory_tasks')
@@ -62,14 +67,17 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
         if (!error && newTask) {
           setRealTaskId(newTask.id);
+        } else {
+          creatingTaskRef.current = false;
         }
       } catch (err) {
         console.error('Error creating task:', err);
+        creatingTaskRef.current = false;
       }
     };
 
     ensureRealTask();
-  }, [initialTaskId, hotelId, isTemporaryTask]);
+  }, [initialTaskId, hotelId, isTemporaryTask, realTaskId]);
 
   // Fetch linen types
   const { data: linenTypes = [] } = useQuery({
