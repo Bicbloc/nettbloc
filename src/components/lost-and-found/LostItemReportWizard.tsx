@@ -531,9 +531,34 @@ export function LostItemReportWizard({
 
   const stepConfig = getStepConfig();
   const StepIcon = stepConfig.icon;
+  const hasUnsavedProgress = Boolean(
+    selectedImage ||
+    imagePreview ||
+    imageUrl ||
+    objectDescription ||
+    objectCategory ||
+    locationType ||
+    roomNumber ||
+    locationDetails ||
+    guestName ||
+    guestFirstName ||
+    guestCheckIn ||
+    guestCheckOut
+  );
+
+  const handleExplicitClose = () => {
+    if (isAnalyzing || uploading || createItemMutation.isPending) return;
+    setOpen(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && ((isAnalyzing || uploading || createItemMutation.isPending) || hasUnsavedProgress)) return;
+        setOpen(nextOpen);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" className="gap-2">
@@ -542,16 +567,27 @@ export function LostItemReportWizard({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
+      <DialogContent
+        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden p-0 [&>button]:hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onFocusOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {/* Header compact */}
-        <div className="p-4 border-b bg-muted/30">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <StepIcon className="h-5 w-5 text-amber-600" />
-              {stepConfig.title}
-            </DialogTitle>
-            <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
-          </DialogHeader>
+        <div className="border-b bg-muted/30 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <DialogHeader className="pb-2 text-left">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <StepIcon className="h-5 w-5 text-warning" />
+                {stepConfig.title}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
+            </DialogHeader>
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={handleExplicitClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
           <Progress value={getStepProgress()} className="h-1.5 mt-3" />
           <p className="text-xs text-muted-foreground mt-1 text-right">
             Étape {getStepIndex() + 1} / {applicableSteps.length}
