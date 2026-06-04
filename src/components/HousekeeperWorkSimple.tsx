@@ -1364,7 +1364,7 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'inventory' && hotelId && (
-          <div className="space-y-4 pb-24">
+          <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-4 overflow-hidden pb-2">
             <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
               <div className="bg-gradient-to-r from-primary to-info px-5 py-5 text-primary-foreground">
                 <div className="flex items-start justify-between gap-4">
@@ -1424,7 +1424,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-card p-4 shadow-sm">
+            <section className="min-h-0 flex-1 overflow-hidden rounded-3xl border bg-card p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-semibold">Zone de comptage</h3>
