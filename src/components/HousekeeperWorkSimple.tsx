@@ -1267,7 +1267,7 @@ const HousekeeperWorkContent: React.FC = () => {
                 )}
 
                 {availableRooms
-                  .filter(room => !rooms.some(existing => existing.id === room.id))
+                  .filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id))
                   .map(room => (
                     <RoomCardEnhanced
                       key={`checkout-${room.id}`}
@@ -1278,8 +1278,7 @@ const HousekeeperWorkContent: React.FC = () => {
                       hotelId={hotelId || ''}
                       housekeeperName={housekeeperName}
                       onUpdateStatus={handleRoomStatusChange}
-                      onUnassign={(roomId, roomNumber) => {
-                      }}
+                      onUnassign={handleUnassignRoom}
                     />
                   ))}
 
@@ -1290,8 +1289,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     hotelId={hotelId || ''}
                     housekeeperName={housekeeperName}
                     onUpdateStatus={handleRoomStatusChange}
-                    onUnassign={(roomId, roomNumber) => {
-                    }}
+                    onUnassign={handleUnassignRoom}
                   />
                 ))}
               </div>
