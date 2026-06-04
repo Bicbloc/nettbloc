@@ -775,7 +775,7 @@ export function IncidentReportWizard({
         )}
       </DialogTrigger>
       <DialogContent 
-        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden p-0 [&>button]:hidden"
+        className="flex max-h-[85vh] w-[95vw] max-w-md flex-col overflow-hidden p-0 [&>button]:hidden"
         onInteractOutside={(e) => {
           // Never close on outside interaction: the native camera/file picker
           // fires stray pointer/focus events when returning to the app, which
