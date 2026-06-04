@@ -340,7 +340,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
     <div className="space-y-4">
       {/* Header with filters and view toggle */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold">Incidents</h2>
+        {!hideHeading && <h2 className="text-2xl font-bold">Incidents</h2>}
         
         <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
