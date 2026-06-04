@@ -763,9 +763,9 @@ export function IncidentReportWizard({
           e.preventDefault();
         }}
         onEscapeKeyDown={(e) => {
-          if (isAnalyzing || currentStep === 'analysis') {
-            e.preventDefault();
-          }
+          // La fermeture est explicite (bouton Annuler) pour éviter de perdre
+          // les données saisies suite à un appui accidentel sur Échap.
+          e.preventDefault();
         }}
       >
         {/* Header compact */}

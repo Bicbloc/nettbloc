@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ interface IncidentListProps {
   hotelId: string;
   defaultFilterStatus?: string;
   sortByPriority?: boolean;
+  /** Masque l'en-tête interne (utile quand le parent affiche déjà un titre) */
+  hideHeading?: boolean;
+  /** Identité de l'acteur pour le journal d'activité */
+  actorName?: string;
+  actorType?: string;
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
@@ -26,13 +31,14 @@ const PRIORITY_ORDER: Record<string, number> = {
   low: 3,
 };
 
-export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPriority = false }: IncidentListProps) {
+export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPriority = false, hideHeading = false, actorName = 'Admin', actorType = 'admin' }: IncidentListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<File[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>(defaultFilterStatus);
+  useEffect(() => { setFilterStatus(defaultFilterStatus); }, [defaultFilterStatus]);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [editingIncident, setEditingIncident] = useState<any | null>(null);
@@ -183,8 +189,8 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
         action_type: "incident_status_change",
         description: `Incident "${incident?.title || '?'}" → ${statusLabels[variables.status] || variables.status}`,
         room_number: incident?.location_reference || null,
-        actor_name: 'Admin',
-        actor_type: 'admin',
+        actor_name: actorName,
+        actor_type: actorType,
       }).then(() => {});
 
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
@@ -335,7 +341,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
     <div className="space-y-4">
       {/* Header with filters and view toggle */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold">Incidents</h2>
+        {!hideHeading && <h2 className="text-2xl font-bold">Incidents</h2>}
         
         <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}

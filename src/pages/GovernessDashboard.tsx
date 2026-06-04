@@ -93,6 +93,8 @@ function GovernessDashboardContent() {
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [hotelCodeError, setHotelCodeError] = useState<string | null>(null);
   const [showLinenScanner, setShowLinenScanner] = useState(false);
+  // Identifiant de session stable pour éviter de créer une tâche à chaque rendu
+  const [govLinenTaskId, setGovLinenTaskId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<GovTab>('rooms');
   
   const navigate = useNavigate();
@@ -551,7 +553,7 @@ function GovernessDashboardContent() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               {[
                 { value: stats.totalRooms, label: 'Total', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
                 { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
@@ -658,14 +660,14 @@ function GovernessDashboardContent() {
                         <h2 className="font-semibold">Inventaire du linge</h2>
                         <p className="text-xs text-muted-foreground">Scanner et compter le linge</p>
                       </div>
-                      <Button onClick={() => setShowLinenScanner(true)} className="rounded-xl">
+                      <Button onClick={() => { setGovLinenTaskId(`temp-governess-${Date.now()}`); setShowLinenScanner(true); }} className="rounded-xl">
                         <Shirt className="h-4 w-4 mr-2" />
                         Scanner
                       </Button>
                     </div>
                     <div className="p-4">
-                      {showLinenScanner && (
-                        <LinenQuickInventory taskId={`temp-governess-${Date.now()}`} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
+                      {showLinenScanner && govLinenTaskId && (
+                        <LinenQuickInventory taskId={govLinenTaskId} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
                       )}
                     </div>
                   </div>
@@ -720,7 +722,7 @@ function GovernessDashboardContent() {
                         </div>
                       </div>
                     </div>
-                    <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+                    <ScrollArea className="h-[60dvh] min-h-[320px] pr-3">
                       <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
                     </ScrollArea>
                   </div>

@@ -189,11 +189,17 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       
       // Si refusée ou à reprendre, mettre à jour le statut de la chambre
       if (status === 'failed' || status === 'needs_rework') {
+        // Préserver la note existante de la chambre plutôt que de l'écraser.
+        const existingNote = (selectedRoom as any).notes?.trim();
+        const inspectionNote = `Inspection: ${inspectionData.notes}`;
+        const mergedNotes = existingNote
+          ? `${existingNote}\n${inspectionNote}`
+          : inspectionNote;
         await supabase
           .from('rooms')
           .update({ 
             status: 'needs-cleaning', 
-            notes: `Inspection: ${inspectionData.notes}`,
+            notes: mergedNotes,
             inspected_at: null,
             inspected_by: null
           })

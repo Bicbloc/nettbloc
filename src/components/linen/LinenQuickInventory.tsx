@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,7 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   const isTemporaryTask = !UUID_REGEX.test(initialTaskId);
 
   // Create real task if temporary
+  const creatingTaskRef = useRef(false);
   useEffect(() => {
     const ensureRealTask = async () => {
       if (!isTemporaryTask) {
@@ -43,9 +44,13 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         return;
       }
 
+      // Empêche la création de plusieurs tâches (re-renders / StrictMode)
+      if (creatingTaskRef.current || realTaskId) return;
+      creatingTaskRef.current = true;
+
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) { creatingTaskRef.current = false; return; }
 
         const { data: newTask, error } = await supabase
           .from('linen_inventory_tasks')
@@ -62,14 +67,17 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
         if (!error && newTask) {
           setRealTaskId(newTask.id);
+        } else {
+          creatingTaskRef.current = false;
         }
       } catch (err) {
         console.error('Error creating task:', err);
+        creatingTaskRef.current = false;
       }
     };
 
     ensureRealTask();
-  }, [initialTaskId, hotelId, isTemporaryTask]);
+  }, [initialTaskId, hotelId, isTemporaryTask, realTaskId]);
 
   // Fetch linen types
   const { data: linenTypes = [] } = useQuery({
@@ -105,18 +113,8 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
     setIsSaving(true);
 
     try {
-      // Delete existing entries
-      const { error: deleteError } = await supabase
-        .from('linen_inventory_entries')
-        .delete()
-        .eq('task_id', realTaskId);
-      
-      if (deleteError) {
-        console.error('Delete error:', deleteError);
-        // Continue anyway - might not have existing entries
-      }
-
-      // Insert new entries
+      // Construire les nouvelles entrées AVANT toute suppression pour éviter
+      // toute perte de données si la préparation échoue.
       const entriesToInsert = Object.entries(entries)
         .filter(([_, entry]) => entry.quantity_clean > 0)
         .map(([linenTypeId, entry]) => ({
@@ -132,16 +130,38 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
           counted_at: new Date().toISOString()
         }));
 
-      if (entriesToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('linen_inventory_entries')
-          .insert(entriesToInsert);
-        
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw new Error(`Erreur insertion: ${insertError.message}`);
-        }
+      // Ne rien supprimer s'il n'y a aucune nouvelle donnée à enregistrer :
+      // on évite ainsi d'effacer un comptage existant par accident.
+      if (entriesToInsert.length === 0) {
+        toast({ title: "Aucune donnée", description: "Scannez au moins un type de linge avec une quantité." });
+        setIsSaving(false);
+        return;
       }
+
+      // Supprimer les anciennes entrées de cette tâche, puis réinsérer.
+      // L'ordre supprimer→insérer évite les conflits de contrainte unique
+      // (task_id, linen_type_id). Le cas "vide" est déjà bloqué ci-dessus,
+      // donc une suppression ne peut plus effacer les données sans réinsertion.
+      const { error: deleteError } = await supabase
+        .from('linen_inventory_entries')
+        .delete()
+        .eq('task_id', realTaskId);
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        // Non bloquant : il se peut qu'il n'y ait aucune entrée existante.
+      }
+
+      const { error: insertError } = await supabase
+        .from('linen_inventory_entries')
+        .insert(entriesToInsert);
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw new Error(`Erreur insertion: ${insertError.message}`);
+      }
+
+
 
       // Mark task complete
       const { error: updateError } = await supabase

@@ -60,7 +60,16 @@ const HousekeeperWorkContent: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
+  const [dismissedRoomIds, setDismissedRoomIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTabState] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
+  // Garantit un identifiant de tâche d'inventaire stable pour éviter de créer
+  // une nouvelle tâche en base à chaque rendu/ouverture de l'onglet.
+  const setActiveTab = useCallback((tab: 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan') => {
+    if (tab === 'inventory') {
+      setActiveLinenTask(prev => prev || `manual_${Date.now()}`);
+    }
+    setActiveTabState(tab);
+  }, []);
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [hasNewInstructions, setHasNewInstructions] = useState(false);
@@ -635,11 +644,13 @@ const HousekeeperWorkContent: React.FC = () => {
 
   const loadWorkData = async (background = false) => {
     try {
-      setIsRefreshing(true);
+      if (!background) setIsRefreshing(true);
       
-      // Cache rapide
-      const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-      const cachedData = localStorage.getItem(cachedKey);
+      // Cache rapide (uniquement avec un profil valide pour éviter un décalage de clé)
+      const cachedKey = housekeeperProfile?.id
+        ? `assignments_${hotelId}_${housekeeperProfile.id}`
+        : null;
+      const cachedData = cachedKey ? localStorage.getItem(cachedKey) : null;
       if (cachedData && rooms.length === 0) {
         try {
           const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
@@ -1035,6 +1046,24 @@ const HousekeeperWorkContent: React.FC = () => {
     }
   };
 
+  // Retirer une chambre de la vue de la femme de chambre (la masquer localement).
+  const handleUnassignRoom = (roomId: string, roomNumber: string) => {
+    setDismissedRoomIds(prev => {
+      const next = new Set(prev);
+      next.add(roomId);
+      return next;
+    });
+    setRooms(prev => prev.filter(r => r.id !== roomId));
+    setAvailableRooms(prev => prev.filter(r => r.id !== roomId));
+    addToActivityLog(`➖ Chambre ${roomNumber} masquée de votre liste`, 'info');
+    toast({
+      title: "Chambre retirée",
+      description: `Chambre ${roomNumber} masquée de votre liste`,
+    });
+  };
+
+
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     storageService.clearHousekeeperProfile();
@@ -1058,12 +1087,14 @@ const HousekeeperWorkContent: React.FC = () => {
   
   // Apply tab filter to rooms
   const filteredByTab = useMemo(() => {
-    const filtered = filterRoomsByTab(rooms.map(r => ({
-      ...r,
-      cleaning_type: r.cleaning_type
-    })), roomFilterTab);
+    const filtered = filterRoomsByTab(rooms
+      .filter(r => !dismissedRoomIds.has(r.id))
+      .map(r => ({
+        ...r,
+        cleaning_type: r.cleaning_type
+      })), roomFilterTab);
     return filtered;
-  }, [rooms, roomFilterTab]);
+  }, [rooms, roomFilterTab, dismissedRoomIds]);
 
   const sortedRooms = [...filteredByTab].sort((a, b) => {
     if (a.status === 'clean' && b.status !== 'clean') return 1;
@@ -1229,7 +1260,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </Card>
             ) : (
               <div className="space-y-3">
-                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length > 0 && (
+                {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id)).length > 0 && (
                   <Card className="border-warning/30 bg-warning/10 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1239,14 +1270,14 @@ const HousekeeperWorkContent: React.FC = () => {
                         </p>
                       </div>
                       <Badge variant="secondary" className="bg-background text-foreground">
-                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id)).length}
+                        {availableRooms.filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id)).length}
                       </Badge>
                     </div>
                   </Card>
                 )}
 
                 {availableRooms
-                  .filter(room => !rooms.some(existing => existing.id === room.id))
+                  .filter(room => !rooms.some(existing => existing.id === room.id) && !dismissedRoomIds.has(room.id))
                   .map(room => (
                     <RoomCardEnhanced
                       key={`checkout-${room.id}`}
@@ -1257,8 +1288,7 @@ const HousekeeperWorkContent: React.FC = () => {
                       hotelId={hotelId || ''}
                       housekeeperName={housekeeperName}
                       onUpdateStatus={handleRoomStatusChange}
-                      onUnassign={(roomId, roomNumber) => {
-                      }}
+                      onUnassign={handleUnassignRoom}
                     />
                   ))}
 
@@ -1269,8 +1299,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     hotelId={hotelId || ''}
                     housekeeperName={housekeeperName}
                     onUpdateStatus={handleRoomStatusChange}
-                    onUnassign={(roomId, roomNumber) => {
-                    }}
+                    onUnassign={handleUnassignRoom}
                   />
                 ))}
               </div>
@@ -1400,7 +1429,7 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
 
               <LinenQuickInventory
-                taskId={activeLinenTask || `manual_${Date.now()}`}
+                taskId={activeLinenTask || 'manual_session'}
                 hotelId={hotelId}
                 embedded
                 onClose={() => {

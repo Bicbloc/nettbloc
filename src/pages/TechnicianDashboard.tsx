@@ -189,6 +189,9 @@ function TechnicianDashboardContent() {
                   hotelId={currentHotelSession.hotel_id}
                   defaultFilterStatus="unresolved"
                   sortByPriority
+                  hideHeading
+                  actorName={profile.name}
+                  actorType="technician"
                 />
               </div>
             </div>

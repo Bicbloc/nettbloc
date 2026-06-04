@@ -150,6 +150,10 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     
     setIsSubmitting(true);
     try {
+      // selectedHousekeeper contient désormais l'ID (évite les erreurs d'homonymes)
+      const chosen = housekeepers.find(h => h.id === selectedHousekeeper);
+      const chosenName = chosen?.name || '';
+      const chosenId = chosen?.id || null;
       const existingAssignment = assignments.get(selectedRoom.id);
       
       if (existingAssignment) {
@@ -157,8 +161,8 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
         await supabase
           .from('assignments')
           .update({ 
-            housekeeper_name: selectedHousekeeper,
-            housekeeper_id: housekeepers.find(h => h.name === selectedHousekeeper)?.id || null
+            housekeeper_name: chosenName,
+            housekeeper_id: chosenId
           })
           .eq('id', existingAssignment.id);
       } else {
@@ -168,8 +172,8 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           .insert({
             hotel_id: hotelId,
             room_id: selectedRoom.id,
-            housekeeper_name: selectedHousekeeper,
-            housekeeper_id: housekeepers.find(h => h.name === selectedHousekeeper)?.id || null,
+            housekeeper_name: chosenName,
+            housekeeper_id: chosenId,
             status: 'assigned'
           });
       }
@@ -178,16 +182,16 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       await supabase.from('daily_action_logs').insert({
         hotel_id: hotelId,
         action_type: 'assignment',
-        description: `Chambre ${selectedRoom.room_number} assignée à ${selectedHousekeeper}`,
+        description: `Chambre ${selectedRoom.room_number} assignée à ${chosenName}`,
         room_number: selectedRoom.room_number,
         actor_name: governessName,
         actor_type: 'governess',
-        details: { housekeeper: selectedHousekeeper }
+        details: { housekeeper: chosenName, housekeeper_id: chosenId }
       });
 
       toast({
         title: 'Assignation réussie',
-        description: `Chambre ${selectedRoom.room_number} assignée à ${selectedHousekeeper}`
+        description: `Chambre ${selectedRoom.room_number} assignée à ${chosenName}`
       });
 
       setAssignDialog(false);
@@ -297,7 +301,11 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const openAssignDialog = (room: Room) => {
     setSelectedRoom(room);
     const existingAssignment = assignments.get(room.id);
-    setSelectedHousekeeper(existingAssignment?.housekeeper_name || '');
+    // Pré-sélectionner par ID (fallback : retrouver l'ID via le nom existant)
+    const existingId = existingAssignment?.housekeeper_id
+      || housekeepers.find(h => h.name === existingAssignment?.housekeeper_name)?.id
+      || '';
+    setSelectedHousekeeper(existingId);
     setAssignDialog(true);
   };
 
@@ -588,7 +596,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
               </SelectTrigger>
               <SelectContent>
                 {housekeepers.filter(h => h.is_active).map(h => (
-                  <SelectItem key={h.id} value={h.name}>
+                  <SelectItem key={h.id} value={h.id}>
                     {h.name}
                   </SelectItem>
                 ))}
