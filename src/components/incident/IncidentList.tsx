@@ -31,7 +31,7 @@ const PRIORITY_ORDER: Record<string, number> = {
   low: 3,
 };
 
-export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPriority = false }: IncidentListProps) {
+export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPriority = false, hideHeading = false, actorName = 'Admin', actorType = 'admin' }: IncidentListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
