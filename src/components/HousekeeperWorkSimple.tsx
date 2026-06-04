@@ -1077,12 +1077,14 @@ const HousekeeperWorkContent: React.FC = () => {
   
   // Apply tab filter to rooms
   const filteredByTab = useMemo(() => {
-    const filtered = filterRoomsByTab(rooms.map(r => ({
-      ...r,
-      cleaning_type: r.cleaning_type
-    })), roomFilterTab);
+    const filtered = filterRoomsByTab(rooms
+      .filter(r => !dismissedRoomIds.has(r.id))
+      .map(r => ({
+        ...r,
+        cleaning_type: r.cleaning_type
+      })), roomFilterTab);
     return filtered;
-  }, [rooms, roomFilterTab]);
+  }, [rooms, roomFilterTab, dismissedRoomIds]);
 
   const sortedRooms = [...filteredByTab].sort((a, b) => {
     if (a.status === 'clean' && b.status !== 'clean') return 1;
