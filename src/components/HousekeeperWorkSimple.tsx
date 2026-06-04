@@ -843,7 +843,7 @@ const HousekeeperWorkContent: React.FC = () => {
           status: a.rooms.status || 'needs-cleaning',
           notes: a.rooms.notes,
           cleaning_priority: a.rooms.cleaning_priority || 5,
-          cleaning_type: a.rooms.cleaning_type,
+          cleaning_type: a.rooms.cleaning_type || ((a.rooms.status === 'ready-to-clean' || a.rooms.status === 'checkout') ? 'a_blanc' : undefined),
           is_twin: a.rooms.is_twin || false
         }));
 
@@ -860,14 +860,19 @@ const HousekeeperWorkContent: React.FC = () => {
         return;
       }
 
+      const normalizedRooms = extractedRooms.map((room) => ({
+        ...room,
+        cleaning_type: room.cleaning_type || ((room.status === 'ready-to-clean' || room.status === 'checkout') ? 'a_blanc' : room.cleaning_type)
+      }));
+
       setAssignments(uniqueAssignments);
-      setRooms(extractedRooms);
+      setRooms(normalizedRooms);
       
       // Sauvegarder dans le cache (seulement si on a des données réelles)
-      if (extractedRooms.length > 0) {
+      if (normalizedRooms.length > 0) {
         localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
           assignments: uniqueAssignments,
-          rooms: extractedRooms,
+          rooms: normalizedRooms,
           timestamp: Date.now()
         }));
       }
