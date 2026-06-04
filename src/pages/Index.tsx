@@ -16,6 +16,7 @@ import EmailReportDialog from "@/components/EmailReportDialog";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
+import { useNotificationContext } from "@/contexts/NotificationContext";
 import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
