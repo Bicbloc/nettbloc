@@ -104,8 +104,10 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
         return isInProgressStatus;
 
       case 'dirty':
-        // À nettoyer = uniquement les statuts "à faire" (pas les statuts "client sorti")
-        return isDirtyStatus && isFullType && !isCheckoutLikeStatus;
+        // À nettoyer = chambres "à blanc" à faire ET chambres "client sorti"
+        // (un départ doit rester visible dans la liste à nettoyer, sinon la
+        // carte semble disparaître / se bloquer après le clic "Client sorti").
+        return isCheckoutLikeStatus || (isDirtyStatus && isFullType);
 
       case 'stayover':
         // Recouche = cleaning_type quick/recouche (peu importe le statut)
