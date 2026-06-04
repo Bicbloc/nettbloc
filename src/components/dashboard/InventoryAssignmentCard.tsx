@@ -92,14 +92,6 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
       ) === i
   );
 
-  const uniqueTasks = tasks.filter(
-    (task: any, index, arr) =>
-      arr.findIndex(
-        (candidate: any) =>
-          candidate.task_date === task.task_date && candidate.assigned_to === task.assigned_to
-      ) === index
-  );
-
   // Tâche d'inventaire du jour
   const { data: tasks = [] } = useQuery({
     queryKey: ["inventory-tasks-today", hotelId, today],
@@ -116,6 +108,14 @@ export function InventoryAssignmentCard({ hotelId }: InventoryAssignmentCardProp
       return data || [];
     },
   });
+
+  const uniqueTasks = tasks.filter(
+    (task: any, index, arr) =>
+      arr.findIndex(
+        (candidate: any) =>
+          candidate.task_date === task.task_date && candidate.assigned_to === task.assigned_to
+      ) === index
+  );
 
   const assignMutation = useMutation({
     mutationFn: async () => {
