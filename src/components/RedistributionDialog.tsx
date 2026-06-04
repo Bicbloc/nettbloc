@@ -9,6 +9,8 @@ import { Shuffle, Layers, Zap, Calendar, Users, UserPlus, AlertCircle, Sparkles 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { isHousekeeperNew } from '@/utils/newHousekeepers';
+import { ClipboardCheck, ClipboardList } from 'lucide-react';
+import { InventoryAssignmentCard } from '@/components/dashboard/InventoryAssignmentCard';
 
 interface RedistributionDialogProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ interface RedistributionDialogProps {
   roomCount: number;
   housekeeperNames: string[];
   onAddHousekeeper: () => void;
+  hotelId?: string | null;
+  onRequestInspection?: () => void;
 }
 
 export type RedistributionMethod = 'random' | 'floor' | 'cleaning-type';
