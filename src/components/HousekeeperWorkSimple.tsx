@@ -307,7 +307,7 @@ const HousekeeperWorkContent: React.FC = () => {
         // Supabase peut ne pas avoir fini de réhydrater le token depuis le
         // stockage. getSession() renverrait alors null à tort et éjecterait la
         // femme de chambre. On réessaie quelques fois avant d'abandonner.
-        let session = null;
+        let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] = null;
         for (let attempt = 0; attempt < 5; attempt++) {
           const { data } = await supabase.auth.getSession();
           session = data.session;
