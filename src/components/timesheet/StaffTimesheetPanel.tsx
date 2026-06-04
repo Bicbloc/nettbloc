@@ -742,7 +742,7 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : timesheets && timesheets.length > 0 ? (
+      ) : mergedTimesheets.length > 0 ? (
         <div className="space-y-4">
           {/* Staff Summary (for week/month view) */}
           {viewMode !== 'day' && staffSummary.length > 0 && (
