@@ -607,7 +607,7 @@ Deno.serve(async (req) => {
     // Test connection only
     if (action === 'test') {
       try {
-        const credentials = pmsConfig.credentials as PmsCredentials;
+        const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
         let rooms: ExtractedRoom[] = [];
 
         switch (pmsConfig.pms_type) {
