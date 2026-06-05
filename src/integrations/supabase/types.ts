@@ -1599,6 +1599,48 @@ export type Database = {
           },
         ]
       }
+      hotel_name_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          hotel_id: string
+          id: string
+          new_name: string | null
+          old_name: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          hotel_id: string
+          id?: string
+          new_name?: string | null
+          old_name?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          new_name?: string | null
+          old_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_name_history_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_name_history_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_pms_configs: {
         Row: {
           auto_sync_enabled: boolean

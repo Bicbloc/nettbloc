@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar, Pencil, Save, X } from 'lucide-react';
+import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar, Pencil, Save, X, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ interface Detail {
   governesses: any[];
   technicians: any[];
   sessions: any[];
+  nameHistory: any[];
 }
 
 export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
@@ -71,6 +72,8 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
       const techRes = await (supabase as any).from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
       const sessionsRes = await supabase.from('user_sessions').select('id, user_name, user_type, login_time, last_activity, is_active').eq('hotel_id', hotelId).order('last_activity', { ascending: false }).limit(50);
 
+      const historyRes = await (supabase as any).from('hotel_name_history').select('id, old_name, new_name, created_at').eq('hotel_id', hotelId).order('created_at', { ascending: false });
+
       let owner: any = null;
       if (hotelRes.data?.user_id) {
         const { data: o } = await supabase.from('profiles').select('email, company_name, subscription_type, trial_end_date').eq('id', hotelRes.data.user_id).maybeSingle();
@@ -85,6 +88,7 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
         governesses: (govRes.data as any[]) || [],
         technicians: (techRes.data as any[]) || [],
         sessions: (sessionsRes.data as any[]) || [],
+        nameHistory: (historyRes.data as any[]) || [],
       });
       setEditName(hotelRes.data?.name || '');
       setEditPhone(hotelRes.data?.phone || '');
@@ -181,7 +185,29 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
                 </CardContent>
               </Card>
 
-              {/* Stats */}
+              {/* Historique des noms */}
+              {data.nameHistory.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2"><History className="h-4 w-4" />Anciens noms d'établissement</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    {data.nameHistory.map((h: any) => (
+                      <div key={h.id} className="flex items-center justify-between gap-2 border-b last:border-0 pb-2 last:pb-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="line-through text-muted-foreground">{h.old_name || '—'}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="font-medium">{h.new_name || '—'}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {h.created_at && format(new Date(h.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                        </span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid grid-cols-4 gap-2">
                 <StatCard icon={Bed} label="Chambres" value={data.rooms.length} />
                 <StatCard icon={Users} label="FdC" value={data.housekeepers.filter(h => h.is_active).length} />
