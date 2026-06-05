@@ -35,6 +35,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     hasUnread: journal.hasUnread,
     addNotification: legacy.addNotification,
     markAsRead: journal.markAsRead,
+    markManyAsRead: journal.markManyAsRead,
     markAllAsRead: journal.markAllAsRead,
     clearNotifications: journal.clearNotifications,
     refreshNotifications: journal.refreshNotifications,
