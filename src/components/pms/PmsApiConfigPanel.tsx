@@ -324,7 +324,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     try {
       const { error } = await supabase
         .from('hotel_rooms_registry')
-        .insert(
+        .upsert(
           newRooms.map(room => ({
             hotel_id: hotelId,
             room_number: room.roomNumber,
@@ -334,7 +334,8 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
             imported_from: config.pms_type,
             is_active: true,
             space_category: 'room',
-          })) as any
+          })) as any,
+          { onConflict: 'hotel_id,room_number', ignoreDuplicates: true }
         );
 
       if (error) {
