@@ -32,6 +32,29 @@ interface PreviewRoom {
   departureDate: string | null;
 }
 
+const previewRoomKey = (room: Pick<PreviewRoom, 'roomNumber'>) => normalizeRoomNumber(room.roomNumber || '');
+
+const dedupePreviewRooms = (rooms: PreviewRoom[]): PreviewRoom[] => {
+  const score = (value: PreviewRoom) =>
+    (value.guestName ? 4 : 0) +
+    (value.arrivalDate || value.departureDate ? 2 : 0) +
+    (value.cleaningType && value.cleaningType !== 'none' ? 2 : 0) +
+    (value.condition ? 1 : 0) +
+    (value.roomType ? 1 : 0) +
+    (value.floor != null ? 1 : 0);
+
+  const map = new Map<string, PreviewRoom>();
+
+  for (const room of rooms) {
+    const key = previewRoomKey(room);
+    if (!key) continue;
+    const existing = map.get(key);
+    map.set(key, !existing || score(room) >= score(existing) ? room : existing);
+  }
+
+  return Array.from(map.values());
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
   return await Promise.race([
     promise,
@@ -206,16 +229,18 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       };
 
       if (config.id) {
-        await supabase
+        const { error } = await supabase
           .from('hotel_pms_configs' as any)
           .update(payload as any)
           .eq('id', config.id);
+        if (error) throw error;
       } else {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('hotel_pms_configs' as any)
           .insert(payload as any)
           .select('id')
           .single();
+        if (error) throw error;
         if (data) setConfig(prev => ({ ...prev, id: (data as any).id }));
       }
 
@@ -258,7 +283,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       }
 
       if (data?.success) {
-        setPreviewRooms(Array.isArray(data.rooms) ? data.rooms : []);
+        setPreviewRooms(dedupePreviewRooms(Array.isArray(data.rooms) ? data.rooms : []));
         // Charger le registre existant pour ne proposer que les chambres inexistantes
         const { data: registry } = await supabase
           .from('hotel_rooms_registry')
@@ -299,7 +324,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     try {
       const { error } = await supabase
         .from('hotel_rooms_registry')
-        .insert(
+        .upsert(
           newRooms.map(room => ({
             hotel_id: hotelId,
             room_number: room.roomNumber,
@@ -309,7 +334,8 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
             imported_from: config.pms_type,
             is_active: true,
             space_category: 'room',
-          })) as any
+          })) as any,
+          { onConflict: 'hotel_id,room_number', ignoreDuplicates: true }
         );
 
       if (error) {
@@ -793,7 +819,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               Tester la connexion
             </Button>
 
-            <Button variant="outline" onClick={syncNow} disabled={syncing || !config.id || !config.is_active}>
+            <Button variant="outline" onClick={syncNow} disabled={syncing || !config.id}>
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Synchroniser maintenant
             </Button>
