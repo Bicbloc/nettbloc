@@ -646,6 +646,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Real-time inbound poll (called by cron, no user auth) ──
+    // Pulls live Mews/Apaleo state into NettoBloc frequently so PMS-side
+    // check-outs and housekeeping changes are reflected almost immediately.
+    if (action === 'poll') {
+      if (!isAuthorizedCronRequest(req)) {
+        return unauthorizedResponse(corsHeaders);
+      }
+      const results = await runRealtimePoll(adminClient);
+      return new Response(JSON.stringify({ processed: results.length, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     // Validate auth (all other actions require a logged-in user)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
