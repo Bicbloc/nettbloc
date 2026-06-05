@@ -165,7 +165,13 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Privileged scheduled function: only callable by the scheduler/service role.
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedResponse(corsHeaders as Record<string, string>);
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
 
   try {
     const { data: hotels, error } = await supabase
