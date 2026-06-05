@@ -1,35 +1,36 @@
-## Objectif
+## Goal
+Connect the app to the Mews **demo** environment using the public demo tokens Mews shared, and make the Demo vs Production choice a proper, reusable setting (so production works later with real tokens).
 
-Créer une **Politique de confidentialité** complète en français et en anglais, stockée dans la table `legal_pages` (gérée depuis l'admin et affichée sur `/legal/<slug>`).
+## Why a change is needed
+The Mews demo tokens only work against `https://api.mews-demo.com`. Today the sync edge function always calls the production host `https://api.mews.com` and ignores the saved `base_url`. So the demo credentials would fail with an auth error until we route requests to the demo host.
 
-## Constat
+## What I'll build
 
-- La table `legal_pages` contient déjà uniquement les CGV (`slug = cgv`, en FR et EN).
-- Aucune page de confidentialité n'existe encore.
-- Le format de contenu est du Markdown (titres `##`, listes `-`, gras `**`), rendu par `LegalPage.tsx`.
+### 1. Mews environment selector in the config panel
+`src/components/pms/PmsApiConfigPanel.tsx`
+- When PMS type = Mews, show an **Environment** dropdown: `Demo` / `Production`.
+- Selecting it sets `base_url`:
+  - Demo → `https://api.mews-demo.com/api/connector/v1`
+  - Production → `https://api.mews.com/api/connector/v1`
+- Add a one-click "Load Mews demo credentials" helper that fills the Client Token + Access Token for the demo enterprise (defaulting to the **Gross / UK** set; I'll note the Net/US option too).
 
-## Ce qui sera fait
+### 2. Route the edge function to the saved host
+`supabase/functions/pms-sync/index.ts`
+- In `extractRoomsForConfig` / the `test` + `sync` paths, pass the config's `base_url` into the Mews call (e.g. merge `baseUrl: pmsConfig.base_url` into `credentials`).
+- `fetchMewsRooms` keeps `credentials.baseUrl || 'https://api.mews.com/api/connector/v1'` as fallback.
+- Add 429 handling: respect the `Retry-After` header, fall back to exponential backoff (Mews enforces 200 req / 30s per AccessToken).
 
-1. **Insérer 2 lignes** dans `legal_pages` (opération de données, pas de migration) :
-   - `slug = privacy`, `language = fr`, `title = Politique de confidentialité`
-   - `slug = privacy`, `language = en`, `title = Privacy Policy`
-2. **Contenu rédigé** adapté à nettobloc (RGPD), couvrant :
-   - Responsable du traitement (bicbloc, contact `support@bicbloc.eu`)
-   - Données collectées (compte établissement, personnel, chambres, données de paiement via GoCardless/Stripe)
-   - Finalités du traitement et bases légales
-   - Sous-traitants / services tiers (Supabase, GoCardless, Stripe, Resend)
-   - Durée de conservation
-   - Droits des utilisateurs (accès, rectification, suppression, portabilité, opposition)
-   - Cookies et stockage local
-   - Sécurité des données et transferts
-   - Coordonnées de contact
+### 3. Connect & verify
+- Save the config for the current hotel with `pms_type = mews`, the demo tokens, and `base_url` = demo host.
+- Run the panel's existing **Test connection** (`action: 'test'`) which calls `spaces/getAll` + `reservations/getAll` and returns the room count — confirming the live demo connection works.
 
-## Détails techniques
+## Things to confirm
+- **Which demo enterprise?** Mews gave a **Gross (UK)** and a **Net (US)** demo. I'll default to Gross/UK unless you prefer Net/US.
+- These are public demo tokens, so it's fine to keep them in the app for testing. Real **production** tokens (per enterprise) should be entered through the panel by the establishment, never committed to code.
 
-- Insertion via le tool d'insertion de données (`INSERT INTO legal_pages ...`), pas de changement de schéma.
-- La page sera accessible immédiatement sur `/legal/privacy` et éditable depuis le panneau admin « Pages légales ».
-- Le contenu reprend la terminologie et le branding existants (nettobloc, domaine `nettobloc.bicbloc.eu`, contact `support@bicbloc.eu`).
-
-## À confirmer éventuellement
-
-- Le `slug` proposé est `privacy` ; je peux utiliser `privacy-policy` ou `confidentialite` si tu préfères.
+## Technical notes
+- No DB migration needed — `hotel_pms_configs` already has `base_url` and `credentials` columns.
+- The config is per-hotel (scoped by `hotel_id`), so connecting happens for the currently selected hotel via the panel.
+- After the edge function edit I'll redeploy `pms-sync`.
+</parameter>
+</invoke>
