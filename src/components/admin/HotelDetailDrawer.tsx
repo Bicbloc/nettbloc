@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar, Pencil, Save, X } from 'lucide-react';
+import { Hotel as HotelIcon, Users, Bed, Activity, Mail, Calendar, Pencil, Save, X, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
