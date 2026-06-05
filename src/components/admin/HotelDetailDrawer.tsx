@@ -30,6 +30,7 @@ interface Detail {
   governesses: any[];
   technicians: any[];
   sessions: any[];
+  nameHistory: any[];
 }
 
 export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
