@@ -32,6 +32,15 @@ interface PreviewRoom {
   departureDate: string | null;
 }
 
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]);
+};
+
 const cleaningLabel = (t: string): { label: string; className: string } => {
   const v = (t || '').toLowerCase();
   if (v === 'depart' || v === 'a_blanc' || v === 'full') return { label: 'À blanc', className: 'bg-orange-500/15 text-orange-600 border-orange-500/30' };
@@ -225,11 +234,19 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     setImported(false);
     try {
       // Save first
-      await saveConfig();
+      await withTimeout(
+        saveConfig(),
+        12000,
+        'La sauvegarde de la configuration prend trop de temps.'
+      );
 
-      const { data, error } = await supabase.functions.invoke('pms-sync', {
-        body: { hotel_id: hotelId, action: 'test' },
-      });
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke('pms-sync', {
+          body: { hotel_id: hotelId, action: 'test' },
+        }),
+        25000,
+        'Le test Mews a expiré. Vérifiez les identifiants, l’environnement Démo/Production et réessayez.'
+      );
 
       if (error) {
         toast({
