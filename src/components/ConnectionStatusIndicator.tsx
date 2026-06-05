@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Wifi, WifiOff, RefreshCw, AlertCircle, Clock } from 'lucide-react';
@@ -20,12 +20,12 @@ export function ConnectionStatusIndicator() {
   const [lastPing, setLastPing] = useState<Date | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const [httpOk, setHttpOk] = useState(true);
-  const reconnectCooldownRef = useState<{ last: number }>({ last: 0 })[0];
+  const reconnectCooldownRef = useRef(0);
 
   const requestReconnect = () => {
     const now = Date.now();
-    if (now - reconnectCooldownRef.last < 5000) return;
-    reconnectCooldownRef.last = now;
+    if (now - reconnectCooldownRef.current < 5000) return;
+    reconnectCooldownRef.current = now;
     try { realtimeManager.forceReconnect(); } catch {}
   };
 
