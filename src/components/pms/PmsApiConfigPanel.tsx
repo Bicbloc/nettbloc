@@ -473,7 +473,57 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
             <div className="space-y-4">
               <Separator />
               <h4 className="font-medium text-sm text-muted-foreground">Identifiants API</h4>
-              
+
+              {/* Mews environment selector (Demo / Production) */}
+              {config.pms_type === 'mews' && (
+                <div className="space-y-2">
+                  <Label>Environnement</Label>
+                  <Select
+                    value={config.base_url === MEWS_HOSTS.production ? 'production' : 'demo'}
+                    onValueChange={(v) => setConfig(prev => ({
+                      ...prev,
+                      base_url: v === 'production' ? MEWS_HOSTS.production : MEWS_HOSTS.demo,
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir l'environnement" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="demo">Démo (api.mews-demo.com)</SelectItem>
+                      <SelectItem value="production">Production (api.mews.com)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {config.base_url !== MEWS_HOSTS.production && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfig(prev => ({
+                          ...prev,
+                          base_url: MEWS_HOSTS.demo,
+                          credentials: { ...prev.credentials, ...MEWS_DEMO_CREDENTIALS.gross },
+                        }))}
+                      >
+                        Charger démo (Gross / UK)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfig(prev => ({
+                          ...prev,
+                          base_url: MEWS_HOSTS.demo,
+                          credentials: { ...prev.credentials, ...MEWS_DEMO_CREDENTIALS.net },
+                        }))}
+                      >
+                        Charger démo (Net / US)
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {selectedPms.fields.map(field => (
                 <div key={field} className="space-y-1">
                   <Label htmlFor={field}>
