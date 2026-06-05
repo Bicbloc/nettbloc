@@ -134,6 +134,12 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Background processor: only callable by the scheduler/service role.
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedResponse(corsHeaders);
+  }
+
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const admin = createClient(supabaseUrl, supabaseServiceKey);
