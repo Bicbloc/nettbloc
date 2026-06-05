@@ -139,6 +139,15 @@ export class RoomSyncService {
   }
 
   /**
+   * Enfile un statut de chambre dans la file de synchro PMS puis déclenche un
+   * traitement immédiat (best-effort). Public : utilisable par l'inspection
+   * gouvernante pour pousser l'état "inspected"/"needs-cleaning" vers le PMS.
+   */
+  static pushStatusToPms(hotelId: string, roomNumber: string, status: string): void {
+    RoomSyncService.pushStatusToApaleo(hotelId, roomNumber, status);
+  }
+
+  /**
    * Enfile le statut de la chambre (propre/sale) dans la file de synchro PMS,
    * puis déclenche un traitement immédiat (best-effort). Si l'envoi échoue,
    * l'entrée reste dans la file et sera retentée automatiquement (backoff).

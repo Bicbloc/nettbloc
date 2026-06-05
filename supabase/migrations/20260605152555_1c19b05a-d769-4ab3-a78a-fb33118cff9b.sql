@@ -1,0 +1,1 @@
+ALTER TABLE public.hotel_rooms_registry DROP CONSTRAINT IF EXISTS hotel_rooms_registry_hotel_room_unique;
