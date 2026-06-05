@@ -8,6 +8,40 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Verrou auth résilient: le verrou natif (navigator.locks) peut rester bloqué
+// en WebView / multi-onglets, ce qui fait stagner getSession() et provoque des
+// "déconnexions/reconnexions" intempestives. On tente le verrou natif avec un
+// délai max, puis on exécute quand même l'opération pour éviter tout blocage.
+const resilientLock = async <R>(
+  name: string,
+  acquireTimeout: number,
+  fn: () => Promise<R>,
+): Promise<R> => {
+  const navLocks = (globalThis as any)?.navigator?.locks;
+  if (!navLocks?.request) {
+    return await fn();
+  }
+
+  try {
+    return await navLocks.request(
+      name,
+      { mode: 'exclusive', ifAvailable: false },
+      async () => {
+        // Garde-fou: ne jamais laisser l'opération bloquer indéfiniment.
+        return await Promise.race([
+          fn(),
+          new Promise<R>((_, reject) =>
+            setTimeout(() => reject(new Error('auth-lock-fn-timeout')), 8000),
+          ),
+        ]);
+      },
+    );
+  } catch {
+    // Verrou indisponible ou expiré: on exécute sans verrou plutôt que stagner.
+    return await fn();
+  }
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -15,6 +49,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
+    lock: resilientLock,
   },
   global: {
     headers: {
