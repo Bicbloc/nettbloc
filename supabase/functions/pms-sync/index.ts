@@ -580,11 +580,11 @@ Deno.serve(async (req) => {
     const userClient = createClient(supabaseUrl, supabaseAnon, {
       global: { headers: { Authorization: authHeader } }
     });
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(authHeader.replace('Bearer ', ''));
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (claimsError || !claimsData?.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = claimsData.user.id as string;
 
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: corsHeaders });
