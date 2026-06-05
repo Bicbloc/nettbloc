@@ -28,6 +28,7 @@ import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { realtimeManager } from "@/services/RealtimeManager";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
 import { FeatureTour, isFeatureTourDone, markFeatureTourDone, TOUR_TOPICS } from "@/components/FeatureTour";
@@ -192,6 +193,7 @@ const IndexDashboard = () => {
   const { t, language } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
+  const { isConnected: isPlatformConnected } = useConnectionStatus();
 
   // Utiliser hotelId du contexte
   const currentHotelId = hotelId;
@@ -853,7 +855,7 @@ const IndexDashboard = () => {
         isPremium={isPremium}
         isFree={isFree}
         isGuestMode={isGuestMode}
-        isConnected={realtimeSync.isConnected}
+        isConnected={isPlatformConnected}
         hotelName={hotelName || undefined}
         hotelCode={contextHotelCode || undefined}
         currentHotelId={currentHotelId}
