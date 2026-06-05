@@ -266,12 +266,33 @@ Deno.serve(async (req) => {
   }
 
   // Background processor: only callable by the scheduler/service role.
-  if (!isAuthorizedCronRequest(req)) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+  // Allow either the scheduler/service-role (cron) OR a logged-in user to
+  // trigger immediate processing. Processing only pushes already-queued, due
+  // rows to the PMS, so authenticated users triggering it is safe and enables
+  // real-time push-back when a room is marked clean/inspected.
+  let authorized = isAuthorizedCronRequest(req);
+  if (!authorized) {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (authHeader.startsWith('Bearer ')) {
+      try {
+        const userClient = createClient(supabaseUrl, supabaseAnon, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await userClient.auth.getUser();
+        authorized = !!user;
+      } catch (_) {
+        authorized = false;
+      }
+    }
+  }
+  if (!authorized) {
     return unauthorizedResponse(corsHeaders);
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const admin = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
