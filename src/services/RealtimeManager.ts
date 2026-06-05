@@ -40,6 +40,8 @@ class RealtimeManager {
   private consecutiveFailures = 0;
   private isForceReconnecting = false;
   private pendingHotelId: string | null = null; // Hôtel en attente de connexion auth
+  private authRetryDelayMs = 400;
+  private maxAuthSessionRetries = 5;
 
   // état réel du canal
   private isSubscribed = false;
@@ -191,6 +193,24 @@ class RealtimeManager {
     await this.connect(this.hotelId);
   }
 
+  private async getStableSession() {
+    for (let attempt = 0; attempt < this.maxAuthSessionRetries; attempt++) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
+        return session;
+      }
+
+      if (attempt < this.maxAuthSessionRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, this.authRetryDelayMs));
+      }
+    }
+
+    return null;
+  }
+
   /**
    * Initialise la connexion temps réel pour un hôtel
    */
@@ -233,16 +253,21 @@ class RealtimeManager {
     this.hotelId = hotelId;
 
     // Vérifier session auth
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const session = await this.getStableSession();
 
     if (!session) {
-      this.pendingHotelId = hotelId; // Mémoriser pour connexion post-login
-      this.isSubscribed = false;
+      this.pendingHotelId = hotelId;
       this.isConnecting = false;
-      this.stopHeartbeat();
-      await this.cleanupChannel();
+
+      // En WebView/mobile, getSession() peut être temporairement null pendant la
+      // réhydratation ou la rotation du refresh token. Ne jamais considérer cela
+      // comme une vraie déconnexion tant que l'app peut encore se rétablir.
+      if (this.channel || this.isSubscribed) {
+        this.notifyStatus('RECONNECTING');
+        this.scheduleReconnect();
+        return false;
+      }
+
       this.notifyStatus('AUTH_REQUIRED');
       return false;
     }
@@ -466,9 +491,7 @@ class RealtimeManager {
 
       try {
         // 1) Vérifier/rafraîchir la session si proche expiration
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await this.getStableSession();
 
         if (session) {
           const expiresAtMs = session.expires_at ? session.expires_at * 1000 : null;
