@@ -219,6 +219,7 @@ export const useActionJournal = (hotelId?: string) => {
     loading,
     hasUnread,
     markAsRead,
+    markManyAsRead,
     markAllAsRead,
     clearNotifications,
     refreshNotifications: loadJournal,
