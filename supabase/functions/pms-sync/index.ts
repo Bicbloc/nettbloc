@@ -660,11 +660,8 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('hotel_id', hotel_id);
 
-    // Only the automatic 'sync' action requires an active config.
-    // 'test' and 'import' run on demand even before activation.
-    if (action === 'sync') {
-      configQuery = configQuery.eq('is_active', true);
-    }
+    // Les actions manuelles ('test', 'import', 'sync') utilisent la config enregistrée,
+    // même si la synchro automatique est coupée. Seule l'action 'scheduled' filtre plus haut.
 
     const { data: pmsConfig } = await configQuery.maybeSingle();
 

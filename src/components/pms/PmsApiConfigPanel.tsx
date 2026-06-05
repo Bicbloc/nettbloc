@@ -819,7 +819,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               Tester la connexion
             </Button>
 
-            <Button variant="outline" onClick={syncNow} disabled={syncing || !config.id || !config.is_active}>
+            <Button variant="outline" onClick={syncNow} disabled={syncing || !config.id}>
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Synchroniser maintenant
             </Button>
