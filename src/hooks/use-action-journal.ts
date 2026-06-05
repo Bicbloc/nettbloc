@@ -183,6 +183,24 @@ export const useActionJournal = (hotelId?: string) => {
     );
   }, [persistRead]);
 
+  const markManyAsRead = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    let changed = false;
+    setNotifications((prev) => {
+      const next = prev.map((n) => {
+        if (idSet.has(n.id) && !n.is_read) {
+          readIdsRef.current.add(n.id);
+          changed = true;
+          return { ...n, is_read: true };
+        }
+        return n;
+      });
+      return changed ? next : prev;
+    });
+    if (changed) persistRead();
+  }, [persistRead]);
+
   const markAllAsRead = useCallback(async () => {
     setNotifications((prev) => {
       prev.forEach((n) => readIdsRef.current.add(n.id));
