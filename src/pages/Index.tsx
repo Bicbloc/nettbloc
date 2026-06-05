@@ -248,7 +248,7 @@ const IndexDashboard = () => {
   // Compteurs par onglet basés sur le journal des actions (daily_action_logs)
   // exposé via le contexte de notifications — afin que le badge "Incidents"
   // et les autres onglets reflètent les actions réelles non lues.
-  const { notifications: journalNotifications, markAsRead } = useNotificationContext();
+  const { notifications: journalNotifications, markManyAsRead } = useNotificationContext();
 
   const tabForNotification = useCallback((n: { type?: string; title?: string; description?: string }): TabValue => {
     const type = (n.type || '').toLowerCase();
@@ -271,15 +271,17 @@ const IndexDashboard = () => {
     return counts;
   }, [journalNotifications, tabForNotification]);
 
-  // Quand l'utilisateur ouvre un onglet, on marque comme lues les notifications
-  // qui lui correspondent → le compteur se vide une fois la source consultée.
+  // Quand l'utilisateur ouvre un onglet, on marque comme lues (en un seul batch)
+  // les notifications qui lui correspondent → le compteur se vide une fois la
+  // source consultée, sans déclencher de boucle de re-rendu.
+  const journalRef = useRef(journalNotifications);
+  journalRef.current = journalNotifications;
   useEffect(() => {
-    const toRead = (journalNotifications || []).filter(
-      n => !n.is_read && tabForNotification(n) === activeTab
-    );
-    if (toRead.length === 0) return;
-    toRead.forEach(n => { void markAsRead(n.id); });
-  }, [activeTab, journalNotifications, tabForNotification, markAsRead]);
+    const ids = (journalRef.current || [])
+      .filter(n => !n.is_read && tabForNotification(n) === activeTab)
+      .map(n => n.id);
+    if (ids.length > 0) void markManyAsRead(ids);
+  }, [activeTab, tabForNotification, markManyAsRead]);
   
   // hotelId est maintenant fourni par le contexte - pas besoin de useAutoSetup
   // const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
