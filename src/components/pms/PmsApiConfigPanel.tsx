@@ -229,16 +229,18 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       };
 
       if (config.id) {
-        await supabase
+        const { error } = await supabase
           .from('hotel_pms_configs' as any)
           .update(payload as any)
           .eq('id', config.id);
+        if (error) throw error;
       } else {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('hotel_pms_configs' as any)
           .insert(payload as any)
           .select('id')
           .single();
+        if (error) throw error;
         if (data) setConfig(prev => ({ ...prev, id: (data as any).id }));
       }
 
@@ -281,7 +283,7 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
       }
 
       if (data?.success) {
-        setPreviewRooms(Array.isArray(data.rooms) ? data.rooms : []);
+        setPreviewRooms(dedupePreviewRooms(Array.isArray(data.rooms) ? data.rooms : []));
         // Charger le registre existant pour ne proposer que les chambres inexistantes
         const { data: registry } = await supabase
           .from('hotel_rooms_registry')
