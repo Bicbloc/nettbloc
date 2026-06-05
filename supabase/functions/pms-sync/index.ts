@@ -520,6 +520,10 @@ Deno.serve(async (req) => {
 
     // ── Scheduled morning sync (called by cron, no user auth) ──
     if (action === 'scheduled') {
+      // Scheduled sync is privileged: require scheduler/service-role auth.
+      if (!isAuthorizedCronRequest(req)) {
+        return unauthorizedResponse(corsHeaders);
+      }
       const results = await runScheduledSync(adminClient);
       return new Response(JSON.stringify({ processed: results.length, results }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
