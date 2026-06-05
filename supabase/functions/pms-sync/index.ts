@@ -588,6 +588,34 @@ async function runScheduledSync(adminClient: any) {
   return results;
 }
 
+// Real-time inbound poll: pull the live PMS state (Mews/Apaleo) for EVERY
+// active config and reflect it into NettoBloc immediately. Unlike the morning
+// scheduled sync, this has no once-per-day gate — it is meant to run frequently
+// (e.g. every minute via cron) so that check-outs and housekeeping-state
+// changes made directly in the PMS appear on the platform in near real-time.
+async function runRealtimePoll(adminClient: any) {
+  const { data: configs, error } = await adminClient
+    .from('hotel_pms_configs')
+    .select('*')
+    .eq('is_active', true)
+    .eq('auto_sync_enabled', true)
+    .in('pms_type', ['mews', 'apaleo']);
+
+  if (error) throw error;
+
+  const results: any[] = [];
+  for (const cfg of (configs || [])) {
+    try {
+      const count = await performSync(adminClient, cfg);
+      results.push({ hotel_id: cfg.hotel_id, synced: true, rooms: count });
+    } catch (e) {
+      console.error(`Realtime poll error hotel ${cfg.hotel_id}:`, e);
+      results.push({ hotel_id: cfg.hotel_id, synced: false, error: String(e) });
+    }
+  }
+  return results;
+}
+
 // ─── Main handler ─────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
