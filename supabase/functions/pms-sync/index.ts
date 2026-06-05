@@ -581,10 +581,10 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (claimsError || !claimsData?.user) {
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
-    const userId = claimsData.user.id as string;
+    const userId = user.id as string;
 
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: corsHeaders });
