@@ -248,31 +248,38 @@ const IndexDashboard = () => {
   // Compteurs par onglet basés sur le journal des actions (daily_action_logs)
   // exposé via le contexte de notifications — afin que le badge "Incidents"
   // et les autres onglets reflètent les actions réelles non lues.
-  const { notifications: journalNotifications } = useNotificationContext();
+  const { notifications: journalNotifications, markAsRead } = useNotificationContext();
+
+  const tabForNotification = useCallback((n: { type?: string; title?: string; description?: string }): TabValue => {
+    const type = (n.type || '').toLowerCase();
+    const text = `${n.title || ''} ${n.description || ''}`.toLowerCase();
+    if (type === 'remark' || text.includes('incident')) return 'incidents';
+    if (type === 'assignment') return 'rooms';
+    if (type.includes('cleaning') || type === 'room-status') return 'rooms';
+    if (text.includes('linge') || text.includes('linen')) return 'linen';
+    if (text.includes('objet') || text.includes('lost')) return 'lost-found';
+    return 'overview';
+  }, []);
+
   const notificationCounts = useMemo(() => {
     const unread = (journalNotifications || []).filter(n => !n.is_read);
     const counts: Partial<Record<TabValue, number>> = {};
-
     unread.forEach(n => {
-      const type = (n.type || '').toLowerCase();
-      const text = `${n.title || ''} ${n.description || ''}`.toLowerCase();
-      if (type === 'remark' || text.includes('incident')) {
-        counts['incidents'] = (counts['incidents'] || 0) + 1;
-      } else if (type === 'assignment') {
-        counts['rooms'] = (counts['rooms'] || 0) + 1;
-      } else if (type.includes('cleaning') || type === 'room-status') {
-        counts['rooms'] = (counts['rooms'] || 0) + 1;
-      } else if (text.includes('linge') || text.includes('linen')) {
-        counts['linen'] = (counts['linen'] || 0) + 1;
-      } else if (text.includes('objet') || text.includes('lost')) {
-        counts['lost-found'] = (counts['lost-found'] || 0) + 1;
-      } else {
-        counts['overview'] = (counts['overview'] || 0) + 1;
-      }
+      const tab = tabForNotification(n);
+      counts[tab] = (counts[tab] || 0) + 1;
     });
-
     return counts;
-  }, [journalNotifications]);
+  }, [journalNotifications, tabForNotification]);
+
+  // Quand l'utilisateur ouvre un onglet, on marque comme lues les notifications
+  // qui lui correspondent → le compteur se vide une fois la source consultée.
+  useEffect(() => {
+    const toRead = (journalNotifications || []).filter(
+      n => !n.is_read && tabForNotification(n) === activeTab
+    );
+    if (toRead.length === 0) return;
+    toRead.forEach(n => { void markAsRead(n.id); });
+  }, [activeTab, journalNotifications, tabForNotification, markAsRead]);
   
   // hotelId est maintenant fourni par le contexte - pas besoin de useAutoSetup
   // const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
