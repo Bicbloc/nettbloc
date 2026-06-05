@@ -75,6 +75,15 @@ export function IncidentReportPrint({ hotelId }: IncidentReportPrintProps) {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
+    // Escape user-controlled values to prevent stored XSS in the print window
+    const esc = (s: unknown) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     const statusLabels = {
       new: "Nouveau",
       in_progress: "En cours",
