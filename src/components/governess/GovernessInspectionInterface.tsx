@@ -185,6 +185,14 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             inspected_by: governessName 
           })
           .eq('id', selectedRoom.id);
+
+        // Pousser l'état "Inspecté" vers le PMS (Mews INS / Apaleo Clean)
+        try {
+          const { RoomSyncService } = await import('@/services/roomSyncService');
+          RoomSyncService.pushStatusToPms(hotelId, selectedRoom.room_number, 'inspected');
+        } catch (e) {
+          console.warn('Push PMS (inspected) échoué:', e);
+        }
       }
       
       // Si refusée ou à reprendre, mettre à jour le statut de la chambre
@@ -204,6 +212,14 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             inspected_by: null
           })
           .eq('id', selectedRoom.id);
+
+        // Pousser l'état "à nettoyer" (sale) vers le PMS
+        try {
+          const { RoomSyncService } = await import('@/services/roomSyncService');
+          RoomSyncService.pushStatusToPms(hotelId, selectedRoom.room_number, 'needs-cleaning');
+        } catch (e) {
+          console.warn('Push PMS (needs-cleaning) échoué:', e);
+        }
       }
 
       // Logger l'action
