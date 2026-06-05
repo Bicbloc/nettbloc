@@ -29,6 +29,54 @@ interface ExtractedRoom {
   notes?: string;
 }
 
+function normalizeRoomKey(value?: string | null): string {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function roomScore(room: ExtractedRoom): number {
+  let score = 0;
+  if (room.guestName) score += 4;
+  if (room.arrivalDate || room.departureDate) score += 2;
+  if (room.cleaningType && room.cleaningType !== 'none') score += 2;
+  if (room.condition) score += 1;
+  if (room.roomType) score += 1;
+  if (room.floor != null) score += 1;
+  if (room.status && room.status !== 'vacant') score += 1;
+  return score;
+}
+
+function dedupeExtractedRooms(rooms: ExtractedRoom[]): ExtractedRoom[] {
+  const byRoom = new Map<string, ExtractedRoom>();
+
+  for (const room of rooms) {
+    const key = normalizeRoomKey(room.roomNumber);
+    if (!key) continue;
+
+    const existing = byRoom.get(key);
+    if (!existing) {
+      byRoom.set(key, room);
+      continue;
+    }
+
+    const preferred = roomScore(room) >= roomScore(existing) ? room : existing;
+    const fallback = preferred === room ? existing : room;
+
+    byRoom.set(key, {
+      ...fallback,
+      ...preferred,
+      roomNumber: preferred.roomNumber || fallback.roomNumber,
+      floor: preferred.floor ?? fallback.floor,
+      roomType: preferred.roomType ?? fallback.roomType,
+      guestName: preferred.guestName ?? fallback.guestName,
+      arrivalDate: preferred.arrivalDate ?? fallback.arrivalDate,
+      departureDate: preferred.departureDate ?? fallback.departureDate,
+      condition: preferred.condition ?? fallback.condition ?? null,
+    });
+  }
+
+  return Array.from(byRoom.values());
+}
+
 // ─── Mews Connector ───────────────────────────────────────────────
 // POST helper that respects Mews rate limits (200 req / 30s per AccessToken).
 // On 429 it waits for Retry-After (or exponential backoff) and retries.
@@ -373,9 +421,9 @@ async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
   const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
   switch (pmsConfig.pms_type) {
     case 'mews':
-      return await fetchMewsRooms(credentials);
+      return dedupeExtractedRooms(await fetchMewsRooms(credentials));
     case 'apaleo':
-      return await fetchApaleoRooms(credentials);
+      return dedupeExtractedRooms(await fetchApaleoRooms(credentials));
     default:
       throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
   }
