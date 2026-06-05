@@ -30,23 +30,41 @@ interface ExtractedRoom {
 }
 
 // ─── Mews Connector ───────────────────────────────────────────────
-async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
-  const baseUrl = credentials.baseUrl || 'https://api.mews.com/api/connector/v1';
-  
-  // 1. Fetch spaces (rooms)
-  const spacesRes = await fetch(`${baseUrl}/spaces/getAll`, {
+// POST helper that respects Mews rate limits (200 req / 30s per AccessToken).
+// On 429 it waits for Retry-After (or exponential backoff) and retries.
+async function mewsFetch(url: string, body: unknown, attempt = 0): Promise<Response> {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ClientToken: credentials.clientToken,
-      AccessToken: credentials.accessToken,
-      LanguageCode: 'fr-FR',
-      Extent: {
-        Spaces: true,
-        SpaceCategories: true,
-        SpaceFeatures: true,
-      }
-    }),
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 429 && attempt < 4) {
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : Math.min(1000 * 2 ** attempt, 8000);
+    await res.text().catch(() => {});
+    await new Promise((r) => setTimeout(r, waitMs));
+    return mewsFetch(url, body, attempt + 1);
+  }
+
+  return res;
+}
+
+async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  const baseUrl = credentials.baseUrl || 'https://api.mews.com/api/connector/v1';
+
+  // 1. Fetch spaces (rooms)
+  const spacesRes = await mewsFetch(`${baseUrl}/spaces/getAll`, {
+    ClientToken: credentials.clientToken,
+    AccessToken: credentials.accessToken,
+    LanguageCode: 'fr-FR',
+    Extent: {
+      Spaces: true,
+      SpaceCategories: true,
+      SpaceFeatures: true,
+    },
   });
 
   if (!spacesRes.ok) {
