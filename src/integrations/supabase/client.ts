@@ -12,6 +12,8 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // en WebView / multi-onglets, ce qui fait stagner getSession() et provoque des
 // "déconnexions/reconnexions" intempestives. On tente le verrou natif avec un
 // délai max, puis on exécute quand même l'opération pour éviter tout blocage.
+const LOCK_NOT_ACQUIRED = Symbol('lock-not-acquired');
+
 const resilientLock = async <R>(
   name: string,
   acquireTimeout: number,
@@ -23,10 +25,18 @@ const resilientLock = async <R>(
   }
 
   try {
-    return await navLocks.request(
+    // 1) Tenter d'acquérir le verrou SANS attendre (ifAvailable). Si un autre
+    //    onglet/page le détient déjà (ou l'a laissé bloqué en WebView), on
+    //    n'attend pas et on exécute l'opération sans verrou. Cela évite que
+    //    getSession() et toutes les requêtes Supabase ne stagnent à l'infini.
+    const result = await navLocks.request(
       name,
-      { mode: 'exclusive', ifAvailable: false },
-      async () => {
+      { mode: 'exclusive', ifAvailable: true },
+      async (lock: unknown) => {
+        if (!lock) {
+          // Verrou non disponible immédiatement.
+          return LOCK_NOT_ACQUIRED as unknown as R;
+        }
         // Garde-fou: ne jamais laisser l'opération bloquer indéfiniment.
         return await Promise.race([
           fn(),
@@ -36,8 +46,13 @@ const resilientLock = async <R>(
         ]);
       },
     );
+
+    if (result === (LOCK_NOT_ACQUIRED as unknown as R)) {
+      return await fn();
+    }
+    return result;
   } catch {
-    // Verrou indisponible ou expiré: on exécute sans verrou plutôt que stagner.
+    // Verrou expiré ou opération trop lente: on exécute sans verrou.
     return await fn();
   }
 };
