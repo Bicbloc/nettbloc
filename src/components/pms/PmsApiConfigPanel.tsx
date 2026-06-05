@@ -78,6 +78,24 @@ const PMS_TYPES = [
   { value: 'medialog', label: 'Medialog', fields: ['apiKey'], fieldLabels: { apiKey: 'Clé API' } },
 ];
 
+// Mews connector hosts. Demo tokens only work against the demo host.
+const MEWS_HOSTS = {
+  demo: 'https://api.mews-demo.com/api/connector/v1',
+  production: 'https://api.mews.com/api/connector/v1',
+};
+
+// Public Mews demo credentials (Gross / UK enterprise) — safe to ship, demo only.
+const MEWS_DEMO_CREDENTIALS = {
+  gross: {
+    clientToken: 'E0D439EE522F44368DC78E1BFB03710C-D24FB11DBE31D4621C4817E028D9E1D',
+    accessToken: 'C66EF7B239D24632943D115EDE9CB810-EA00F8FD8294692C940F6B5A8F9453D',
+  },
+  net: {
+    clientToken: 'E0D439EE522F44368DC78E1BFB03710C-D24FB11DBE31D4621C4817E028D9E1D',
+    accessToken: '4D6C7ABE0E6A4681B0AFB16900AE5D86-DF50CBC89E1D4FF5859DDF021649ED5',
+  },
+};
+
 const SYNC_FREQUENCIES = [
   { value: 15, label: 'Toutes les 15 minutes' },
   { value: 30, label: 'Toutes les 30 minutes' },
