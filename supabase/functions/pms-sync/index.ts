@@ -30,58 +30,87 @@ interface ExtractedRoom {
 }
 
 // ─── Mews Connector ───────────────────────────────────────────────
-async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
-  const baseUrl = credentials.baseUrl || 'https://api.mews.com/api/connector/v1';
-  
-  // 1. Fetch spaces (rooms)
-  const spacesRes = await fetch(`${baseUrl}/spaces/getAll`, {
+// POST helper that respects Mews rate limits (200 req / 30s per AccessToken).
+// On 429 it waits for Retry-After (or exponential backoff) and retries.
+async function mewsFetch(url: string, body: unknown, attempt = 0): Promise<Response> {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ClientToken: credentials.clientToken,
-      AccessToken: credentials.accessToken,
-      LanguageCode: 'fr-FR',
-      Extent: {
-        Spaces: true,
-        SpaceCategories: true,
-        SpaceFeatures: true,
-      }
-    }),
+    body: JSON.stringify(body),
   });
 
-  if (!spacesRes.ok) {
-    const errBody = await spacesRes.text();
-    throw new Error(`Mews spaces/getAll failed [${spacesRes.status}]: ${errBody}`);
+  if (res.status === 429 && attempt < 4) {
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : Math.min(1000 * 2 ** attempt, 8000);
+    await res.text().catch(() => {});
+    await new Promise((r) => setTimeout(r, waitMs));
+    return mewsFetch(url, body, attempt + 1);
   }
 
-  const spacesData = await spacesRes.json();
-  const spaces = spacesData.Spaces || [];
-  const categories = spacesData.SpaceCategories || [];
+  return res;
+}
 
-  // Build category map
+async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  const baseUrl = credentials.baseUrl || 'https://api.mews.com/api/connector/v1';
+  const auth = {
+    ClientToken: credentials.clientToken,
+    AccessToken: credentials.accessToken,
+    Client: 'NettoBloc 1.0',
+  };
+
+  // 1. Fetch resources (rooms/spaces) + their categories
+  const resourcesRes = await mewsFetch(`${baseUrl}/resources/getAll`, {
+    ...auth,
+    Extent: {
+      Resources: true,
+      ResourceCategories: true,
+      ResourceCategoryAssignments: true,
+    },
+  });
+
+  if (!resourcesRes.ok) {
+    const errBody = await resourcesRes.text();
+    throw new Error(`Mews resources/getAll failed [${resourcesRes.status}]: ${errBody}`);
+  }
+
+  const resourcesData = await resourcesRes.json();
+  const resources = resourcesData.Resources || [];
+  const categories = resourcesData.ResourceCategories || [];
+  const categoryAssignments = resourcesData.ResourceCategoryAssignments || [];
+
+  // Category id -> readable name
+  const pickName = (names: Record<string, string> | undefined) => {
+    if (!names) return undefined;
+    return names['fr-FR'] || names['en-US'] || Object.values(names)[0];
+  };
   const categoryMap: Record<string, string> = {};
   for (const cat of categories) {
-    categoryMap[cat.Id] = cat.ShortName || cat.Name || 'Standard';
+    categoryMap[cat.Id] = pickName(cat.ShortNames) || pickName(cat.Names) || 'Standard';
+  }
+  // Resource id -> category name (first active assignment)
+  const resourceCategory: Record<string, string> = {};
+  for (const a of categoryAssignments) {
+    if (a.IsActive && a.ResourceId && !resourceCategory[a.ResourceId] && categoryMap[a.CategoryId]) {
+      resourceCategory[a.ResourceId] = categoryMap[a.CategoryId];
+    }
   }
 
-  // 2. Fetch reservations for today
+  // 2. Fetch reservations colliding with today
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  const reservationsRes = await fetch(`${baseUrl}/reservations/getAll`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ClientToken: credentials.clientToken,
-      AccessToken: credentials.accessToken,
-      StartUtc: `${today}T00:00:00Z`,
-      EndUtc: `${tomorrow}T23:59:59Z`,
-      Extent: {
-        Reservations: true,
-        Customers: true,
-      },
-      States: ['Confirmed', 'Started'],
-    }),
+  const reservationsRes = await mewsFetch(`${baseUrl}/reservations/getAll`, {
+    ...auth,
+    StartUtc: `${today}T00:00:00Z`,
+    EndUtc: `${tomorrow}T23:59:59Z`,
+    TimeFilter: 'Colliding',
+    Extent: {
+      Reservations: true,
+      Customers: true,
+    },
+    States: ['Confirmed', 'Started', 'Processed'],
   });
 
   let reservations: any[] = [];
@@ -98,28 +127,32 @@ async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoo
     customerMap[c.Id] = `${c.LastName || ''} ${c.FirstName || ''}`.trim();
   }
 
-  // Build reservation map by space (room)
-  const reservationBySpace: Record<string, any> = {};
+  // Build reservation map by assigned resource (room)
+  const reservationByResource: Record<string, any> = {};
   for (const r of reservations) {
-    if (r.AssignedSpaceId) {
-      reservationBySpace[r.AssignedSpaceId] = r;
-    }
+    const rid = r.AssignedResourceId || r.AssignedSpaceId;
+    if (rid) reservationByResource[rid] = r;
   }
 
-  // 3. Map to ExtractedRoom[]
-  return spaces
-    .filter((s: any) => s.Type === 'Room' || !s.Type)
+  // 3. Map to ExtractedRoom[] — only physical spaces (rooms)
+  return resources
+    .filter((r: any) => (r.Data?.Discriminator === 'Space') && r.IsActive !== false)
     .map((space: any) => {
-      const reservation = reservationBySpace[space.Id];
+      const reservation = reservationByResource[space.Id];
       const hasReservation = !!reservation;
-      
-      let cleaningType = 'recouche';
-      let status = 'occupied';
+      const floorRaw = space.Data?.Value?.FloorNumber;
+      const floor = floorRaw != null && floorRaw !== '' ? parseInt(floorRaw, 10) || undefined : undefined;
 
-      if (!hasReservation) {
-        cleaningType = 'depart';
-        status = 'vacant';
-      } else if (reservation) {
+      // Housekeeping state from Mews
+      const mewsState = space.State; // Clean | Dirty | Inspected | OutOfService | OutOfOrder
+      let status = 'occupied';
+      let cleaningType = 'none';
+      let condition: string | null = mewsState ?? null;
+
+      if (mewsState === 'OutOfService' || mewsState === 'OutOfOrder') {
+        cleaningType = 'hors_service';
+        status = 'out-of-service';
+      } else if (hasReservation) {
         const checkIn = reservation.StartUtc?.split('T')[0];
         const checkOut = reservation.EndUtc?.split('T')[0];
         if (checkOut === today) {
@@ -128,17 +161,23 @@ async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoo
         } else if (checkIn === today) {
           cleaningType = 'arrivee';
           status = 'arrival';
+        } else {
+          cleaningType = 'recouche';
+          status = 'occupied';
         }
+      } else {
+        // No reservation: needs cleaning only if dirty
+        cleaningType = mewsState === 'Dirty' ? 'depart' : 'none';
+        status = mewsState === 'Clean' || mewsState === 'Inspected' ? 'clean' : 'vacant';
       }
 
-      const floor = space.FloorNumber || (space.Number ? parseInt(space.Number.toString().slice(0, -2)) || undefined : undefined);
-
       return {
-        roomNumber: space.Number || space.Name || space.Id,
+        roomNumber: space.Name || space.Id,
         status,
         cleaningType,
+        condition,
         floor,
-        roomType: categoryMap[space.CategoryId] || undefined,
+        roomType: resourceCategory[space.Id] || undefined,
         guestName: reservation ? customerMap[reservation.CustomerId] : undefined,
         arrivalDate: reservation?.StartUtc?.split('T')[0],
         departureDate: reservation?.EndUtc?.split('T')[0],
@@ -331,7 +370,7 @@ function toDbStatus(room: ExtractedRoom): string {
 }
 
 async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
-  const credentials = pmsConfig.credentials as PmsCredentials;
+  const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
   switch (pmsConfig.pms_type) {
     case 'mews':
       return await fetchMewsRooms(credentials);
@@ -593,7 +632,7 @@ Deno.serve(async (req) => {
     // Test connection only
     if (action === 'test') {
       try {
-        const credentials = pmsConfig.credentials as PmsCredentials;
+        const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
         let rooms: ExtractedRoom[] = [];
 
         switch (pmsConfig.pms_type) {
