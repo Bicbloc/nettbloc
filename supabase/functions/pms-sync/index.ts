@@ -345,7 +345,7 @@ function toDbStatus(room: ExtractedRoom): string {
 }
 
 async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
-  const credentials = pmsConfig.credentials as PmsCredentials;
+  const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
   switch (pmsConfig.pms_type) {
     case 'mews':
       return await fetchMewsRooms(credentials);
