@@ -72,6 +72,8 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
       const techRes = await (supabase as any).from('technician_profiles').select('id, name, email, is_active').eq('hotel_id', hotelId);
       const sessionsRes = await supabase.from('user_sessions').select('id, user_name, user_type, login_time, last_activity, is_active').eq('hotel_id', hotelId).order('last_activity', { ascending: false }).limit(50);
 
+      const historyRes = await (supabase as any).from('hotel_name_history').select('id, old_name, new_name, created_at').eq('hotel_id', hotelId).order('created_at', { ascending: false });
+
       let owner: any = null;
       if (hotelRes.data?.user_id) {
         const { data: o } = await supabase.from('profiles').select('email, company_name, subscription_type, trial_end_date').eq('id', hotelRes.data.user_id).maybeSingle();
@@ -86,6 +88,7 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
         governesses: (govRes.data as any[]) || [],
         technicians: (techRes.data as any[]) || [],
         sessions: (sessionsRes.data as any[]) || [],
+        nameHistory: (historyRes.data as any[]) || [],
       });
       setEditName(hotelRes.data?.name || '');
       setEditPhone(hotelRes.data?.phone || '');
