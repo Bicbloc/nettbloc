@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface PmsCredentials {
@@ -519,6 +520,10 @@ Deno.serve(async (req) => {
 
     // ── Scheduled morning sync (called by cron, no user auth) ──
     if (action === 'scheduled') {
+      // Scheduled sync is privileged: require scheduler/service-role auth.
+      if (!isAuthorizedCronRequest(req)) {
+        return unauthorizedResponse(corsHeaders);
+      }
       const results = await runScheduledSync(adminClient);
       return new Response(JSON.stringify({ processed: results.length, results }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

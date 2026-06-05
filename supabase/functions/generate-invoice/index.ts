@@ -389,6 +389,35 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // ---- Authenticate caller ----
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userErr } = await authClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = userData.user.id;
+
+    // Admins/super_admins may access any invoice
+    const { data: roleRows } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId);
+    const isAdmin = (roleRows || []).some(
+      (r: any) => r.role === "admin" || r.role === "super_admin"
+    );
+
     const body = await req.json();
 
     // ---- MODE 1: Download / generate PDF for an existing invoice ----
@@ -406,6 +435,14 @@ serve(async (req) => {
       if (fetchErr || !invoice) {
         throw new Error("Invoice not found");
       }
+
+      // Ownership check: caller must own the invoice (or be an admin)
+      if (!isAdmin && invoice.user_id !== callerId) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
 
       // If PDF already exists in storage, return a signed URL
       if (invoice.pdf_url && !returnBlob) {
@@ -522,6 +559,13 @@ serve(async (req) => {
 
     if (!user_id || !plan_type || !amount_cents) {
       throw new Error("Missing required fields: user_id, plan_type, amount_cents");
+    }
+
+    // Ownership check: callers may only create invoices for themselves (or be an admin)
+    if (!isAdmin && user_id !== callerId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     logStep("Creating invoice", { user_id, plan_type, amount_cents });

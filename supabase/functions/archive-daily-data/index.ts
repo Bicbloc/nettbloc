@@ -1,15 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Privileged scheduled function: only callable by the scheduler/service role.
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedResponse(corsHeaders);
   }
 
   try {

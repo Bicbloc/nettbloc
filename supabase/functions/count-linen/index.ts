@@ -11,6 +11,28 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Require an authenticated user to prevent anonymous AI-cost abuse.
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  {
+    const authClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+
   try {
     const { 
       image, 
