@@ -185,7 +185,29 @@ export function HotelDetailDrawer({ hotelId, onClose, onUpdated }: Props) {
                 </CardContent>
               </Card>
 
-              {/* Stats */}
+              {/* Historique des noms */}
+              {data.nameHistory.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2"><History className="h-4 w-4" />Anciens noms d'établissement</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    {data.nameHistory.map((h: any) => (
+                      <div key={h.id} className="flex items-center justify-between gap-2 border-b last:border-0 pb-2 last:pb-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="line-through text-muted-foreground">{h.old_name || '—'}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="font-medium">{h.new_name || '—'}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {h.created_at && format(new Date(h.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                        </span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid grid-cols-4 gap-2">
                 <StatCard icon={Bed} label="Chambres" value={data.rooms.length} />
                 <StatCard icon={Users} label="FdC" value={data.housekeepers.filter(h => h.is_active).length} />
