@@ -32,6 +32,29 @@ interface PreviewRoom {
   departureDate: string | null;
 }
 
+const previewRoomKey = (room: Pick<PreviewRoom, 'roomNumber'>) => normalizeRoomNumber(room.roomNumber || '');
+
+const dedupePreviewRooms = (rooms: PreviewRoom[]): PreviewRoom[] => {
+  const score = (value: PreviewRoom) =>
+    (value.guestName ? 4 : 0) +
+    (value.arrivalDate || value.departureDate ? 2 : 0) +
+    (value.cleaningType && value.cleaningType !== 'none' ? 2 : 0) +
+    (value.condition ? 1 : 0) +
+    (value.roomType ? 1 : 0) +
+    (value.floor != null ? 1 : 0);
+
+  const map = new Map<string, PreviewRoom>();
+
+  for (const room of rooms) {
+    const key = previewRoomKey(room);
+    if (!key) continue;
+    const existing = map.get(key);
+    map.set(key, !existing || score(room) >= score(existing) ? room : existing);
+  }
+
+  return Array.from(map.values());
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
   return await Promise.race([
     promise,
