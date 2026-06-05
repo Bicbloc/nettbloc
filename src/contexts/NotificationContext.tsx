@@ -8,6 +8,7 @@ interface NotificationContextValue {
   hasUnread: boolean;
   addNotification: (notification: Omit<Notification, 'id' | 'created_at' | 'is_read' | 'hotel_id'>) => Promise<Notification | null>;
   markAsRead: (notificationId: string) => Promise<void>;
+  markManyAsRead: (ids: string[]) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   clearNotifications: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
@@ -34,6 +35,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     hasUnread: journal.hasUnread,
     addNotification: legacy.addNotification,
     markAsRead: journal.markAsRead,
+    markManyAsRead: journal.markManyAsRead,
     markAllAsRead: journal.markAllAsRead,
     clearNotifications: journal.clearNotifications,
     refreshNotifications: journal.refreshNotifications,
