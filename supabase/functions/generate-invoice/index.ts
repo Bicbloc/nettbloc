@@ -561,6 +561,13 @@ serve(async (req) => {
       throw new Error("Missing required fields: user_id, plan_type, amount_cents");
     }
 
+    // Ownership check: callers may only create invoices for themselves (or be an admin)
+    if (!isAdmin && user_id !== callerId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     logStep("Creating invoice", { user_id, plan_type, amount_cents });
 
     // Get user hotel
