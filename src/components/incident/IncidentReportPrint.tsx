@@ -207,13 +207,13 @@ export function IncidentReportPrint({ hotelId }: IncidentReportPrintProps) {
                   (incident) => `
                 <tr>
                   <td>${format(new Date(incident.created_at), "dd/MM/yy HH:mm")}</td>
-                  <td><strong>${incident.title}</strong></td>
-                  <td>${incident.location_type === "room" ? `Chambre ${incident.location_reference}` : incident.location_type === "common_area" ? `Zone commune - ${incident.location_reference}` : "N/A"}</td>
-                  <td>${incident.type?.name || "N/A"}</td>
-                  <td>${incident.category?.icon || ""} ${incident.category?.name || "N/A"}</td>
+                  <td><strong>${esc(incident.title)}</strong></td>
+                  <td>${incident.location_type === "room" ? `Chambre ${esc(incident.location_reference)}` : incident.location_type === "common_area" ? `Zone commune - ${esc(incident.location_reference)}` : "N/A"}</td>
+                  <td>${esc(incident.type?.name) || "N/A"}</td>
+                  <td>${esc(incident.category?.icon || "")} ${esc(incident.category?.name) || "N/A"}</td>
                   <td class="priority-${incident.priority}">${priorityLabels[incident.priority] || "N/A"}</td>
                   <td class="status-${incident.status}">${statusLabels[incident.status] || "N/A"}</td>
-                  <td>${incident.reported_by_name}</td>
+                  <td>${esc(incident.reported_by_name)}</td>
                 </tr>
               `
                 )
