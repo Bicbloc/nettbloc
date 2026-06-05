@@ -48,7 +48,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     try {
       const { error: insertError } = await supabase
         .from('hotel_rooms_registry')
-        .insert({
+        .upsert({
           hotel_id: hotelId,
           room_number: room.room_number,
           floor: room.floor,
@@ -57,7 +57,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           imported_from: room.pms_type,
           is_active: true,
           space_category: 'room',
-        } as any);
+        } as any, { onConflict: 'hotel_id,room_number', ignoreDuplicates: true });
       if (insertError) throw insertError;
 
       await supabase
@@ -93,7 +93,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     try {
       const { error: insertError } = await supabase
         .from('hotel_rooms_registry')
-        .insert(
+        .upsert(
           rooms.map(room => ({
             hotel_id: hotelId,
             room_number: room.room_number,
@@ -103,7 +103,8 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
             imported_from: room.pms_type,
             is_active: true,
             space_category: 'room',
-          })) as any
+          })) as any,
+          { onConflict: 'hotel_id,room_number', ignoreDuplicates: true }
         );
       if (insertError) throw insertError;
 
