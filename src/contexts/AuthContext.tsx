@@ -263,7 +263,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     return { error: null, success: true };
-  }, [startTokenRefresh]);
+  }, []);
 
   const signOut = useCallback(async () => {
     // Nettoyer TOUS les profils de rôles pour éviter les conflits de session
