@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
 import { realtimeManager } from '@/services/RealtimeManager';
@@ -9,6 +9,14 @@ export function useConnectionStatus() {
   const [lastPingTime, setLastPingTime] = useState<number | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const [lastSuccessfulPing, setLastSuccessfulPing] = useState<Date | null>(null);
+  const reconnectCooldownRef = useRef(0);
+
+  const requestReconnect = useCallback(() => {
+    const now = Date.now();
+    if (now - reconnectCooldownRef.current < 5000) return;
+    reconnectCooldownRef.current = now;
+    try { realtimeManager.forceReconnect(); } catch {}
+  }, []);
 
   // Test Supabase connection via ping edge function (bypasse RLS)
   const pingSupabase = useCallback(async () => {
@@ -19,7 +27,7 @@ export function useConnectionStatus() {
       if (error || !data?.ok) {
         setConsecutiveFailures(prev => prev + 1);
         // Reconnexion silencieuse, on ne marque PAS déconnecté tant que le navigateur est online.
-        try { realtimeManager.forceReconnect(); } catch {}
+          requestReconnect();
         if (!navigator.onLine) {
           setIsSupabaseConnected(false);
         }
@@ -34,7 +42,7 @@ export function useConnectionStatus() {
       return true;
     } catch (error) {
       setConsecutiveFailures(prev => prev + 1);
-      try { realtimeManager.forceReconnect(); } catch {}
+      requestReconnect();
       if (!navigator.onLine) {
         setIsSupabaseConnected(false);
       }
@@ -62,7 +70,7 @@ export function useConnectionStatus() {
       setIsOnline(true);
       setConsecutiveFailures(0);
       setIsSupabaseConnected(true);
-      try { realtimeManager.forceReconnect(); } catch {}
+      requestReconnect();
       setTimeout(() => pingSupabase(), 500);
     };
 
@@ -74,7 +82,7 @@ export function useConnectionStatus() {
     // Reconnexion automatique au retour de focus / visibilité
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        try { realtimeManager.forceReconnect(); } catch {}
+        requestReconnect();
         pingSupabase();
       }
     };
@@ -90,7 +98,7 @@ export function useConnectionStatus() {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
     };
-  }, [pingSupabase]);
+  }, [pingSupabase, requestReconnect]);
 
   // Ping périodique espacé (60s) — uniquement si nécessaire
   useEffect(() => {
