@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
 
   /**
@@ -81,28 +80,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  /**
-   * Démarre le refresh automatique du token (toutes les 10 minutes)
-   */
-  const startTokenRefresh = useCallback(() => {
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
-    }
-    refreshIntervalRef.current = setInterval(() => {
-      refreshSession();
-    }, 10 * 60 * 1000);
-  }, [refreshSession]);
-
-  /**
-   * Arrête le refresh automatique
-   */
-  const stopTokenRefresh = useCallback(() => {
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
-      refreshIntervalRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     let mounted = true;
     let sessionRestoredFromGetSession = false;
@@ -122,7 +99,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(currentSession?.user ?? null);
           setLoading(false);
           setIsInitialized(true);
-          if (currentSession) startTokenRefresh();
           return;
         }
 
@@ -133,12 +109,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setIsInitialized(true);
 
         if (event === 'SIGNED_IN' && currentSession) {
-          startTokenRefresh();
           window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, {
             detail: { userId: currentSession.user.id }
           }));
+        } else if (event === 'TOKEN_REFRESHED' && currentSession) {
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SESSION_REFRESHED));
         } else if (event === 'SIGNED_OUT') {
-          stopTokenRefresh();
           storageService.clearHotel();
           storageService.clearActivePortal();
           window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_OUT));
@@ -173,10 +149,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
-          
-          if (currentSession) {
-            startTokenRefresh();
-          }
         }
       } catch (err) {
         console.error('❌ getSession exception:', err);
@@ -211,10 +183,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: { session: current } } = await supabase.auth.getSession();
       if (!mounted || !current) return;
 
-      // Re-valider/rafraîchir la session puis signaler aux écrans de recharger
-      const ok = await refreshSession();
-      if ((ok || current) && mounted) {
-        startTokenRefresh();
+      // La session est déjà là: on laisse Supabase gérer l'auto-refresh et on
+      // signale seulement aux écrans qu'ils peuvent resynchroniser leurs données.
+      if (mounted) {
         window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SESSION_REFRESHED));
       }
     };
@@ -225,12 +196,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       mounted = false;
       clearTimeout(safetyTimeout);
-      stopTokenRefresh();
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleResume);
       window.removeEventListener('focus', handleResume);
     };
-  }, [refreshSession, startTokenRefresh, stopTokenRefresh]);
+  }, []);
 
   const signUp = useCallback(async (
     email: string,
@@ -287,17 +257,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(data.session);
       setUser(data.session.user);
       setLoading(false);
-      startTokenRefresh();
       window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
         detail: { userId: data.session.user.id } 
       }));
     }
     
     return { error: null, success: true };
-  }, [startTokenRefresh]);
+  }, []);
 
   const signOut = useCallback(async () => {
-    stopTokenRefresh();
     // Nettoyer TOUS les profils de rôles pour éviter les conflits de session
     try {
       localStorage.removeItem('housekeeper_profile');
@@ -314,7 +282,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Forcer le nettoyage du token même si signOut échoue
       localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
     }
-  }, [stopTokenRefresh]);
+  }, []);
 
   const value = useMemo(() => ({
     user,
