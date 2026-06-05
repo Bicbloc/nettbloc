@@ -20,6 +20,14 @@ export function ConnectionStatusIndicator() {
   const [lastPing, setLastPing] = useState<Date | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const [httpOk, setHttpOk] = useState(true);
+  const reconnectCooldownRef = useState<{ last: number }>({ last: 0 })[0];
+
+  const requestReconnect = () => {
+    const now = Date.now();
+    if (now - reconnectCooldownRef.last < 5000) return;
+    reconnectCooldownRef.last = now;
+    try { realtimeManager.forceReconnect(); } catch {}
+  };
 
   useEffect(() => {
     // Écouter les changements de statut du RealtimeManager
@@ -43,7 +51,7 @@ export function ConnectionStatusIndicator() {
       setConnectionState('online');
       setHttpOk(true);
       // Forcer une reconnexion realtime en silence
-      try { realtimeManager.forceReconnect(); } catch {}
+      requestReconnect();
       pingSupabase();
     };
 
@@ -59,7 +67,7 @@ export function ConnectionStatusIndicator() {
     // Reconnexion automatique au retour de focus / visibilité
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        try { realtimeManager.forceReconnect(); } catch {}
+        requestReconnect();
         pingSupabase();
       }
     };
@@ -99,7 +107,7 @@ export function ConnectionStatusIndicator() {
         setConsecutiveFailures(prev => {
           const next = prev + 1;
           // Auto-reconnexion silencieuse en arrière-plan
-          try { realtimeManager.forceReconnect(); } catch {}
+          requestReconnect();
           // On NE bascule JAMAIS en "offline" sur un échec de ping si le navigateur est online.
           // On reste sur l'état actuel (online) — les retries internes suffisent.
           return next;
@@ -115,7 +123,7 @@ export function ConnectionStatusIndicator() {
       setHttpOk(false);
       setConsecutiveFailures(prev => prev + 1);
       // Reconnexion silencieuse, pas de bascule visuelle
-      try { realtimeManager.forceReconnect(); } catch {}
+        requestReconnect();
     }
   };
 
@@ -124,7 +132,7 @@ export function ConnectionStatusIndicator() {
     setConsecutiveFailures(0);
 
     try {
-      realtimeManager.forceReconnect();
+      requestReconnect();
       await new Promise(resolve => setTimeout(resolve, 1000));
       await pingSupabase();
     } finally {
