@@ -86,20 +86,16 @@ async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoo
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  const reservationsRes = await fetch(`${baseUrl}/reservations/getAll`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ClientToken: credentials.clientToken,
-      AccessToken: credentials.accessToken,
-      StartUtc: `${today}T00:00:00Z`,
-      EndUtc: `${tomorrow}T23:59:59Z`,
-      Extent: {
-        Reservations: true,
-        Customers: true,
-      },
-      States: ['Confirmed', 'Started'],
-    }),
+  const reservationsRes = await mewsFetch(`${baseUrl}/reservations/getAll`, {
+    ClientToken: credentials.clientToken,
+    AccessToken: credentials.accessToken,
+    StartUtc: `${today}T00:00:00Z`,
+    EndUtc: `${tomorrow}T23:59:59Z`,
+    Extent: {
+      Reservations: true,
+      Customers: true,
+    },
+    States: ['Confirmed', 'Started'],
   });
 
   let reservations: any[] = [];
