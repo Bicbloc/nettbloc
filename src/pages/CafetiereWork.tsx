@@ -297,13 +297,46 @@ export default function CafetiereWork() {
         </div>
       </header>
 
+      {/* Recherche + filtres par statut de séjour */}
+      <div className="px-3 pt-3 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher une chambre ou un client…"
+            className="pl-9"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {([
+            { key: 'all', label: 'Toutes' },
+            { key: 'current', label: 'En cours' },
+            { key: 'arrival', label: 'Arrivée' },
+            { key: 'departure', label: 'Départ' },
+          ] as const).map((f) => (
+            <Button
+              key={f.key}
+              size="sm"
+              variant={statusFilter === f.key ? 'default' : 'outline'}
+              className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0' : 'shrink-0'}
+              onClick={() => setStatusFilter(f.key)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
       ) : rooms.length === 0 ? (
         <p className="p-6 text-muted-foreground">Aucune chambre en cours de séjour.</p>
+      ) : filteredRooms.length === 0 ? (
+        <p className="p-6 text-muted-foreground">Aucune chambre ne correspond au filtre.</p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-3">
-          {rooms.map((room) => {
+          {filteredRooms.map((room) => {
             const log = logs[room.room_number];
             const isIncluded = log ? log.included : room.breakfast_included;
             const hasCount = log && !log.included && log.people_count > 0;
@@ -324,6 +357,9 @@ export default function CafetiereWork() {
               >
                 {sent && (
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
+                )}
+                {log?.comment && (
+                  <MessageSquare className="absolute top-1 left-1 h-3 w-3 opacity-70" />
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
                 {room.guest_name && (
@@ -354,17 +390,6 @@ export default function CafetiereWork() {
         </div>
       )}
 
-      {/* Send to PMS bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-card px-4 py-3">
-        <Button
-          className="w-full bg-amber-700 hover:bg-amber-800"
-          disabled={sending || pendingPms === 0}
-          onClick={handleSendPms}
-        >
-          <Send className="h-4 w-4 mr-2" />
-          {sending ? 'Envoi…' : `Envoyer au PMS (${pendingPms})`}
-        </Button>
-      </div>
 
       {/* Bottom sheet for entry */}
       <Sheet open={!!selected} onOpenChange={(o) => { if (!o && !savingRoom) setSelected(null); }}>
