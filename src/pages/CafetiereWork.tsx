@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
   upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
+  type PmsRoom,
 } from '@/services/breakfastConfigService';
 
 interface SimpleRoom {
