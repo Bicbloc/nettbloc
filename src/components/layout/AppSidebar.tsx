@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast' | 'integrations';
 
 interface NavItem {
   value: TabValue;
