@@ -421,9 +421,23 @@ export default function CafetiereWork() {
             {selectedGuestName && (
               <p className="text-center text-sm text-muted-foreground">{selectedGuestName}</p>
             )}
+            {stayRange(selectedRoom?.check_in ?? null, selectedRoom?.check_out ?? null) && (
+              <p className="text-center text-xs text-muted-foreground">
+                Séjour : {stayRange(selectedRoom?.check_in ?? null, selectedRoom?.check_out ?? null)}
+              </p>
+            )}
           </SheetHeader>
 
           <div className="py-6 space-y-5">
+            {selectedRoom?.pms_comment && (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm flex gap-2">
+                <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Commentaire PMS</p>
+                  <p>{selectedRoom.pms_comment}</p>
+                </div>
+              </div>
+            )}
             {rooms.find((r) => r.room_number === selected)?.breakfast_included && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
                 Cette chambre a le petit-déjeuner <strong>inclus</strong> dans le séjour.
