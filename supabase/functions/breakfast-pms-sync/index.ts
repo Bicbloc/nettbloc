@@ -434,6 +434,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ─── FETCH ROOMS MODE ─────────────────────────────────────────
+    // Returns the in-house rooms today with their breakfast-inclusion status
+    // detected directly from the PMS reservations.
+    if (mode === 'fetch_rooms') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', rooms: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const rooms = await fetchMewsRooms(creds)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', rooms }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const rooms = await fetchApaleoRooms(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rooms }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+
+
     // ─── TEST / DIAGNOSTIC MODE ───────────────────────────────────
 
     if (mode === 'test') {
