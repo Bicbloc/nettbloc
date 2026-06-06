@@ -621,28 +621,37 @@ export function IncidentReportDialogSimple({
                   render={({ field }) => (
                     <FormItem className="space-y-1">
                       <FormLabel className="text-sm">Chambre *</FormLabel>
-                      {registeredRooms && registeredRooms.length > 0 ? (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="N°..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[200px]">
-                            {registeredRooms.map((room) => (
-                              <SelectItem key={room.id} value={room.room_number} className="text-sm">
-                                {room.room_number}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <Input placeholder="101..." {...field} className="h-9" />
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="N°..." />
+                          </SelectTrigger>
                         </FormControl>
-                      )}
+                        <SelectContent className="max-h-[240px]">
+                          {roomOptions.map((room) => {
+                            const stay = stayLabel(room.status, room.occupied);
+                            return (
+                              <SelectItem key={room.room_number} value={room.room_number} className="text-sm">
+                                <span className="font-medium">{room.room_number}</span>
+                                {room.guest && <span className="text-muted-foreground"> — {room.guest}</span>}
+                                {stay.label && <span className={`ml-1 ${stay.className}`}>({stay.label})</span>}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {field.value && (() => {
+                        const meta = roomMeta[field.value.trim().toLowerCase()];
+                        return meta?.guest ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Client : <span className="font-medium text-foreground">{meta.guest}</span>
+                            {(() => { const s = stayLabel(meta.status, meta.occupied); return s.label ? <span className={`ml-1 ${s.className}`}>· {s.label}</span> : null; })()}
+                          </p>
+                        ) : null;
+                      })()}
                       <FormMessage />
                     </FormItem>
+
                   )}
                 />
 
