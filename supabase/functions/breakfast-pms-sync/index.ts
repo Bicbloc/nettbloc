@@ -261,17 +261,22 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
     const name = rid ? resourceName[rid] : undefined
     if (!name) continue
     const account = r.CustomerId || r.OwnerId || r.AccountId
-    const checkIn = r.StartUtc?.split('T')[0]
-    const checkOut = r.EndUtc?.split('T')[0]
+    const checkIn = r.StartUtc?.split('T')[0] || null
+    const checkOut = r.EndUtc?.split('T')[0] || null
     let status = 'inhouse'
     if (checkOut === today) status = 'departure'
     else if (checkIn === today) status = 'arrival'
+    const comment = [r.Notes, r.ChannelManagerNumber ? null : null]
+      .filter(Boolean).join(' ').trim() || null
     rooms.push({
       room_number: String(name).trim(),
       occupied: true,
       breakfast_included: account ? breakfastAccounts.has(account) : false,
       guest_name: account ? (customerName[account] || null) : null,
       status,
+      check_in: checkIn,
+      check_out: checkOut,
+      comment,
     })
   }
   return rooms
