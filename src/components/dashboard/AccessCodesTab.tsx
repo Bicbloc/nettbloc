@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Crown, Wrench, ChevronRight, Bell, Loader2 } from "lucide-react";
+import { UserPlus, Crown, Wrench, ChevronRight, Bell, Loader2, Coffee } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,7 +22,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
   const [counts, setCounts] = useState({
     housekeepers: { total: 0, pending: 0 },
     governesses: { total: 0, pending: 0 },
-    technicians: { total: 0, pending: 0 }
+    technicians: { total: 0, pending: 0 },
+    cafetieres: { total: 0, pending: 0 }
   });
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +43,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         return;
       }
 
-      const [housekeeperRes, governessRes, technicianRes] = await Promise.all([
+      const [housekeeperRes, governessRes, technicianRes, cafetiereRes] = await Promise.all([
         supabase
           .from('housekeeper_access_requests')
           .select('id, status')
@@ -53,6 +54,10 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
           .in('hotel_id', hotelIds),
         supabase
           .from('technician_access_requests')
+          .select('id, status')
+          .in('hotel_id', hotelIds),
+        supabase
+          .from('cafetiere_access_requests')
           .select('id, status')
           .in('hotel_id', hotelIds)
       ]);
@@ -69,6 +74,10 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         technicians: {
           total: technicianRes.data?.length || 0,
           pending: technicianRes.data?.filter(r => r.status === 'pending').length || 0
+        },
+        cafetieres: {
+          total: cafetiereRes.data?.length || 0,
+          pending: cafetiereRes.data?.filter(r => r.status === 'pending').length || 0
         }
       });
     } catch (error) {
