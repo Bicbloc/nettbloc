@@ -244,14 +244,32 @@ export default function CafetiereWork() {
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [logs]
   );
-  const pendingPms = useMemo(
-    () => Object.values(logs).filter((l) => !l.included && Number(l.total_amount) > 0 && l.pms_status !== 'sent').length,
-    [logs]
-  );
   const selectedGuestName = useMemo(
     () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
     [rooms, selected]
   );
+
+  // Filtre par statut de séjour + recherche par numéro/nom de client.
+  const filteredRooms = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rooms.filter((room) => {
+      if (statusFilter !== 'all') {
+        const s = (room.status || '').toLowerCase();
+        const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+        const isArrival = s.includes('arriv') || s.includes('reserved');
+        const isCurrent = !isDeparture && !isArrival && (room.occupied || s.length > 0);
+        if (statusFilter === 'departure' && !isDeparture) return false;
+        if (statusFilter === 'arrival' && !isArrival) return false;
+        if (statusFilter === 'current' && !isCurrent) return false;
+      }
+      if (q) {
+        const hay = `${room.room_number} ${room.guest_name || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rooms, search, statusFilter]);
+
 
   if (!hotelId) {
     return (
