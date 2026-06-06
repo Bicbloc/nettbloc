@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble,
-  RefreshCw, Check, Settings,
+  RefreshCw, Check, Settings, Search,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
