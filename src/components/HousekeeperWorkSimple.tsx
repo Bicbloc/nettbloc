@@ -849,7 +849,8 @@ const HousekeeperWorkContent: React.FC = () => {
             notes,
             cleaning_priority,
             cleaning_type,
-            is_twin
+            is_twin,
+            do_not_disturb
           )
         `)
         .eq('hotel_id', hotelId)
