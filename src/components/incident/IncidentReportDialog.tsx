@@ -404,13 +404,29 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
                     <SelectValue placeholder="Sélectionner une chambre" />
                   </SelectTrigger>
                   <SelectContent>
-                    {registeredRooms.map((room) => (
-                      <SelectItem key={room.id} value={room.room_number}>
-                        Chambre {room.room_number}
-                      </SelectItem>
-                    ))}
+                    {registeredRooms.map((room) => {
+                      const stay = stayLabel(room.status, room.occupied);
+                      return (
+                        <SelectItem key={room.id} value={room.room_number}>
+                          <span className="font-medium">Chambre {room.room_number}</span>
+                          {room.guest && <span className="text-muted-foreground"> — {room.guest}</span>}
+                          {stay.label && <span className={`ml-1 ${stay.className}`}>({stay.label})</span>}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
+              ) : formData.location_type === 'room' ? (
+                <Select
+                  value={formData.location_reference}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, location_reference: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucune chambre disponible" />
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+
               ) : (
                 <Input
                   value={formData.location_reference}
