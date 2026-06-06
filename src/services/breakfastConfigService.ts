@@ -115,14 +115,14 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
   if (existing) {
     const { error } = await supabase
       .from('hotel_breakfast_configs')
-      .update(payload)
+      .update(payload as never)
       .eq('id', existing.id);
     if (error) {
       console.error('[breakfast] update config error:', error);
       return false;
     }
   } else {
-    const { error } = await supabase.from('hotel_breakfast_configs').insert(payload);
+    const { error } = await supabase.from('hotel_breakfast_configs').insert(payload as never);
     if (error) {
       console.error('[breakfast] insert config error:', error);
       return false;
