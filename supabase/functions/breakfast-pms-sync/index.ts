@@ -429,13 +429,24 @@ Deno.serve(async (req) => {
 
     const itemsOf = (log: any): BreakfastItem[] => {
       const items = Array.isArray(log.items) ? log.items : []
-      if (items.length > 0) return items.filter((i: any) => i && Number(i.qty) > 0)
+      if (items.length > 0) {
+        return items
+          .filter((i: any) => i && Number(i.qty) > 0)
+          .map((i: any) => ({
+            name: i.name || '',
+            qty: Number(i.qty),
+            price: Number(i.price),
+            productId: i.pms_product_id ?? i.productId ?? null,
+            taxCode: i.pms_tax_code ?? i.taxCode ?? null,
+          }))
+      }
       return [{
         name: log.breakfast_type || '',
         qty: Number(log.people_count) || 1,
         price: Number(log.unit_price) || Number(log.total_amount),
       }]
     }
+
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
