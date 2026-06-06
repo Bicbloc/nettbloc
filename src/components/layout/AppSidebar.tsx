@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { 
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText, 
   Brain, Archive, ClipboardCheck, Package, 
-  ChevronRight, Settings, Repeat, ShoppingCart, TicketCheck, Coffee
+  ChevronRight, Settings, Repeat, ShoppingCart, TicketCheck, Coffee, Webhook
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast' | 'integrations';
 
 interface NavItem {
   value: TabValue;
@@ -75,6 +75,7 @@ export function AppSidebar({
   const toolsItems: NavItem[] = [
     { value: 'templates', label: 'Templates', icon: <Repeat className="h-5 w-5" /> },
     { value: 'reports', label: t.dashboard.reports, icon: <FileText className="h-5 w-5" /> },
+    { value: 'integrations', label: 'Intégrations', icon: <Webhook className="h-5 w-5" />, premium: true },
     { value: 'archives', label: t.dashboard.archives, icon: <Archive className="h-5 w-5" /> },
     // Training IA retiré de la nav — accessible via Gestion des chambres > Config avancée
   ];
