@@ -548,6 +548,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ─── FETCH ROOM GUESTS MODE (Objets trouvés) ──────────────────
+    // Returns guests with their stay dates for in-house AND recently
+    // checked-out reservations, used to suggest the guest who lost an item.
+    if (mode === 'fetch_room_guests') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', guests: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const guests = await fetchMewsRoomGuests(creds)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const guests = await fetchApaleoRoomGuests(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+
+
 
 
     // ─── TEST / DIAGNOSTIC MODE ───────────────────────────────────
