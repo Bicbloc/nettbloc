@@ -332,6 +332,18 @@ export function RoomCard({
         {/* Boutons de changement rapide et menu réassignation */}
         {showActions && (
           <div className="ml-2 flex items-center gap-1 flex-shrink-0">
+            <button
+              className={`h-6 w-6 flex items-center justify-center rounded-lg transition-colors ${
+                room.doNotDisturb ? 'bg-rose-100 text-rose-700' : 'hover:bg-rose-100 text-rose-600'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDnd();
+              }}
+              title={t.rooms.doNotDisturb}
+            >
+              <Moon className="h-3 w-3" />
+            </button>
             <button 
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-purple-100 text-purple-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
