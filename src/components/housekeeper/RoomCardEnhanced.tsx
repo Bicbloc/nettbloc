@@ -19,6 +19,7 @@ interface Room {
   cleaning_type?: string;
   is_checkout?: boolean; // Client sorti
   is_twin?: boolean; // Chambre twin
+  do_not_disturb?: boolean; // Ne pas déranger
   // Guest info from PMS data
   guest_arrival?: GuestInfo;
   guest_departure?: GuestInfo;
