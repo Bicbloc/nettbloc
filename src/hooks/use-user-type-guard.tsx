@@ -21,6 +21,7 @@ const INTERFACE_NAMES: Record<AppPortal, string> = {
   housekeeper: 'Femme de chambre',
   governess: 'Gouvernante',
   technician: 'Technicien',
+  cafetiere: 'Cafetière',
 };
 
 /**
@@ -214,6 +215,38 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
             matchedTypes.push('governess');
           }
         }
+
+        const canRepairCafetiereProfile =
+          !matchedTypes.includes('cafetiere') &&
+          expectedType === 'cafetiere' &&
+          (user.user_metadata?.role === 'cafetiere' || user.user_metadata?.user_type === 'cafetiere');
+
+        if (canRepairCafetiereProfile) {
+          const fallbackName =
+            user.user_metadata?.name?.trim() ||
+            email.split('@')[0] ||
+            'Cafetière';
+
+          const { error: repairError } = await supabase
+            .from('cafetiere_profiles')
+            .upsert(
+              {
+                id: user.id,
+                email,
+                name: fallbackName,
+                phone: user.user_metadata?.phone ?? null,
+                is_active: true,
+              },
+              { onConflict: 'id' }
+            );
+
+          if (repairError) {
+            console.error('❌ Error repairing cafetiere profile:', repairError);
+          } else {
+            matchedTypes.push('cafetiere');
+          }
+        }
+
 
         const rememberedPortal = storageService.getActivePortal();
         const needsExplicitChoice =

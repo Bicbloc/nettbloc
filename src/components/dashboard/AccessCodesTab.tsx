@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Crown, Wrench, ChevronRight, Bell, Loader2 } from "lucide-react";
+import { UserPlus, Crown, Wrench, ChevronRight, Bell, Loader2, Coffee } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,7 +22,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
   const [counts, setCounts] = useState({
     housekeepers: { total: 0, pending: 0 },
     governesses: { total: 0, pending: 0 },
-    technicians: { total: 0, pending: 0 }
+    technicians: { total: 0, pending: 0 },
+    cafetieres: { total: 0, pending: 0 }
   });
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +43,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         return;
       }
 
-      const [housekeeperRes, governessRes, technicianRes] = await Promise.all([
+      const [housekeeperRes, governessRes, technicianRes, cafetiereRes] = await Promise.all([
         supabase
           .from('housekeeper_access_requests')
           .select('id, status')
@@ -53,6 +54,10 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
           .in('hotel_id', hotelIds),
         supabase
           .from('technician_access_requests')
+          .select('id, status')
+          .in('hotel_id', hotelIds),
+        supabase
+          .from('cafetiere_access_requests')
           .select('id, status')
           .in('hotel_id', hotelIds)
       ]);
@@ -69,6 +74,10 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         technicians: {
           total: technicianRes.data?.length || 0,
           pending: technicianRes.data?.filter(r => r.status === 'pending').length || 0
+        },
+        cafetieres: {
+          total: cafetiereRes.data?.length || 0,
+          pending: cafetiereRes.data?.filter(r => r.status === 'pending').length || 0
         }
       });
     } catch (error) {
@@ -90,6 +99,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'housekeeper_access_requests' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'governess_access_requests' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_access_requests' }, loadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cafetiere_access_requests' }, loadCounts)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -103,7 +113,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     );
   }
 
-  const totalPending = counts.housekeepers.pending + counts.governesses.pending + counts.technicians.pending;
+  const totalPending = counts.housekeepers.pending + counts.governesses.pending + counts.technicians.pending + counts.cafetieres.pending;
 
   return (
     <div className="space-y-6">
@@ -116,7 +126,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Femmes de chambre */}
         <Card 
           className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50 group"
@@ -210,6 +220,39 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               {counts.technicians.pending > 0 && (
                 <Badge className="bg-amber-500 hover:bg-amber-600">
                   {counts.technicians.pending} en attente
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cafetières */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-all hover:border-amber-600/50 group"
+          onClick={() => navigate('/access/cafetieres')}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-600/10">
+                  <Coffee className="h-6 w-6 text-amber-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Cafetières</CardTitle>
+                  <CardDescription>Gérer les demandes d'accès</CardDescription>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-amber-600 transition-colors" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="text-sm">
+                {counts.cafetieres.total} demande{counts.cafetieres.total !== 1 ? 's' : ''}
+              </Badge>
+              {counts.cafetieres.pending > 0 && (
+                <Badge className="bg-amber-500 hover:bg-amber-600">
+                  {counts.cafetieres.pending} en attente
                 </Badge>
               )}
             </div>
