@@ -1552,6 +1552,8 @@ export type Database = {
           hotel_id: string
           id: string
           is_active: boolean
+          pms_service_id: string | null
+          pms_tax_code: string | null
           price_per_person: number
           pricing_source: string
           updated_at: string
@@ -1564,6 +1566,8 @@ export type Database = {
           hotel_id: string
           id?: string
           is_active?: boolean
+          pms_service_id?: string | null
+          pms_tax_code?: string | null
           price_per_person?: number
           pricing_source?: string
           updated_at?: string
@@ -1576,6 +1580,8 @@ export type Database = {
           hotel_id?: string
           id?: string
           is_active?: boolean
+          pms_service_id?: string | null
+          pms_tax_code?: string | null
           price_per_person?: number
           pricing_source?: string
           updated_at?: string
