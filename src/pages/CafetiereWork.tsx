@@ -52,6 +52,7 @@ export default function CafetiereWork() {
   const [savingRoom, setSavingRoom] = useState(false);
   const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirmBillIncluded, setConfirmBillIncluded] = useState(false);
 
   // Quantité par prestation (clé = nom du type) + inclus dans le séjour
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
