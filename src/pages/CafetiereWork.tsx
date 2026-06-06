@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
-  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, todayDate,
+  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
 } from '@/services/breakfastConfigService';
 
 interface SimpleRoom {
@@ -70,9 +70,19 @@ export default function CafetiereWork() {
       loadBreakfastConfig(hotelId),
       hasActivePmsConfig(hotelId),
     ]);
+    // Inclusion du petit-déjeuner récupérée en temps réel depuis le PMS (Mews/Apaleo).
+    let includedMap: Record<string, boolean> = {};
+    if (pmsOk) {
+      const pmsRooms = await fetchPmsRooms(hotelId);
+      if (pmsRooms.ok) {
+        includedMap = Object.fromEntries(
+          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r.breakfast_included])
+        );
+      }
+    }
     const list: SimpleRoom[] = (roomData || []).map((r) => ({
       room_number: r.room_number,
-      breakfast_included: false,
+      breakfast_included: includedMap[String(r.room_number).trim().toLowerCase()] ?? false,
     }));
     setRooms(list);
     setConfig(cfg);

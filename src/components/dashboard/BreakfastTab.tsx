@@ -2,7 +2,7 @@
  * Onglet admin : configuration de la facturation des petits-déjeuners.
  */
 import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download } from 'lucide-react';
+import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble, RefreshCw, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,13 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity, fetchPmsProducts,
+  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
+  fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 
@@ -30,6 +34,11 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [testing, setTesting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
+  const [previewProducts, setPreviewProducts] = useState<PmsProduct[] | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [rooms, setRooms] = useState<PmsRoom[] | null>(null);
+  const [roomsLoading, setRoomsLoading] = useState(false);
 
   useEffect(() => {
     if (!currentHotelId) return;
@@ -111,6 +120,38 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     });
     toast.success(`${types.length} prestation(s) importée(s) depuis le PMS. Pensez à enregistrer.`);
   };
+
+  // Prévisualise les prestations récupérables depuis le PMS, sans les importer.
+  const handlePreviewProducts = async () => {
+    if (!currentHotelId) return;
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewProducts(null);
+    const res = await fetchPmsProducts(currentHotelId);
+    setPreviewLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération impossible');
+      setPreviewProducts([]);
+      return;
+    }
+    setPreviewProducts(res.products);
+  };
+
+  const handleLoadRooms = async () => {
+    if (!currentHotelId) return;
+    setRoomsLoading(true);
+    const res = await fetchPmsRooms(currentHotelId);
+    setRoomsLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération des chambres impossible');
+      setRooms([]);
+      return;
+    }
+    setRooms(res.rooms);
+    toast.success(`${res.rooms.length} chambre(s) en séjour récupérée(s) depuis le PMS.`);
+  };
+
+
 
 
   return (
@@ -218,13 +259,23 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
             Importez les prestations directement depuis votre PMS (Mews / Apaleo) — une seule
             configuration — ou ajoutez-les manuellement (ex. Continental, Buffet).
           </CardDescription>
-          <Button
-            variant="secondary" size="sm" className="gap-2 mt-2 w-fit"
-            onClick={handleImportProducts} disabled={importing}
-          >
-            <Download className="h-4 w-4" />
-            {importing ? 'Import en cours…' : 'Importer les prestations depuis le PMS'}
-          </Button>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Button
+              variant="secondary" size="sm" className="gap-2 w-fit"
+              onClick={handleImportProducts} disabled={importing}
+            >
+              <Download className="h-4 w-4" />
+              {importing ? 'Import en cours…' : 'Importer les prestations depuis le PMS'}
+            </Button>
+            <Button
+              variant="outline" size="sm" className="gap-2 w-fit"
+              onClick={handlePreviewProducts} disabled={previewLoading}
+              title="Voir les prestations récupérables depuis le PMS"
+            >
+              <Eye className="h-4 w-4" />
+              {previewLoading ? 'Test…' : 'Tester / voir les prestations'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {config.breakfast_types.length === 0 && (
@@ -315,10 +366,101 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
 
 
 
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BedDouble className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Chambres &amp; petit-déjeuner</CardTitle>
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleLoadRooms} disabled={roomsLoading}>
+              <RefreshCw className={`h-4 w-4 ${roomsLoading ? 'animate-spin' : ''}`} />
+              {roomsLoading ? 'Chargement…' : 'Récupérer les chambres'}
+            </Button>
+          </div>
+          <CardDescription>
+            Chambres en séjour récupérées depuis le PMS. En vert : le petit-déjeuner est
+            déjà inclus dans la réservation ; en ambre : non inclus (à déclarer / facturer).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {rooms === null ? (
+            <p className="text-sm text-muted-foreground">
+              Cliquez sur « Récupérer les chambres » pour afficher l'occupation du jour.
+            </p>
+          ) : rooms.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucune chambre en séjour aujourd'hui.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-4 mb-3 text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-emerald-500 inline-block" />
+                  Inclus ({rooms.filter((r) => r.breakfast_included).length})
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-amber-500 inline-block" />
+                  Non inclus ({rooms.filter((r) => !r.breakfast_included).length})
+                </span>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                {rooms
+                  .slice()
+                  .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+                  .map((r) => (
+                    <div
+                      key={r.room_number}
+                      title={r.guest_name || undefined}
+                      className={[
+                        'rounded-lg border p-2 text-center',
+                        r.breakfast_included
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : 'bg-amber-50 border-amber-200 text-amber-700',
+                      ].join(' ')}
+                    >
+                      <p className="font-bold text-sm">{r.room_number}</p>
+                      <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
+                        {r.breakfast_included ? (<><Check className="h-3 w-3" /> Inclus</>) : 'Non inclus'}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Button onClick={handleSave} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" />
         {saving ? 'Enregistrement…' : 'Enregistrer'}
       </Button>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prestations récupérables depuis le PMS</DialogTitle>
+            <DialogDescription>
+              Aperçu des prestations petit-déjeuner détectées. Utilisez « Importer » pour les ajouter.
+            </DialogDescription>
+          </DialogHeader>
+          {previewLoading ? (
+            <p className="text-sm text-muted-foreground py-4">Récupération en cours…</p>
+          ) : !previewProducts || previewProducts.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">Aucune prestation trouvée.</p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {previewProducts.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
+                  <span className="truncate">{p.name}</span>
+                  <span className="font-medium shrink-0 ml-2">
+                    {p.price.toFixed(2)} {p.currency || config.currency}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

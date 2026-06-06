@@ -305,3 +305,31 @@ export async function fetchPmsProducts(
   return { ok: true, service_id: data.service_id ?? null, products: (data.products || []) as PmsProduct[] };
 }
 
+export interface PmsRoom {
+  room_number: string;
+  occupied: boolean;
+  breakfast_included: boolean;
+  guest_name: string | null;
+  status: string | null;
+}
+
+/**
+ * Récupère les chambres en cours de séjour depuis le PMS (Mews/Apaleo) avec leur
+ * statut d'inclusion du petit-déjeuner détecté à partir des réservations.
+ */
+export async function fetchPmsRooms(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; rooms: PmsRoom[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_rooms' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, rooms: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucune chambre trouvée', rooms: [] };
+  }
+  return { ok: true, rooms: (data.rooms || []) as PmsRoom[] };
+}
+
+
