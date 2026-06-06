@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Package, Camera, User, Calendar, ArrowRight, ArrowLeft } from "lucide-react";
+import { fetchRoomGuestOptions, type RoomGuestOption } from "@/components/lost-and-found/roomGuestLookup";
 
 export interface GuestInfo {
   firstName?: string;
@@ -89,6 +90,7 @@ export function ReportLostItemDialog({
   const [uploading, setUploading] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<string>("");
   const [availableRooms, setAvailableRooms] = useState<string[]>([]);
+  const [fetchedGuestOptions, setFetchedGuestOptions] = useState<RoomGuestOption[]>([]);
   const [manualRoom, setManualRoom] = useState(false);
 
   const { toast } = useToast();
@@ -132,19 +134,56 @@ export function ReportLostItemDialog({
     return () => { cancelled = true; };
   }, [open, hotelId]);
 
-  // Options de clients à proposer (départ = check-out, en cours = staying, arrivée)
-  const guestOptions = [
+  const clearGuestFields = () => {
+    setGuestFirstName("");
+    setGuestName("");
+    setGuestCheckIn("");
+    setGuestCheckOut("");
+  };
+
+  const fallbackGuestOptions = [
     guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
     guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
     guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
   ].filter(Boolean) as { key: string; label: string; info: GuestInfo }[];
 
+  const shouldUseFallbackGuestOptions =
+    !!defaultRoomNumber && roomNumber.trim().toLowerCase() === defaultRoomNumber.trim().toLowerCase();
+
+  const guestOptions = fetchedGuestOptions.length > 0
+    ? fetchedGuestOptions
+    : shouldUseFallbackGuestOptions
+      ? fallbackGuestOptions
+      : [];
+
   // Determine available guests
-  const hasSingleGuest = guestStaying || (guestArrival && !guestDeparture) || (guestDeparture && !guestArrival);
+  const hasSingleGuest = guestOptions.length === 1;
+
+  useEffect(() => {
+    if (!open || locationType !== "room") return;
+
+    const normalizedRoom = roomNumber.trim();
+    setFetchedGuestOptions([]);
+
+    if (!normalizedRoom) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const options = await fetchRoomGuestOptions(hotelId, normalizedRoom);
+      if (!cancelled) {
+        setFetchedGuestOptions(options);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, hotelId, locationType, roomNumber]);
 
   // Pre-fill guest info when dialog opens or guest selection changes
   useEffect(() => {
-    if (!open) return;
+    if (!open || locationType !== "room") return;
     if (selectedGuest === 'manual') return;
 
     // Si plusieurs clients sont proposés, on suit la sélection radio
@@ -160,15 +199,24 @@ export function ReportLostItemDialog({
       setGuestName(guestToUse.lastName || "");
       setGuestCheckIn(guestToUse.checkIn || "");
       setGuestCheckOut(guestToUse.checkOut || "");
+    } else {
+      clearGuestFields();
     }
-  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
+  }, [open, locationType, selectedGuest, guestOptions]);
 
   // Sélection par défaut : le client en départ (check-out), le plus probable propriétaire
   useEffect(() => {
-    if (open && guestOptions.length > 1 && !selectedGuest) {
+    if (!open || locationType !== "room") return;
+
+    if (guestOptions.length === 0) {
+      setSelectedGuest("");
+      return;
+    }
+
+    if (!guestOptions.some((guest) => guest.key === selectedGuest)) {
       setSelectedGuest(guestOptions[0].key);
     }
-  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
+  }, [open, locationType, guestOptions, selectedGuest]);
 
 
   const createItemMutation = useMutation({
@@ -257,6 +305,7 @@ export function ReportLostItemDialog({
     setGuestCheckOut("");
     setImageUrl("");
     setSelectedGuest("");
+    setFetchedGuestOptions([]);
     setManualRoom(false);
   };
 

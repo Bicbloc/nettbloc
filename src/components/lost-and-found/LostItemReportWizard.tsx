@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { createNotification } from "@/services/notificationService";
@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Package, 
   Camera, 
@@ -36,6 +37,7 @@ import {
   FileText,
   Search
 } from "lucide-react";
+import { fetchRoomGuestOptions, type RoomGuestOption } from "@/components/lost-and-found/roomGuestLookup";
 
 export interface GuestInfo {
   firstName?: string;
@@ -135,6 +137,8 @@ export function LostItemReportWizard({
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestCheckIn, setGuestCheckIn] = useState("");
   const [guestCheckOut, setGuestCheckOut] = useState("");
+  const [selectedGuest, setSelectedGuest] = useState("");
+  const [fetchedGuestOptions, setFetchedGuestOptions] = useState<RoomGuestOption[]>([]);
 
   // Search query for categories
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
@@ -154,23 +158,83 @@ export function LostItemReportWizard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Determine best guest info to use
-  const bestGuest = useMemo(() => {
-    if (guestDeparture) return guestDeparture;
-    if (guestStaying) return guestStaying;
-    if (guestArrival) return guestArrival;
-    return null;
-  }, [guestArrival, guestDeparture, guestStaying]);
+  const clearGuestFields = useCallback(() => {
+    setGuestFirstName("");
+    setGuestName("");
+    setGuestCheckIn("");
+    setGuestCheckOut("");
+  }, []);
 
-  // Auto-fill guest info when room is selected
+  const fallbackGuestOptions = useMemo(() => [
+    guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
+    guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
+    guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
+  ].filter(Boolean) as RoomGuestOption[], [guestArrival, guestDeparture, guestStaying]);
+
+  const shouldUseFallbackGuestOptions =
+    !!defaultRoomNumber && roomNumber.trim().toLowerCase() === defaultRoomNumber.trim().toLowerCase();
+
+  const guestOptions = useMemo(() => {
+    if (fetchedGuestOptions.length > 0) return fetchedGuestOptions;
+    if (shouldUseFallbackGuestOptions) return fallbackGuestOptions;
+    return [] as RoomGuestOption[];
+  }, [fetchedGuestOptions, shouldUseFallbackGuestOptions, fallbackGuestOptions]);
+
   useEffect(() => {
-    if (open && locationType === "room" && bestGuest) {
-      setGuestFirstName(bestGuest.firstName || "");
-      setGuestName(bestGuest.lastName || "");
-      setGuestCheckIn(bestGuest.checkIn || "");
-      setGuestCheckOut(bestGuest.checkOut || "");
+    if (!open || locationType !== "room") return;
+
+    setFetchedGuestOptions([]);
+
+    const normalizedRoom = roomNumber.trim();
+    if (!normalizedRoom) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const options = await fetchRoomGuestOptions(hotelId, normalizedRoom);
+      if (!cancelled) {
+        setFetchedGuestOptions(options);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, hotelId, locationType, roomNumber]);
+
+  useEffect(() => {
+    if (!open || locationType !== "room") return;
+    if (selectedGuest === 'manual') return;
+
+    let guestToUse: GuestInfo | undefined;
+    if (guestOptions.length > 1) {
+      guestToUse = guestOptions.find((guest) => guest.key === selectedGuest)?.info;
+    } else {
+      guestToUse = guestOptions[0]?.info;
     }
-  }, [open, locationType, bestGuest]);
+
+    if (guestToUse) {
+      setGuestFirstName(guestToUse.firstName || "");
+      setGuestName(guestToUse.lastName || "");
+      setGuestCheckIn(guestToUse.checkIn || "");
+      setGuestCheckOut(guestToUse.checkOut || "");
+    } else {
+      clearGuestFields();
+    }
+  }, [open, locationType, selectedGuest, guestOptions, clearGuestFields]);
+
+  useEffect(() => {
+    if (!open || locationType !== "room") return;
+
+    if (guestOptions.length === 0) {
+      setSelectedGuest("");
+      return;
+    }
+
+    if (!guestOptions.some((guest) => guest.key === selectedGuest)) {
+      setSelectedGuest(guestOptions[0].key);
+    }
+  }, [open, locationType, guestOptions, selectedGuest]);
 
   // Reset on close
   useEffect(() => {
@@ -191,6 +255,8 @@ export function LostItemReportWizard({
       setGuestFirstName("");
       setGuestCheckIn("");
       setGuestCheckOut("");
+      setSelectedGuest("");
+      setFetchedGuestOptions([]);
       setCategorySearchQuery("");
     }
   }, [open, defaultRoomNumber]);
@@ -884,6 +950,45 @@ export function LostItemReportWizard({
             {/* STEP: Guest Name */}
             {currentStep === 'guest_name' && (
               <div className="space-y-4">
+                {guestOptions.length > 0 && (
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Quel client a oublié l'objet ?
+                    </h4>
+                    <RadioGroup value={selectedGuest} onValueChange={setSelectedGuest} className="space-y-2">
+                      {guestOptions.map((guest) => (
+                        <div key={guest.key} className="flex items-center space-x-3 rounded-lg border border-border bg-background p-3">
+                          <RadioGroupItem value={guest.key} id={`wizard-guest-${guest.key}`} />
+                          <label htmlFor={`wizard-guest-${guest.key}`} className="flex-1 cursor-pointer text-sm">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                {guest.key === 'departure' ? (
+                                  <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+                                ) : guest.key === 'arrival' ? (
+                                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <span className="font-medium">{guest.label}</span>
+                                <span className="text-muted-foreground">
+                                  {guest.info.firstName} {guest.info.lastName}
+                                </span>
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      ))}
+                      <div className="flex items-center space-x-3 rounded-lg border border-border bg-background p-3">
+                        <RadioGroupItem value="manual" id="wizard-guest-manual" />
+                        <label htmlFor="wizard-guest-manual" className="flex-1 cursor-pointer text-sm font-medium">
+                          Saisir manuellement
+                        </label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <label className="text-sm text-muted-foreground">Prénom</label>
@@ -891,6 +996,7 @@ export function LostItemReportWizard({
                       placeholder="Prénom..."
                       value={guestFirstName}
                       onChange={(e) => setGuestFirstName(e.target.value)}
+                      readOnly={!!selectedGuest && selectedGuest !== 'manual'}
                       className="h-12"
                     />
                   </div>
@@ -900,11 +1006,12 @@ export function LostItemReportWizard({
                       placeholder="Nom..."
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
+                      readOnly={!!selectedGuest && selectedGuest !== 'manual'}
                       className="h-12"
                     />
                   </div>
                 </div>
-                {bestGuest && (
+                {guestOptions.length > 0 && (
                   <p className="text-xs text-muted-foreground text-center">
                     💡 Informations pré-remplies depuis les données de la chambre
                   </p>
@@ -922,6 +1029,7 @@ export function LostItemReportWizard({
                       type="date"
                       value={guestCheckIn}
                       onChange={(e) => setGuestCheckIn(e.target.value)}
+                      readOnly={!!selectedGuest && selectedGuest !== 'manual'}
                       className="h-12"
                     />
                   </div>
@@ -931,6 +1039,7 @@ export function LostItemReportWizard({
                       type="date"
                       value={guestCheckOut}
                       onChange={(e) => setGuestCheckOut(e.target.value)}
+                      readOnly={!!selectedGuest && selectedGuest !== 'manual'}
                       className="h-12"
                     />
                   </div>
