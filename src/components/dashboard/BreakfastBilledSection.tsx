@@ -132,7 +132,54 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
           <RefreshCw className="h-4 w-4" />
         </Button>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
+        {/* Ajout manuel d'une chambre par l'admin */}
+        <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
+          <p className="text-sm font-medium flex items-center gap-1">
+            <Plus className="h-4 w-4" /> Ajouter une chambre
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Chambre</label>
+              <Input
+                className="w-24"
+                placeholder="N°"
+                value={addRoom}
+                onChange={(e) => setAddRoom(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Quantité</label>
+              <Input
+                className="w-20"
+                type="number"
+                min={1}
+                value={addQty}
+                onChange={(e) => setAddQty(Math.max(1, Number(e.target.value)))}
+              />
+            </div>
+            {breakfastTypes.length > 0 && (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Type</label>
+                <Select value={addType} onValueChange={setAddType}>
+                  <SelectTrigger className="w-44"><SelectValue placeholder="Type" /></SelectTrigger>
+                  <SelectContent>
+                    {breakfastTypes.map((t) => (
+                      <SelectItem key={t.name} value={t.name}>
+                        {t.name} — {t.price.toFixed(2)} {currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button onClick={handleAdd} disabled={adding} className="gap-1">
+              <Plus className="h-4 w-4" />
+              {adding ? 'Ajout…' : `Ajouter (${(addQty * addUnitPrice).toFixed(2)} ${currency})`}
+            </Button>
+          </div>
+        </div>
+
         {loading ? (
           <p className="text-muted-foreground">Chargement…</p>
         ) : billed.length === 0 ? (
