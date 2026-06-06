@@ -423,7 +423,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const creds = (config.credentials || {}) as PmsCredentials
+    const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
     let sent = 0
     let failed = 0
 
