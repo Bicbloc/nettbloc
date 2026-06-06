@@ -19,15 +19,28 @@ import {
   upsertBreakfastLog, todayDate,
 } from '@/services/breakfastConfigService';
 
+interface RoomMeta {
+  guest_name: string | null;
+  status: string | null;
+}
+
 interface Props {
   hotelId: string;
   currency: string;
   breakfastTypes: BreakfastType[];
   pricePerPerson: number;
   availableRooms?: string[];
+  roomMeta?: Record<string, RoomMeta>;
 }
 
-export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [] }: Props) {
+const stayText = (status: string | null | undefined): string => {
+  if (status === 'departure') return 'Check-out';
+  if (status === 'arrival') return 'Arrivée';
+  if (status) return 'En cours';
+  return '';
+};
+
+export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [], roomMeta = {} }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
