@@ -29,6 +29,7 @@ import {
   fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
+import { CafetiereShareCard } from '@/components/dashboard/CafetiereShareCard';
 
 interface BreakfastTabProps {
   currentHotelId: string | null;
