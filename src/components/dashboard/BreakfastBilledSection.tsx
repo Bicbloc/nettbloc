@@ -240,10 +240,6 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
                 </div>
               ))}
             </div>
-            <Button onClick={handleSend} disabled={sending || pendingPms === 0} className="gap-2">
-              <Send className="h-4 w-4" />
-              {sending ? 'Envoi…' : `Envoyer au PMS (${pendingPms})`}
-            </Button>
           </>
         )}
       </CardContent>
