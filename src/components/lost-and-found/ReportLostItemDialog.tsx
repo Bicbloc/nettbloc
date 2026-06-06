@@ -313,16 +313,42 @@ export function ReportLostItemDialog({
             </Select>
           </div>
 
-          {/* Room Number (if room) */}
+          {/* Room Number (if room) - liste des chambres existantes */}
           {locationType === "room" && (
             <div className="space-y-2">
-              <Label htmlFor="roomNumber">Numéro de chambre</Label>
-              <Input
-                id="roomNumber"
-                placeholder="Ex: 101"
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-              />
+              <Label htmlFor="roomNumber">Chambre</Label>
+              {availableRooms.length > 0 && !manualRoom ? (
+                <Select
+                  value={availableRooms.includes(roomNumber) ? roomNumber : ""}
+                  onValueChange={(v) => {
+                    if (v === "__manual__") {
+                      setManualRoom(true);
+                      setRoomNumber("");
+                    } else {
+                      setRoomNumber(v);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une chambre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((rn) => (
+                      <SelectItem key={rn} value={rn}>
+                        Chambre {rn}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__manual__">Autre / saisir manuellement…</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="roomNumber"
+                  placeholder="Ex: 101"
+                  value={roomNumber}
+                  onChange={(e) => setRoomNumber(e.target.value)}
+                />
+              )}
             </div>
           )}
 
