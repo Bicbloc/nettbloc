@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig,
 } from '@/services/breakfastConfigService';
+import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
+
+
 
 interface BreakfastTabProps {
   currentHotelId: string | null;
