@@ -80,19 +80,52 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
 
   const loadRegisteredRooms = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hotel_rooms_registry')
-        .select('id, room_number')
-        .eq('hotel_id', hotelId)
-        .eq('is_active', true)
-        .order('room_number');
+      const [{ data, error }, pmsRes] = await Promise.all([
+        supabase
+          .from('hotel_rooms_registry')
+          .select('id, room_number')
+          .eq('hotel_id', hotelId)
+          .eq('is_active', true)
+          .order('room_number'),
+        fetchPmsRooms(hotelId),
+      ]);
 
       if (error) throw error;
-      setRegisteredRooms(data || []);
+
+      // Carte des chambres remontées par le PMS (nom du client + statut séjour),
+      // y compris les départs (check-out).
+      const pmsMap = new Map<string, { guest: string | null; status: string | null; occupied: boolean }>();
+      if (pmsRes.ok) {
+        for (const r of pmsRes.rooms) {
+          pmsMap.set(String(r.room_number).trim(), {
+            guest: r.guest_name, status: r.status, occupied: r.occupied,
+          });
+        }
+      }
+
+      const byNumber = new Map<string, { room_number: string; id: string; guest: string | null; status: string | null; occupied: boolean }>();
+      // PMS d'abord (chambres en séjour / départ)
+      if (pmsRes.ok) {
+        for (const r of pmsRes.rooms) {
+          const key = String(r.room_number).trim();
+          byNumber.set(key, { id: `pms-${key}`, room_number: key, guest: r.guest_name, status: r.status, occupied: r.occupied });
+        }
+      }
+      for (const r of data || []) {
+        const key = String(r.room_number).trim();
+        if (!byNumber.has(key)) {
+          byNumber.set(key, { id: r.id, room_number: key, guest: null, status: null, occupied: false });
+        }
+      }
+      const merged = Array.from(byNumber.values()).sort((a, b) =>
+        a.room_number.localeCompare(b.room_number, undefined, { numeric: true })
+      );
+      setRegisteredRooms(merged);
     } catch (error) {
       console.error('Erreur lors du chargement des chambres:', error);
     }
   };
+
 
   const loadInventory = async () => {
     const [categoriesRes, typesRes, rolesRes] = await Promise.all([
