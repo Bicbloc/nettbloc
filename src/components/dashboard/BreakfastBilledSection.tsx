@@ -24,9 +24,10 @@ interface Props {
   currency: string;
   breakfastTypes: BreakfastType[];
   pricePerPerson: number;
+  availableRooms?: string[];
 }
 
-export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson }: Props) {
+export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [] }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -141,12 +142,20 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Chambre</label>
-              <Input
-                className="w-24"
-                placeholder="N°"
-                value={addRoom}
-                onChange={(e) => setAddRoom(e.target.value)}
-              />
+              <Select value={addRoom} onValueChange={setAddRoom}>
+                <SelectTrigger className="w-32"><SelectValue placeholder="Chambre" /></SelectTrigger>
+                <SelectContent>
+                  {availableRooms.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Aucune chambre disponible
+                    </div>
+                  ) : (
+                    availableRooms.map((rn) => (
+                      <SelectItem key={rn} value={rn}>{rn}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Quantité</label>
