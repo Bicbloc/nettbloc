@@ -426,23 +426,44 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
                       Client
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    {selectedItem.guest_name || selectedItem.guest_first_name ? (
-                      <>
-                        <p>
-                          {selectedItem.guest_first_name} {selectedItem.guest_name}
-                        </p>
-                        {selectedItem.guest_check_in && (
-                          <p className="text-sm text-muted-foreground">
-                            Séjour: {format(new Date(selectedItem.guest_check_in), "dd/MM/yyyy")}
-                            {selectedItem.guest_check_out &&
-                              ` - ${format(new Date(selectedItem.guest_check_out), "dd/MM/yyyy")}`}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground">Aucune information</p>
-                    )}
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+                        <Input
+                          value={guestFirstName}
+                          onChange={(e) => setGuestFirstName(e.target.value)}
+                          placeholder="Prénom du client"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Nom</label>
+                        <Input
+                          value={guestName}
+                          onChange={(e) => setGuestName(e.target.value)}
+                          placeholder="Nom du client"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Arrivée</label>
+                        <Input
+                          type="date"
+                          value={guestCheckIn}
+                          onChange={(e) => setGuestCheckIn(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Départ</label>
+                        <Input
+                          type="date"
+                          value={guestCheckOut}
+                          onChange={(e) => setGuestCheckOut(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Modifiable manuellement par l'établissement.
+                    </p>
                   </CardContent>
                 </Card>
               </div>
