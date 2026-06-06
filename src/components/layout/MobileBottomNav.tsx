@@ -24,7 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast';
 
 interface MobileBottomNavProps {
   activeTab: TabValue;
