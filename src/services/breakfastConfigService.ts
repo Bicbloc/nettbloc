@@ -18,6 +18,10 @@ export interface BreakfastConfig {
   currency: string;
   breakfast_types: BreakfastType[];
   default_included: boolean;
+  /** Identifiant du service Mews/PMS sous lequel facturer (requis pour Mews). */
+  pms_service_id: string | null;
+  /** Code de taxe PMS appliqué aux charges (requis pour Mews). */
+  pms_tax_code: string | null;
 }
 
 export interface BreakfastLogItem {
