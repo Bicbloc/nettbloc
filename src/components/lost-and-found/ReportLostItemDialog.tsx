@@ -119,7 +119,6 @@ export function ReportLostItemDialog({
   ].filter(Boolean) as { key: string; label: string; info: GuestInfo }[];
 
   // Determine available guests
-  const hasMultipleGuests = guestArrival && guestDeparture;
   const hasSingleGuest = guestStaying || (guestArrival && !guestDeparture) || (guestDeparture && !guestArrival);
 
   // Pre-fill guest info when dialog opens or guest selection changes
