@@ -70,6 +70,21 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     );
   };
 
+  const handleTest = async () => {
+    if (!currentHotelId) return;
+    setTesting(true);
+    setTestResult(null);
+    const res = await testPmsConnectivity(currentHotelId);
+    setTesting(false);
+    setTestResult(res);
+    if (res.ok) {
+      toast.success(`Connexion ${String(res.pms || 'PMS').toUpperCase()} OK`);
+    } else {
+      toast.error(res.error || 'Connexion PMS impossible');
+    }
+  };
+
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
