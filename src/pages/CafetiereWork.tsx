@@ -50,7 +50,6 @@ export default function CafetiereWork() {
   const [config, setConfig] = useState<BreakfastConfig | null>(null);
   const [logs, setLogs] = useState<Record<string, BreakfastLog>>({});
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [savingRoom, setSavingRoom] = useState(false);
   const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
