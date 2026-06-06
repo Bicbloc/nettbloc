@@ -26,10 +26,51 @@ interface Props {
   pricePerPerson: number;
 }
 
-export function BreakfastBilledSection({ hotelId, currency }: Props) {
+export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+
+  // Ajout manuel par l'admin
+  const [addRoom, setAddRoom] = useState('');
+  const [addQty, setAddQty] = useState(1);
+  const [addType, setAddType] = useState<string>(breakfastTypes[0]?.name || '');
+  const [adding, setAdding] = useState(false);
+
+  const addUnitPrice = useMemo(() => {
+    const found = breakfastTypes.find((t) => t.name === addType);
+    return found ? found.price : pricePerPerson;
+  }, [breakfastTypes, addType, pricePerPerson]);
+
+  const handleAdd = async () => {
+    const room = addRoom.trim();
+    if (!room || addQty <= 0) {
+      toast.error('Indiquez un numéro de chambre et une quantité.');
+      return;
+    }
+    setAdding(true);
+    const items = [{ name: addType || 'Petit-déjeuner', qty: addQty, price: addUnitPrice }];
+    const ok = await upsertBreakfastLog({
+      hotelId,
+      roomNumber: room,
+      peopleCount: addQty,
+      breakfastType: addType || null,
+      unitPrice: addUnitPrice,
+      included: false,
+      items,
+      loggedBy: 'Admin',
+    });
+    setAdding(false);
+    if (ok) {
+      toast.success(`Chambre ${room} ajoutée`);
+      setAddRoom('');
+      setAddQty(1);
+      refresh();
+    } else {
+      toast.error("Échec de l'ajout");
+    }
+  };
+
 
   const refresh = useCallback(async () => {
     setLoading(true);
