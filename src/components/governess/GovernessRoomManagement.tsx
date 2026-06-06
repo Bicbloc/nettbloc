@@ -76,6 +76,23 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const [noteText, setNoteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Femmes de chambre disponibles aujourd'hui (présence gérée par la gouvernante).
+  const today = new Date().toISOString().split('T')[0];
+  const availableStorageKey = `gov_available_${hotelId}_${today}`;
+  const [availableIds, setAvailableIds] = useState<Set<string>>(new Set());
+  const [availableInitialized, setAvailableInitialized] = useState(false);
+
+  const toggleAvailable = (id: string) => {
+    setAvailableIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(availableStorageKey, JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const availableHousekeepers = housekeepers.filter(h => h.is_active && availableIds.has(h.id));
+
   const loadData = useCallback(async () => {
     try {
       // Charger toutes les chambres
@@ -144,6 +161,22 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     tables: ['rooms', 'assignments', 'room_inspections'],
     onUpdate: handleRealtimeUpdate
   });
+
+  // Initialiser la liste des disponibilités une fois les femmes de chambre chargées :
+  // on restaure le choix du jour (localStorage) ou, à défaut, toutes les actives.
+  useEffect(() => {
+    if (availableInitialized || housekeepers.length === 0) return;
+    const activeIds = housekeepers.filter(h => h.is_active).map(h => h.id);
+    let initial: string[] | null = null;
+    try {
+      const raw = localStorage.getItem(availableStorageKey);
+      if (raw) initial = (JSON.parse(raw) as string[]).filter(id => activeIds.includes(id));
+    } catch { /* ignore */ }
+    setAvailableIds(new Set(initial ?? activeIds));
+    setAvailableInitialized(true);
+  }, [housekeepers, availableInitialized, availableStorageKey]);
+
+
 
   const handleAssign = async () => {
     if (!selectedRoom || !selectedHousekeeper) return;
@@ -412,6 +445,46 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       ) : (
       <>
 
+      {/* Femmes de chambre disponibles aujourd'hui */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-sm">Femmes de chambre disponibles aujourd'hui</h3>
+          <Badge variant="secondary" className="ml-auto">{availableHousekeepers.length}</Badge>
+        </div>
+        {housekeepers.filter(h => h.is_active).length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucune femme de chambre active. Ajoutez-les depuis l'espace établissement.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {housekeepers.filter(h => h.is_active).map(h => {
+              const on = availableIds.has(h.id);
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => toggleAvailable(h.id)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                    on
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {on ? <Check className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}
+                  {h.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Seules les femmes de chambre cochées peuvent recevoir des chambres à nettoyer.
+        </p>
+      </Card>
+
+
+
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <Card className="p-3 text-center">
@@ -590,18 +663,25 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
             <DialogTitle>Assigner la chambre {selectedRoom?.room_number}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une femme de chambre" />
-              </SelectTrigger>
-              <SelectContent>
-                {housekeepers.filter(h => h.is_active).map(h => (
-                  <SelectItem key={h.id} value={h.id}>
-                    {h.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {availableHousekeepers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune femme de chambre disponible. Sélectionnez d'abord les présentes du jour
+                en haut de l'onglet « Chambres ».
+              </p>
+            ) : (
+              <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une femme de chambre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableHousekeepers.map(h => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialog(false)}>Annuler</Button>
