@@ -88,9 +88,35 @@ export function ReportLostItemDialog({
   const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<string>("");
+  const [availableRooms, setAvailableRooms] = useState<string[]>([]);
+  const [manualRoom, setManualRoom] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Charger les chambres existantes de l'hôtel pour les proposer dans une liste
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("rooms")
+        .select("room_number")
+        .eq("hotel_id", hotelId)
+        .order("room_number");
+      if (!cancelled && data) {
+        setAvailableRooms(data.map((r) => r.room_number));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, hotelId]);
+
+  // Options de clients à proposer (départ = check-out, en cours = staying, arrivée)
+  const guestOptions = [
+    guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
+    guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
+    guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
+  ].filter(Boolean) as { key: string; label: string; info: GuestInfo }[];
 
   // Determine available guests
   const hasMultipleGuests = guestArrival && guestDeparture;
