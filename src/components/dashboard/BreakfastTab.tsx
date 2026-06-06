@@ -85,6 +85,33 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     }
   };
 
+  const handleImportProducts = async () => {
+    if (!currentHotelId) return;
+    setImporting(true);
+    const res = await fetchPmsProducts(currentHotelId);
+    setImporting(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Import des prestations impossible');
+      return;
+    }
+    if (res.products.length === 0) {
+      toast.warning('Aucune prestation trouvée dans le PMS pour ce service.');
+      return;
+    }
+    const types: BreakfastType[] = res.products.map((p) => ({
+      name: p.name,
+      price: p.price,
+      pms_product_id: p.id,
+      pms_tax_code: p.taxCode,
+    }));
+    update({
+      breakfast_types: types,
+      pricing_source: 'pms',
+      ...(res.service_id ? { pms_service_id: res.service_id } : {}),
+    });
+    toast.success(`${types.length} prestation(s) importée(s) depuis le PMS. Pensez à enregistrer.`);
+  };
+
 
   return (
     <div className="space-y-6 max-w-2xl">
