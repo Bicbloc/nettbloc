@@ -18,6 +18,10 @@ export interface BreakfastConfig {
   currency: string;
   breakfast_types: BreakfastType[];
   default_included: boolean;
+  /** Identifiant du service Mews/PMS sous lequel facturer (requis pour Mews). */
+  pms_service_id: string | null;
+  /** Code de taxe PMS appliqué aux charges (requis pour Mews). */
+  pms_tax_code: string | null;
 }
 
 export interface BreakfastLogItem {
@@ -50,6 +54,8 @@ const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
   currency: 'EUR',
   breakfast_types: [],
   default_included: false,
+  pms_service_id: null,
+  pms_tax_code: null,
 });
 
 export function todayDate(): string {
@@ -81,6 +87,8 @@ export async function loadBreakfastConfig(hotelId: string): Promise<BreakfastCon
       ? (data.breakfast_types as unknown as BreakfastType[])
       : [],
     default_included: !!data.default_included,
+    pms_service_id: (data as { pms_service_id?: string | null }).pms_service_id ?? null,
+    pms_tax_code: (data as { pms_tax_code?: string | null }).pms_tax_code ?? null,
   };
 }
 
@@ -94,6 +102,8 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
     currency: config.currency,
     breakfast_types: config.breakfast_types as unknown as never,
     default_included: config.default_included,
+    pms_service_id: config.pms_service_id,
+    pms_tax_code: config.pms_tax_code,
   };
 
   const { data: existing } = await supabase
@@ -105,14 +115,14 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
   if (existing) {
     const { error } = await supabase
       .from('hotel_breakfast_configs')
-      .update(payload)
+      .update(payload as never)
       .eq('id', existing.id);
     if (error) {
       console.error('[breakfast] update config error:', error);
       return false;
     }
   } else {
-    const { error } = await supabase.from('hotel_breakfast_configs').insert(payload);
+    const { error } = await supabase.from('hotel_breakfast_configs').insert(payload as never);
     if (error) {
       console.error('[breakfast] insert config error:', error);
       return false;
@@ -247,4 +257,19 @@ export async function hasActivePmsConfig(hotelId: string): Promise<boolean> {
     .maybeSingle();
   return !!data;
 }
+
+/** Teste la connectivité PMS (Mews/Apaleo) et le rapprochement des chambres. */
+export async function testPmsConnectivity(
+  hotelId: string,
+  logDate: string = todayDate(),
+): Promise<{ ok: boolean; error?: string; [key: string]: unknown }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, log_date: logDate, mode: 'test' },
+  });
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return data as { ok: boolean; [key: string]: unknown };
+}
+
 

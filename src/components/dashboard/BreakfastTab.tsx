@@ -2,7 +2,7 @@
  * Onglet admin : configuration de la facturation des petits-déjeuners.
  */
 import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save, ExternalLink } from 'lucide-react';
+import { Coffee, Plus, Trash2, Save, ExternalLink, Plug } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
-  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig,
+  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 
@@ -27,6 +27,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [config, setConfig] = useState<BreakfastConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!currentHotelId) return;
@@ -68,6 +70,21 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     );
   };
 
+  const handleTest = async () => {
+    if (!currentHotelId) return;
+    setTesting(true);
+    setTestResult(null);
+    const res = await testPmsConnectivity(currentHotelId);
+    setTesting(false);
+    setTestResult(res);
+    if (res.ok) {
+      toast.success(`Connexion ${String(res.pms || 'PMS').toUpperCase()} OK`);
+    } else {
+      toast.error(res.error || 'Connexion PMS impossible');
+    }
+  };
+
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -86,7 +103,12 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
       </div>
 
       {config.is_active && (
-        <BreakfastBilledSection hotelId={currentHotelId} currency={config.currency || 'EUR'} />
+        <BreakfastBilledSection
+          hotelId={currentHotelId}
+          currency={config.currency || 'EUR'}
+          breakfastTypes={config.breakfast_types}
+          pricePerPerson={config.price_per_person}
+        />
       )}
 
 
@@ -200,6 +222,94 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           </Button>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Facturation PMS (Mews / Apaleo)</CardTitle>
+          <CardDescription>
+            Les petits-déjeuners facturables sont envoyés sur la facture du client dans le PMS.
+            Pour Mews, renseignez l'identifiant du service et le code de taxe ci-dessous.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="bf-service">Identifiant du service Mews (Service ID)</Label>
+            <Input
+              id="bf-service"
+              placeholder="ex. bd26d8db-86da-4f96-9efc-e5a4654a4a94"
+              value={config.pms_service_id || ''}
+              onChange={(e) => update({ pms_service_id: e.target.value.trim() || null })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Service Mews de type « Orderable » actif. Laissez vide pour une sélection
+              automatique. Utilisez « Tester la connexion » pour découvrir les services disponibles.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bf-tax">Code de taxe Mews (Tax code)</Label>
+            <Input
+              id="bf-tax"
+              placeholder="ex. FR-2024-N"
+              value={config.pms_tax_code || ''}
+              onChange={(e) => update({ pms_tax_code: e.target.value.trim() || null })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Code de TVA appliqué à la charge. Apaleo n'en a pas besoin.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
+              <Plug className="h-4 w-4" />
+              {testing ? 'Test en cours…' : 'Tester la connexion PMS'}
+            </Button>
+            {testResult && (
+              <div className="rounded-lg border p-3 text-xs bg-muted/40 space-y-1">
+                {testResult.ok ? (
+                  <>
+                    <p className="font-medium text-emerald-600">
+                      Connexion {String(testResult.pms || '').toUpperCase()} : OK
+                    </p>
+                    {'reservations_in_house' in testResult && (
+                      <p>Réservations en cours : {String(testResult.reservations_in_house)}</p>
+                    )}
+                    {'services' in testResult && (
+                      <p>Services PMS détectés : {String(testResult.services)}
+                        {'orderable_services' in testResult && ` (dont ${String(testResult.orderable_services)} facturables)`}
+                      </p>
+                    )}
+                    {testResult.suggested_service_id && (
+                      <p className="flex items-center flex-wrap gap-2">
+                        Service suggéré : <span className="font-medium">{String(testResult.suggested_service_name)}</span>
+                        <Button
+                          size="sm" variant="secondary" className="h-6 px-2 text-xs"
+                          onClick={() => update({ pms_service_id: String(testResult.suggested_service_id) })}
+                        >
+                          Utiliser
+                        </Button>
+                      </p>
+                    )}
+                    {'billable_rooms' in testResult && (
+                      <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
+                    )}
+                    {Array.isArray(testResult.rooms_matched) && (
+                      <p>Chambres rapprochées : {(testResult.rooms_matched as string[]).join(', ') || '—'}</p>
+                    )}
+                    {Array.isArray(testResult.rooms_unmatched) && (testResult.rooms_unmatched as string[]).length > 0 && (
+                      <p className="text-amber-600">
+                        Sans réservation : {(testResult.rooms_unmatched as string[]).join(', ')}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-destructive">{String(testResult.error || 'Erreur')}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       <Button onClick={handleSave} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" />
