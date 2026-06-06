@@ -62,12 +62,14 @@ export default function CafetiereWork() {
   const loadAll = useCallback(async () => {
     if (!hotelId) { setLoading(false); return; }
     setLoading(true);
-    const [{ data: roomData }, cfg] = await Promise.all([
+    const [{ data: roomData }, cfg, pmsOk] = await Promise.all([
       supabase.from('rooms').select('room_number, breakfast_included').eq('hotel_id', hotelId).order('room_number'),
       loadBreakfastConfig(hotelId),
+      hasActivePmsConfig(hotelId),
     ]);
     setRooms((roomData || []) as SimpleRoom[]);
     setConfig(cfg);
+    setPmsConfigured(pmsOk);
     await refreshLogs();
     setLoading(false);
   }, [hotelId, refreshLogs]);
@@ -86,7 +88,7 @@ export default function CafetiereWork() {
     return () => { supabase.removeChannel(channel); };
   }, [hotelId, refreshLogs]);
 
-  const unitPriceFor = (type: string): number => {
+  const priceFor = (type: string): number => {
     if (!config) return 0;
     const found = config.breakfast_types.find((t) => t.name === type);
     return found ? found.price : config.price_per_person;
@@ -94,28 +96,61 @@ export default function CafetiereWork() {
 
   const openRoom = (room: SimpleRoom) => {
     const existing = logs[room.room_number];
-    const defaultType = config?.breakfast_types[0]?.name || '';
-    setDraftType(existing?.breakfast_type || defaultType);
-    setDraftPeople(existing?.people_count ?? (existing ? 0 : 1));
+    const items: Record<string, number> = {};
+    if (existing && Array.isArray(existing.items)) {
+      for (const it of existing.items) items[it.name] = it.qty;
+    }
+    setDraftItems(items);
     setDraftIncluded(
       existing ? existing.included : (room.breakfast_included || config?.default_included || false)
     );
     setSelected(room.room_number);
   };
 
-  const closeAndSave = async () => {
+  const setItemQty = (name: string, delta: number) => {
+    setDraftItems((prev) => {
+      const next = Math.max(0, (prev[name] || 0) + delta);
+      return { ...prev, [name]: next };
+    });
+  };
+
+  // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
+  const validateRoom = async () => {
     if (!selected || !hotelId) { setSelected(null); return; }
-    const unit = unitPriceFor(draftType);
+    setSavingRoom(true);
+    const items = (config?.breakfast_types || [])
+      .map((t) => ({ name: t.name, qty: draftItems[t.name] || 0, price: t.price }))
+      .filter((i) => i.qty > 0);
+    const peopleCount = items.reduce((s, i) => s + i.qty, 0);
+    const firstType = items[0]?.name || null;
+    const firstUnit = items[0]?.price || 0;
+
     await upsertBreakfastLog({
       hotelId,
       roomNumber: selected,
-      peopleCount: draftPeople,
-      breakfastType: draftType || null,
-      unitPrice: unit,
+      peopleCount,
+      breakfastType: firstType,
+      unitPrice: firstUnit,
       included: draftIncluded,
+      items,
       loggedBy: 'Cafetière',
     });
     await refreshLogs();
+
+    // Envoi direct au PMS si configuré et facturable
+    if (pmsConfigured && !draftIncluded && peopleCount > 0) {
+      const res = await sendBreakfastsToPms(hotelId, todayDate(), selected);
+      if (res.ok && res.sent > 0) {
+        toast.success(`Chambre ${selected} enregistrée et envoyée au PMS`);
+      } else if (res.ok) {
+        toast.success(`Chambre ${selected} enregistrée`);
+      } else {
+        toast.warning(`Chambre ${selected} enregistrée — envoi PMS échoué`);
+      }
+    } else {
+      toast.success(`Chambre ${selected} enregistrée`);
+    }
+    setSavingRoom(false);
     setSelected(null);
   };
 
@@ -133,7 +168,10 @@ export default function CafetiereWork() {
   };
 
   const currency = config?.currency || 'EUR';
-  const draftTotal = draftIncluded ? 0 : draftPeople * unitPriceFor(draftType);
+  const draftTotal = draftIncluded
+    ? 0
+    : (config?.breakfast_types || []).reduce((s, t) => s + (draftItems[t.name] || 0) * t.price, 0);
+
 
   const totalBillable = useMemo(
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
