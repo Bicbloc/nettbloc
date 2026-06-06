@@ -432,6 +432,29 @@ export default function CafetiereWork() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Reconfirmation : facturer une chambre dont le PDJ est déjà inclus */}
+      <AlertDialog open={confirmBillIncluded} onOpenChange={setConfirmBillIncluded}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Facturer un petit-déjeuner inclus ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La chambre {selected} a déjà le petit-déjeuner inclus dans le séjour.
+              Voulez-vous quand même la facturer ({draftTotal.toFixed(2)} {currency})
+              et l'envoyer au PMS ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-700 hover:bg-amber-800"
+              onClick={async () => { setConfirmBillIncluded(false); await doSaveRoom(); }}
+            >
+              Facturer quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
