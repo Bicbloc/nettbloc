@@ -322,6 +322,9 @@ export default function CafetiereWork() {
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-center">Chambre {selected}</SheetTitle>
+            {selectedGuestName && (
+              <p className="text-center text-sm text-muted-foreground">{selectedGuestName}</p>
+            )}
           </SheetHeader>
 
           <div className="py-6 space-y-5">
