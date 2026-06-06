@@ -62,6 +62,7 @@ const IntegrationsTab = lazy(() => import("@/components/dashboard/IntegrationsTa
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { NewDayBanner } from "@/components/dashboard/NewDayBanner";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
+import { GovernessAssignmentManager } from "@/components/governess/GovernessAssignmentManager";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
