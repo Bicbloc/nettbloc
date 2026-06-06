@@ -468,8 +468,11 @@ Deno.serve(async (req) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  let authorized = authHeader.includes(serviceKey)
-  if (!authorized && authHeader.startsWith('Bearer ')) {
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  // Authorized if: service role key, valid anon key (staff cafétière authenticate
+  // via local access codes, not a Supabase session), or a valid logged-in user.
+  let authorized = authHeader.includes(serviceKey) || bearer === anonKey
+  if (!authorized && bearer) {
     try {
       const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
       const { data: { user } } = await userClient.auth.getUser()
