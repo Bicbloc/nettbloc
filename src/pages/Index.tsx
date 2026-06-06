@@ -62,6 +62,7 @@ const IntegrationsTab = lazy(() => import("@/components/dashboard/IntegrationsTa
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { NewDayBanner } from "@/components/dashboard/NewDayBanner";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
+import { GovernessAssignmentManager } from "@/components/governess/GovernessAssignmentManager";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
@@ -1045,10 +1046,13 @@ const IndexDashboard = () => {
               description="Inspectez et validez le nettoyage des chambres avec la version Premium."
             >
               {currentHotelId && (
-                <GovernessInspectionInterface
-                  hotelId={currentHotelId}
-                  governessName="Gouvernante"
-                />
+                <div className="space-y-6">
+                  <GovernessAssignmentManager hotelId={currentHotelId} />
+                  <GovernessInspectionInterface
+                    hotelId={currentHotelId}
+                    governessName="Gouvernante"
+                  />
+                </div>
               )}
             </PremiumLimitGuard>
           )}
