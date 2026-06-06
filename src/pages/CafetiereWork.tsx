@@ -285,6 +285,11 @@ export default function CafetiereWork() {
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
+                {room.guest_name && (
+                  <span className="text-[9px] leading-tight text-center px-0.5 line-clamp-2 opacity-90">
+                    {room.guest_name}
+                  </span>
+                )}
                 {hasCount ? (
                   <span className="text-xs font-medium">{log.people_count} pers.</span>
                 ) : isIncluded ? (
