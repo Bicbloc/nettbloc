@@ -1137,7 +1137,8 @@ const HousekeeperWorkContent: React.FC = () => {
   const roomCounts = useMemo(() => {
     const counts = calculateRoomCounts(rooms.map(r => ({
       status: r.status,
-      cleaning_type: r.cleaning_type
+      cleaning_type: r.cleaning_type,
+      do_not_disturb: r.do_not_disturb
     })));
     return counts;
   }, [rooms]);

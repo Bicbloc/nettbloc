@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Check, Clock, Trash2, Bed, LogOut, Layers } from "lucide-react";
+import { Check, Clock, Trash2, Bed, LogOut, Layers, Moon } from "lucide-react";
 import { isFullCleaning, isQuickCleaning } from "@/utils/cleaningTypeUtils";
 
-export type RoomFilterTab = 'all' | 'clean' | 'in_progress' | 'dirty' | 'stayover' | 'checkout';
+export type RoomFilterTab = 'all' | 'clean' | 'in_progress' | 'dirty' | 'stayover' | 'checkout' | 'dnd';
 
 interface RoomStatusTabsProps {
   activeTab: RoomFilterTab;
@@ -14,6 +14,7 @@ interface RoomStatusTabsProps {
     dirty: number;
     stayover: number;
     checkout: number;
+    dnd: number;
   };
   compact?: boolean;
 }
@@ -26,6 +27,7 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
     { value: 'dirty', label: 'À nettoyer', icon: Trash2, count: counts.dirty, color: 'bg-yellow-500' },
     { value: 'stayover', label: 'Recouche', icon: Bed, count: counts.stayover, color: 'bg-purple-500' },
     { value: 'checkout', label: 'Client sorti', icon: LogOut, count: counts.checkout, color: 'bg-red-500' },
+    { value: 'dnd', label: 'Ne pas déranger', icon: Moon, count: counts.dnd, color: 'bg-rose-500' },
   ];
 
   const handleTabChange = (value: string) => {
@@ -71,13 +73,16 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
  * - cleaning_type: 'full'/'a_blanc' (À blanc) ou 'quick'/'recouche' (Recouche) ou 'none'
  * - status: 'checkout', 'clean', 'needs-cleaning', 'ready-to-clean', 'stayover', 'in_progress', etc.
  */
-export function filterRoomsByTab<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
+export function filterRoomsByTab<T extends { status?: string; cleaning_type?: string; cleaningType?: string; doNotDisturb?: boolean; do_not_disturb?: boolean }>(
   rooms: T[],
   tab: RoomFilterTab
 ): T[] {
   if (tab === 'all') return rooms;
-  
-  
+
+  if (tab === 'dnd') {
+    return rooms.filter((room) => room.doNotDisturb === true || room.do_not_disturb === true);
+  }
+
   const result = rooms.filter((room) => {
     const status = (room.status || '').toLowerCase().replace(/-/g, '_');
     const rawCleaningType = (room.cleaning_type || room.cleaningType || '').toLowerCase();
@@ -128,9 +133,9 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
 /**
  * Calcule le nombre de chambres pour chaque onglet
  */
-export function calculateRoomCounts<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
+export function calculateRoomCounts<T extends { status?: string; cleaning_type?: string; cleaningType?: string; doNotDisturb?: boolean; do_not_disturb?: boolean }>(
   rooms: T[]
-): { all: number; clean: number; in_progress: number; dirty: number; stayover: number; checkout: number } {
+): { all: number; clean: number; in_progress: number; dirty: number; stayover: number; checkout: number; dnd: number } {
   const getCleaningType = (r: T) => (r.cleaning_type || r.cleaningType || '').toLowerCase();
   const getStatus = (r: T) => (r.status || '').toLowerCase().replace(/-/g, '_');
   
@@ -162,6 +167,7 @@ export function calculateRoomCounts<T extends { status?: string; cleaning_type?:
       const isCheckoutLikeStatus = s === 'checkout' || s === 'ready_to_clean';
       return isCheckoutLikeStatus;
     }).length,
+    dnd: rooms.filter(r => r.doNotDisturb === true || r.do_not_disturb === true).length,
   };
   
   return counts;
