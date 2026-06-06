@@ -111,7 +111,13 @@ export default function CafetiereWork() {
     if (!selected || !hotelId) { setSelected(null); return; }
     setSavingRoom(true);
     const items = (config?.breakfast_types || [])
-      .map((t) => ({ name: t.name, qty: draftItems[t.name] || 0, price: t.price }))
+      .map((t) => ({
+        name: t.name,
+        qty: draftItems[t.name] || 0,
+        price: t.price,
+        pms_product_id: t.pms_product_id ?? null,
+        pms_tax_code: t.pms_tax_code ?? null,
+      }))
       .filter((i) => i.qty > 0);
     const peopleCount = items.reduce((s, i) => s + i.qty, 0);
     const firstType = items[0]?.name || null;
