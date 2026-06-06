@@ -559,7 +559,8 @@ const IndexDashboard = () => {
             notes: r.notes || undefined,
             isUrgent: r.cleaning_priority === 10,
             notUrgent: r.cleaning_priority === 1,
-            isTwin: false,
+            isTwin: r.is_twin || false,
+            doNotDisturb: r.do_not_disturb || false,
             priority: r.cleaning_priority === 10 ? 'high' as const : undefined,
             lastCleanedAt: r.last_cleaned_at || r.updated_at || undefined
           };

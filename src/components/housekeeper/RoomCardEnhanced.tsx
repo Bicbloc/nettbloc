@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut, Bed } from 'lucide-react';
+import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut, Bed, Moon } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { LostItemReportWizard, GuestInfo } from '@/components/lost-and-found/LostItemReportWizard';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +19,7 @@ interface Room {
   cleaning_type?: string;
   is_checkout?: boolean; // Client sorti
   is_twin?: boolean; // Chambre twin
+  do_not_disturb?: boolean; // Ne pas déranger
   // Guest info from PMS data
   guest_arrival?: GuestInfo;
   guest_departure?: GuestInfo;
@@ -299,7 +300,15 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                     {room.cleaning_priority === 3 ? 'URGENT' : 'Prioritaire'}
                   </Badge>
                 )}
-                
+
+                {/* Ne pas déranger placard */}
+                {room.do_not_disturb && (
+                  <Badge className="bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs gap-1 shadow-md">
+                    <Moon className="h-3 w-3" />
+                    Ne pas déranger
+                  </Badge>
+                )}
+
                 {/* Client sorti badge */}
                 {(room.is_checkout || isFullCleaning(room.cleaning_type) || room.status === 'checkout' || room.status === 'ready-to-clean') && (
                   <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs gap-1">

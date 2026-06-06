@@ -62,6 +62,7 @@ export function useRealtimeRooms({
               cleaningType: normalizedCleaningType,
               cleaning_type: newRecord.cleaning_type, // Keep raw value for filtering
               notes: newRecord.notes || r.notes,
+              doNotDisturb: newRecord.do_not_disturb ?? r.doNotDisturb,
               lastCleanedAt: newRecord.status === 'clean'
                 ? (newRecord.last_cleaned_at || new Date().toISOString())
                 : (newRecord.last_cleaned_at || r.lastCleanedAt)

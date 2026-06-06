@@ -131,6 +131,8 @@ type TranslationSchema = {
     priorityMedium: string;
     priorityLow: string;
     notUrgent: string;
+    doNotDisturb: string;
+    doNotDisturbActive: string;
     linkedRooms: string;
     incidents: string;
     viewIncidents: string;
@@ -446,6 +448,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       priorityMedium: "Moyenne",
       priorityLow: "Basse",
       notUrgent: "Pas urgent",
+      doNotDisturb: "Ne pas déranger",
+      doNotDisturbActive: "Ne pas déranger",
       linkedRooms: "Chambres liées",
       incidents: "Incidents",
       viewIncidents: "Voir les incidents",
@@ -776,6 +780,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       priorityMedium: "Medium",
       priorityLow: "Low",
       notUrgent: "Not urgent",
+      doNotDisturb: "Do not disturb",
+      doNotDisturbActive: "Do not disturb",
       linkedRooms: "Linked rooms",
       incidents: "Incidents",
       viewIncidents: "View incidents",

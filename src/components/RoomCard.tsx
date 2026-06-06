@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star, X } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star, X, Moon } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -169,6 +169,17 @@ export function RoomCard({
     });
   };
 
+  const toggleDnd = () => {
+    const next = !room.doNotDisturb;
+    onUpdate({
+      ...room,
+      doNotDisturb: next
+    });
+    toast({
+      description: `${t.rooms.room} ${room.number} — ${next ? `🌙 ${t.rooms.doNotDisturb}` : `✅ ${t.rooms.doNotDisturb} ✕`}`
+    });
+  };
+
   const toggleUrgent = () => {
     onUpdate({
       ...room,
@@ -233,6 +244,11 @@ export function RoomCard({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
+          {room.doNotDisturb && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-rose-100 text-rose-700 border border-rose-300 flex items-center gap-0.5">
+              <Moon className="h-2.5 w-2.5" /> {t.rooms.doNotDisturb}
+            </span>
+          )}
           {(room.cleaningType === 'full' || room.cleaningType === 'a_blanc') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-700 border border-purple-200">
               {t.rooms.fullCleanShort}
@@ -316,6 +332,18 @@ export function RoomCard({
         {/* Boutons de changement rapide et menu réassignation */}
         {showActions && (
           <div className="ml-2 flex items-center gap-1 flex-shrink-0">
+            <button
+              className={`h-6 w-6 flex items-center justify-center rounded-lg transition-colors ${
+                room.doNotDisturb ? 'bg-rose-100 text-rose-700' : 'hover:bg-rose-100 text-rose-600'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDnd();
+              }}
+              title={t.rooms.doNotDisturb}
+            >
+              <Moon className="h-3 w-3" />
+            </button>
             <button 
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-purple-100 text-purple-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
@@ -594,6 +622,11 @@ export function RoomCard({
           )}
         </div>
         <div className="flex gap-1">
+          {room.doNotDisturb && (
+            <Badge variant="outline" className="bg-rose-100 text-rose-700 border-rose-300 gap-1">
+              <Moon className="h-3 w-3" /> {t.rooms.doNotDisturb}
+            </Badge>
+          )}
           {getStatusBadge(room.status)}
           {getCleaningTypeBadge(room.cleaningType)}
         </div>
@@ -672,6 +705,19 @@ export function RoomCard({
       </div>
       
       <div className="flex flex-col gap-2 mt-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`dnd-${room.number}`}
+            checked={room.doNotDisturb || false}
+            onCheckedChange={toggleDnd}
+          />
+          <label
+            htmlFor={`dnd-${room.number}`}
+            className="text-sm font-medium flex items-center gap-1 cursor-pointer text-rose-600"
+          >
+            {t.rooms.doNotDisturb} <Moon className="h-4 w-4" />
+          </label>
+        </div>
         <div className="flex items-center gap-2">
           <Checkbox 
             id={`twin-${room.number}`} 
