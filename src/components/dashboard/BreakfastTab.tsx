@@ -2,7 +2,7 @@
  * Onglet admin : configuration de la facturation des petits-déjeuners.
  */
 import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download } from 'lucide-react';
+import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble, RefreshCw, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,13 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity, fetchPmsProducts,
+  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
+  fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 
