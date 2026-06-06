@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey)
 
   try {
-    const { hotel_id, log_date } = await req.json()
+    const { hotel_id, log_date, room_number } = await req.json()
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id requis' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const date = log_date || new Date().toISOString().split('T')[0]
 
     // Billable, not-yet-sent breakfast logs
-    const { data: logs, error: logsErr } = await admin
+    let logsQuery = admin
       .from('breakfast_logs')
       .select('*')
       .eq('hotel_id', hotel_id)
@@ -120,6 +120,8 @@ Deno.serve(async (req) => {
       .eq('included', false)
       .gt('total_amount', 0)
       .neq('pms_status', 'sent')
+    if (room_number) logsQuery = logsQuery.eq('room_number', room_number)
+    const { data: logs, error: logsErr } = await logsQuery
     if (logsErr) throw logsErr
 
     if (!logs || logs.length === 0) {
