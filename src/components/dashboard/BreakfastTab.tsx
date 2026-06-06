@@ -256,8 +256,46 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
               Code de TVA appliqué à la charge. Apaleo n'en a pas besoin.
             </p>
           </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
+              <Plug className="h-4 w-4" />
+              {testing ? 'Test en cours…' : 'Tester la connexion PMS'}
+            </Button>
+            {testResult && (
+              <div className="rounded-lg border p-3 text-xs bg-muted/40 space-y-1">
+                {testResult.ok ? (
+                  <>
+                    <p className="font-medium text-emerald-600">
+                      Connexion {String(testResult.pms || '').toUpperCase()} : OK
+                    </p>
+                    {'reservations_in_house' in testResult && (
+                      <p>Réservations en cours : {String(testResult.reservations_in_house)}</p>
+                    )}
+                    {'services' in testResult && (
+                      <p>Services PMS détectés : {String(testResult.services)}</p>
+                    )}
+                    {'billable_rooms' in testResult && (
+                      <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
+                    )}
+                    {Array.isArray(testResult.rooms_matched) && (
+                      <p>Chambres rapprochées : {(testResult.rooms_matched as string[]).join(', ') || '—'}</p>
+                    )}
+                    {Array.isArray(testResult.rooms_unmatched) && (testResult.rooms_unmatched as string[]).length > 0 && (
+                      <p className="text-amber-600">
+                        Sans réservation : {(testResult.rooms_unmatched as string[]).join(', ')}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-destructive">{String(testResult.error || 'Erreur')}</p>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
+
 
       <Button onClick={handleSave} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" />
