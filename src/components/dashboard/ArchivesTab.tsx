@@ -690,7 +690,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
               variant="default"
               className="gap-2"
               onClick={handleExportPdf}
-              disabled={isExporting || (dailyReports.length === 0 && incidents.length === 0)}
+              disabled={isExporting || (dailyReports.length === 0 && incidents.length === 0 && breakfastLogs.length === 0)}
             >
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Télécharger PDF
