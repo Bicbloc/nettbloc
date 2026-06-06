@@ -133,9 +133,9 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
 /**
  * Calcule le nombre de chambres pour chaque onglet
  */
-export function calculateRoomCounts<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
+export function calculateRoomCounts<T extends { status?: string; cleaning_type?: string; cleaningType?: string; doNotDisturb?: boolean; do_not_disturb?: boolean }>(
   rooms: T[]
-): { all: number; clean: number; in_progress: number; dirty: number; stayover: number; checkout: number } {
+): { all: number; clean: number; in_progress: number; dirty: number; stayover: number; checkout: number; dnd: number } {
   const getCleaningType = (r: T) => (r.cleaning_type || r.cleaningType || '').toLowerCase();
   const getStatus = (r: T) => (r.status || '').toLowerCase().replace(/-/g, '_');
   
