@@ -225,6 +225,39 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Cafetières */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-all hover:border-amber-600/50 group"
+          onClick={() => navigate('/access/cafetieres')}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-600/10">
+                  <Coffee className="h-6 w-6 text-amber-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Cafetières</CardTitle>
+                  <CardDescription>Gérer les demandes d'accès</CardDescription>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-amber-600 transition-colors" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="text-sm">
+                {counts.cafetieres.total} demande{counts.cafetieres.total !== 1 ? 's' : ''}
+              </Badge>
+              {counts.cafetieres.pending > 0 && (
+                <Badge className="bg-amber-500 hover:bg-amber-600">
+                  {counts.cafetieres.pending} en attente
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
