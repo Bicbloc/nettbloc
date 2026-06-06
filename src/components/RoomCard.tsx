@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star, X } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star, X, Moon } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -166,6 +166,17 @@ export function RoomCard({
     onUpdate({
       ...room,
       isTwin: !room.isTwin
+    });
+  };
+
+  const toggleDnd = () => {
+    const next = !room.doNotDisturb;
+    onUpdate({
+      ...room,
+      doNotDisturb: next
+    });
+    toast({
+      description: `${t.rooms.room} ${room.number} — ${next ? `🌙 ${t.rooms.doNotDisturb}` : `✅ ${t.rooms.doNotDisturb} ✕`}`
     });
   };
 
