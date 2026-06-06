@@ -129,6 +129,7 @@ export function LostItemReportWizard({
   const [objectCategory, setObjectCategory] = useState("other");
   const [locationType, setLocationType] = useState(defaultRoomNumber ? "room" : "");
   const [roomNumber, setRoomNumber] = useState(defaultRoomNumber || "");
+  const [availableRooms, setAvailableRooms] = useState<string[]>([]);
   const [locationDetails, setLocationDetails] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestFirstName, setGuestFirstName] = useState("");
@@ -184,6 +185,7 @@ export function LostItemReportWizard({
       setObjectCategory("other");
       setLocationType(defaultRoomNumber ? "room" : "");
       setRoomNumber(defaultRoomNumber || "");
+      setAvailableRooms([]);
       setLocationDetails("");
       setGuestName("");
       setGuestFirstName("");
@@ -192,6 +194,48 @@ export function LostItemReportWizard({
       setCategorySearchQuery("");
     }
   }, [open, defaultRoomNumber]);
+
+  useEffect(() => {
+    if (!open || !hotelId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const [roomsRes, registryRes] = await Promise.all([
+        supabase
+          .from("rooms")
+          .select("room_number")
+          .eq("hotel_id", hotelId)
+          .order("room_number"),
+        supabase
+          .from("hotel_rooms_registry")
+          .select("room_number")
+          .eq("hotel_id", hotelId)
+          .eq("is_active", true)
+          .order("room_number"),
+      ]);
+
+      if (cancelled) return;
+
+      const mergedRooms = [
+        ...(roomsRes.data || []).map((room) => room.room_number),
+        ...(registryRes.data || []).map((room) => room.room_number),
+      ]
+        .filter((value): value is string => !!value)
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const uniqueSortedRooms = Array.from(new Set(mergedRooms)).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      );
+
+      setAvailableRooms(uniqueSortedRooms);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hotelId]);
 
   // Filter categories by search query
   const filteredCategories = useMemo(() => {
@@ -725,8 +769,32 @@ export function LostItemReportWizard({
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
                   className="h-14 text-xl text-center font-bold"
+                  list="lost-item-room-suggestions"
                   autoFocus
                 />
+                <datalist id="lost-item-room-suggestions">
+                  {availableRooms.map((room) => (
+                    <option key={room} value={room} />
+                  ))}
+                </datalist>
+
+                {availableRooms.length > 0 && (
+                  <ScrollArea className="h-[240px] rounded-md border border-border p-2">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {availableRooms.map((room) => (
+                        <Button
+                          key={room}
+                          type="button"
+                          variant={roomNumber === room ? "default" : "outline"}
+                          className="h-11"
+                          onClick={() => setRoomNumber(room)}
+                        >
+                          {room}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             )}
 
