@@ -623,18 +623,25 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
             <DialogTitle>Assigner la chambre {selectedRoom?.room_number}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une femme de chambre" />
-              </SelectTrigger>
-              <SelectContent>
-                {housekeepers.filter(h => h.is_active).map(h => (
-                  <SelectItem key={h.id} value={h.id}>
-                    {h.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {availableHousekeepers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune femme de chambre disponible. Sélectionnez d'abord les présentes du jour
+                en haut de l'onglet « Chambres ».
+              </p>
+            ) : (
+              <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une femme de chambre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableHousekeepers.map(h => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialog(false)}>Annuler</Button>
