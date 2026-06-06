@@ -258,3 +258,18 @@ export async function hasActivePmsConfig(hotelId: string): Promise<boolean> {
   return !!data;
 }
 
+/** Teste la connectivité PMS (Mews/Apaleo) et le rapprochement des chambres. */
+export async function testPmsConnectivity(
+  hotelId: string,
+  logDate: string = todayDate(),
+): Promise<{ ok: boolean; error?: string; [key: string]: unknown }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, log_date: logDate, mode: 'test' },
+  });
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return data as { ok: boolean; [key: string]: unknown };
+}
+
+
