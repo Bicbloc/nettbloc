@@ -326,6 +326,9 @@ export interface PmsRoom {
   breakfast_included: boolean;
   guest_name: string | null;
   status: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  comment: string | null;
 }
 
 /**
