@@ -743,6 +743,16 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                     </CardContent>
                   </Card>
                 )}
+                {breakfastLogs.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Petits-déjeuners du jour</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {renderBreakfast()}
+                    </CardContent>
+                  </Card>
+                )}
               </>
             ) : (
               <>
