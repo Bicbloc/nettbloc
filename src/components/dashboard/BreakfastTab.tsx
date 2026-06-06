@@ -213,6 +213,26 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     if (oa !== ob) return oa - ob;
     return a.localeCompare(b, undefined, { numeric: true });
   });
+
+  // Filtre par statut de séjour + recherche (numéro de chambre / nom du client).
+  const filteredGridRooms = gridRooms.filter((rn) => {
+    const key = rn.trim().toLowerCase();
+    if (roomStatusFilter !== 'all') {
+      const s = (statusByRoom[key] || '').toLowerCase();
+      const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+      const isArrival = s.includes('arriv') || s.includes('reserved');
+      const isCurrent = !isDeparture && !isArrival && (occupiedByRoom[key] || s.length > 0);
+      if (roomStatusFilter === 'departure' && !isDeparture) return false;
+      if (roomStatusFilter === 'arrival' && !isArrival) return false;
+      if (roomStatusFilter === 'current' && !isCurrent) return false;
+    }
+    const q = roomSearch.trim().toLowerCase();
+    if (q) {
+      const hay = `${rn} ${guestByRoom[key] || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
   const includedCount = gridRooms.filter((rn) => inclusionByRoom[rn.trim().toLowerCase()]).length;
   const occupiedCount = gridRooms.filter((rn) => occupiedByRoom[rn.trim().toLowerCase()]).length;
 
