@@ -14,6 +14,11 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { stayLabel } from '@/utils/stayStatus';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
@@ -47,6 +52,7 @@ export default function CafetiereWork() {
   const [savingRoom, setSavingRoom] = useState(false);
   const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirmBillIncluded, setConfirmBillIncluded] = useState(false);
 
   // Quantité par prestation (clé = nom du type) + inclus dans le séjour
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
@@ -158,7 +164,7 @@ export default function CafetiereWork() {
   };
 
   // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
-  const validateRoom = async () => {
+  const doSaveRoom = async () => {
     if (!selected || !hotelId) { setSelected(null); return; }
     setSavingRoom(true);
     const items = (config?.breakfast_types || [])
@@ -202,6 +208,21 @@ export default function CafetiereWork() {
     setSavingRoom(false);
     setSelected(null);
   };
+
+  const validateRoom = async () => {
+    if (!selected || !hotelId) { setSelected(null); return; }
+    const room = rooms.find((r) => r.room_number === selected);
+    const peopleCount = (config?.breakfast_types || [])
+      .reduce((s, t) => s + (draftItems[t.name] || 0), 0);
+    // La chambre a déjà le petit-déjeuner inclus mais on tente de la facturer :
+    // demander une reconfirmation avant de facturer quand même.
+    if (room?.breakfast_included && !draftIncluded && peopleCount > 0) {
+      setConfirmBillIncluded(true);
+      return;
+    }
+    await doSaveRoom();
+  };
+
 
   const handleSendPms = async () => {
     if (!hotelId) return;
@@ -272,6 +293,7 @@ export default function CafetiereWork() {
             const isIncluded = log ? log.included : room.breakfast_included;
             const hasCount = log && !log.included && log.people_count > 0;
             const sent = log?.pms_status === 'sent';
+            const stay = stayLabel(room.status, room.occupied);
             return (
               <button
                 key={room.room_number}
@@ -292,6 +314,14 @@ export default function CafetiereWork() {
                 {room.guest_name && (
                   <span className="text-[9px] leading-tight text-center px-0.5 line-clamp-2 opacity-90">
                     {room.guest_name}
+                  </span>
+                )}
+                {stay.label && (
+                  <span className={[
+                    'text-[8px] font-semibold uppercase tracking-wide',
+                    hasCount ? 'text-white/90' : stay.className,
+                  ].join(' ')}>
+                    {stay.label}
                   </span>
                 )}
                 {hasCount ? (
@@ -332,10 +362,18 @@ export default function CafetiereWork() {
           </SheetHeader>
 
           <div className="py-6 space-y-5">
+            {rooms.find((r) => r.room_number === selected)?.breakfast_included && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                Cette chambre a le petit-déjeuner <strong>inclus</strong> dans le séjour.
+                Vous pouvez tout de même la facturer en désactivant « Inclus dans le séjour » —
+                une confirmation vous sera demandée.
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-lg border p-3">
               <span className="font-medium">Inclus dans le séjour</span>
               <Switch checked={draftIncluded} onCheckedChange={setDraftIncluded} />
             </div>
+
 
             {!draftIncluded && (
               <div className="space-y-3">
@@ -394,6 +432,29 @@ export default function CafetiereWork() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Reconfirmation : facturer une chambre dont le PDJ est déjà inclus */}
+      <AlertDialog open={confirmBillIncluded} onOpenChange={setConfirmBillIncluded}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Facturer un petit-déjeuner inclus ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La chambre {selected} a déjà le petit-déjeuner inclus dans le séjour.
+              Voulez-vous quand même la facturer ({draftTotal.toFixed(2)} {currency})
+              et l'envoyer au PMS ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-700 hover:bg-amber-800"
+              onClick={async () => { setConfirmBillIncluded(false); await doSaveRoom(); }}
+            >
+              Facturer quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { fetchPmsRooms } from "@/services/breakfastConfigService";
+import { stayLabel } from "@/utils/stayStatus";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -111,6 +113,53 @@ export function IncidentReportDialogSimple({
       return data;
     },
   });
+
+  // Chambres remontées par le PMS (avec nom du client et statut de séjour),
+  // y compris les clients en départ (check-out).
+  const { data: pmsRooms } = useQuery({
+    queryKey: ["incident-pms-rooms", hotelId],
+    queryFn: async () => {
+      const res = await fetchPmsRooms(hotelId);
+      return res.ok ? res.rooms : [];
+    },
+    enabled: isOpen,
+  });
+
+  const roomMeta = useMemo(() => {
+    const map: Record<string, { guest: string | null; status: string | null; occupied: boolean }> = {};
+    for (const r of pmsRooms || []) {
+      map[String(r.room_number).trim().toLowerCase()] = {
+        guest: r.guest_name,
+        status: r.status,
+        occupied: r.occupied,
+      };
+    }
+    return map;
+  }, [pmsRooms]);
+
+  // Liste fusionnée : on privilégie les chambres du PMS (séjour en cours / départ),
+  // complétées par le registre pour ne rien manquer.
+  const roomOptions = useMemo(() => {
+    const byNumber = new Map<string, { room_number: string; guest: string | null; status: string | null; occupied: boolean }>();
+    for (const r of pmsRooms || []) {
+      byNumber.set(String(r.room_number).trim(), {
+        room_number: String(r.room_number).trim(),
+        guest: r.guest_name,
+        status: r.status,
+        occupied: r.occupied,
+      });
+    }
+    for (const r of registeredRooms || []) {
+      const key = String(r.room_number).trim();
+      if (!byNumber.has(key)) {
+        byNumber.set(key, { room_number: key, guest: null, status: null, occupied: false });
+      }
+    }
+    return Array.from(byNumber.values()).sort((a, b) =>
+      a.room_number.localeCompare(b.room_number, undefined, { numeric: true })
+    );
+  }, [pmsRooms, registeredRooms]);
+
 
   const { data: categoriesWithItems } = useQuery({
     queryKey: ["categories-with-items", hotelId],
@@ -272,12 +321,16 @@ export function IncidentReportDialogSimple({
       // Determine priority from AI suggestion or default
       const priority = aiSuggestion?.severity || "medium";
 
+      const guestMeta = roomMeta[String(values.location_reference).trim().toLowerCase()];
+      const descriptionWithGuest = guestMeta?.guest
+        ? `${values.description ? values.description + "\n\n" : ""}Client : ${guestMeta.guest}`
+        : values.description;
       const { data: incident, error: incidentError } = await supabase
         .from("incidents")
         .insert({
           hotel_id: hotelId,
           title: values.title,
-          description: values.description,
+          description: descriptionWithGuest,
           category_id: item?.category_id,
           item_id: values.item_id,
           type_id: values.type_id,
@@ -572,28 +625,37 @@ export function IncidentReportDialogSimple({
                   render={({ field }) => (
                     <FormItem className="space-y-1">
                       <FormLabel className="text-sm">Chambre *</FormLabel>
-                      {registeredRooms && registeredRooms.length > 0 ? (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="N°..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[200px]">
-                            {registeredRooms.map((room) => (
-                              <SelectItem key={room.id} value={room.room_number} className="text-sm">
-                                {room.room_number}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <Input placeholder="101..." {...field} className="h-9" />
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="N°..." />
+                          </SelectTrigger>
                         </FormControl>
-                      )}
+                        <SelectContent className="max-h-[240px]">
+                          {roomOptions.map((room) => {
+                            const stay = stayLabel(room.status, room.occupied);
+                            return (
+                              <SelectItem key={room.room_number} value={room.room_number} className="text-sm">
+                                <span className="font-medium">{room.room_number}</span>
+                                {room.guest && <span className="text-muted-foreground"> — {room.guest}</span>}
+                                {stay.label && <span className={`ml-1 ${stay.className}`}>({stay.label})</span>}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {field.value && (() => {
+                        const meta = roomMeta[field.value.trim().toLowerCase()];
+                        return meta?.guest ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Client : <span className="font-medium text-foreground">{meta.guest}</span>
+                            {(() => { const s = stayLabel(meta.status, meta.occupied); return s.label ? <span className={`ml-1 ${s.className}`}>· {s.label}</span> : null; })()}
+                          </p>
+                        ) : null;
+                      })()}
                       <FormMessage />
                     </FormItem>
+
                   )}
                 />
 
