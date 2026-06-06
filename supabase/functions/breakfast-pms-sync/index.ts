@@ -14,6 +14,16 @@ interface BreakfastItem {
   name: string
   qty: number
   price: number
+  productId?: string | null
+  taxCode?: string | null
+}
+
+interface PmsProduct {
+  id: string
+  name: string
+  price: number
+  currency: string | null
+  taxCode: string | null
 }
 
 // ─── Apaleo ────────────────────────────────────────────────────────
