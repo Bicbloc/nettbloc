@@ -146,6 +146,7 @@ interface UpsertLogParams {
   breakfastType: string | null;
   unitPrice: number;
   included: boolean;
+  items?: BreakfastLogItem[];
   loggedBy?: string | null;
   logDate?: string;
 }
@@ -159,11 +160,15 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     breakfastType,
     unitPrice,
     included,
+    items = [],
     loggedBy = null,
     logDate = todayDate(),
   } = params;
 
-  const total = included ? 0 : Number((peopleCount * unitPrice).toFixed(2));
+  const cleanItems = items.filter((i) => i.qty > 0);
+  const total = included
+    ? 0
+    : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
 
   const payload = {
     hotel_id: hotelId,
@@ -174,6 +179,7 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     unit_price: unitPrice,
     total_amount: total,
     included,
+    items: cleanItems as unknown as never,
     source: 'manual',
     logged_by: loggedBy,
     pms_status: 'pending',
