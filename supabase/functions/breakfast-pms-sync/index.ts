@@ -158,14 +158,27 @@ async function buildMewsReservationMap(
   return { map, reservations: reservations.length, resources: resources.length }
 }
 
-async function fetchMewsServices(creds: PmsCredentials): Promise<{ id: string; name: string }[]> {
+interface MewsService { id: string; name: string; type: string; active: boolean }
+
+async function fetchMewsServices(creds: PmsCredentials): Promise<MewsService[]> {
   const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
   const res = await mewsFetch(`${baseUrl}/services/getAll`, { ...mewsAuth(creds) })
   if (!res.ok) return []
   const data = await res.json()
   const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
     (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
-  return (data.Services || []).map((s: any) => ({ id: s.Id, name: pickName(s.Names, s.Name) }))
+  return (data.Services || []).map((s: any) => ({
+    id: s.Id, name: pickName(s.Names, s.Name), type: s.Type, active: s.IsActive !== false,
+  }))
+}
+
+// A breakfast charge must target an active "Orderable" service.
+function pickOrderableService(services: MewsService[]): MewsService | undefined {
+  const orderable = services.filter((s) => s.active && s.type === 'Orderable')
+  return (
+    orderable.find((s) => /breakfast|petit|pdj|déjeuner|dejeuner|f&b|food/i.test(s.name)) ||
+    orderable[0]
+  )
 }
 
 async function postMewsOrder(
