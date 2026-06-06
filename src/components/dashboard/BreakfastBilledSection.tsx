@@ -122,19 +122,8 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
     () => billed.reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [billed]
   );
-  const pendingPms = billed.filter((l) => l.pms_status !== 'sent').length;
 
-  const handleSend = async () => {
-    setSending(true);
-    const res = await sendBreakfastsToPms(hotelId);
-    setSending(false);
-    if (res.ok) {
-      toast.success(`${res.sent} envoyé(s) au PMS${res.failed ? `, ${res.failed} échec(s)` : ''}`);
-      refresh();
-    } else {
-      toast.error(res.error || "Échec de l'envoi au PMS");
-    }
-  };
+
 
   const statusBadge = (s: string) => {
     if (s === 'sent') return <Badge>Facturé PMS</Badge>;
