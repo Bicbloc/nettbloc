@@ -278,6 +278,8 @@ Deno.serve(async (req) => {
       if (config.pms_type === 'mews') {
         const { map, reservations, resources } = await buildMewsReservationMap(creds)
         const services = await fetchMewsServices(creds)
+        const orderable = services.filter((s) => s.active && s.type === 'Orderable')
+        const suggested = pickOrderableService(services)
         const matched = billableRooms.filter((r) => map.has(r.trim().toLowerCase()))
         const unmatched = billableRooms.filter((r) => !map.has(r.trim().toLowerCase()))
         return new Response(JSON.stringify({
@@ -287,7 +289,10 @@ Deno.serve(async (req) => {
           resources,
           reservations_in_house: reservations,
           services: services.length,
-          services_sample: services.slice(0, 10),
+          orderable_services: orderable.length,
+          orderable_services_sample: orderable.slice(0, 15),
+          suggested_service_id: suggested?.id || null,
+          suggested_service_name: suggested?.name || null,
           service_id_configured: bfCfg?.pms_service_id || null,
           tax_code_configured: bfCfg?.pms_tax_code || null,
           billable_rooms: billableRooms.length,
