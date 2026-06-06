@@ -339,12 +339,12 @@ export function ImportCSVDialog({ onImportRooms, existingRooms }: ImportCSVDialo
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Type de nettoyage</Label>
-                  <Select value={mapping.cleaningType} onValueChange={(v) => setMapping(prev => ({ ...prev, cleaningType: v }))}>
+                  <Select value={mapping.cleaningType || '__none__'} onValueChange={(v) => setMapping(prev => ({ ...prev, cleaningType: v === '__none__' ? '' : v }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Non défini</SelectItem>
+                      <SelectItem value="__none__">Non défini</SelectItem>
                       {headers.map(h => (
                         <SelectItem key={h} value={h}>{h}</SelectItem>
                       ))}
