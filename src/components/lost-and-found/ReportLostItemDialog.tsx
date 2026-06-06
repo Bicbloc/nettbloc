@@ -426,8 +426,8 @@ export function ReportLostItemDialog({
                     id="guestFirstName"
                     value={guestFirstName}
                     onChange={(e) => setGuestFirstName(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
                 <div className="space-y-2">
@@ -436,8 +436,8 @@ export function ReportLostItemDialog({
                     id="guestName"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
               </div>
@@ -449,8 +449,8 @@ export function ReportLostItemDialog({
                     type="date"
                     value={guestCheckIn}
                     onChange={(e) => setGuestCheckIn(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
                 <div className="space-y-2">
@@ -460,8 +460,8 @@ export function ReportLostItemDialog({
                     type="date"
                     value={guestCheckOut}
                     onChange={(e) => setGuestCheckOut(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
               </div>
