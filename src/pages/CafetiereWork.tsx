@@ -53,10 +53,13 @@ export default function CafetiereWork() {
   const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmBillIncluded, setConfirmBillIncluded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
 
   // Quantité par prestation (clé = nom du type) + inclus dans le séjour
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
+  const [draftComment, setDraftComment] = useState('');
 
   const refreshLogs = useCallback(async () => {
     if (!hotelId) return;
