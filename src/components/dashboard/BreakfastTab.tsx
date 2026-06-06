@@ -34,6 +34,11 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [testing, setTesting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
+  const [previewProducts, setPreviewProducts] = useState<PmsProduct[] | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [rooms, setRooms] = useState<PmsRoom[] | null>(null);
+  const [roomsLoading, setRoomsLoading] = useState(false);
 
   useEffect(() => {
     if (!currentHotelId) return;
