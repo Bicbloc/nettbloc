@@ -463,12 +463,15 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   <span className="h-3 w-3 rounded-full bg-muted inline-block border" />
                   Libre
                 </span>
+                <span className="ml-auto text-muted-foreground">En séjour : {occupiedCount}</span>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {gridRooms.map((rn) => {
                   const key = rn.trim().toLowerCase();
                   const included = inclusionByRoom[key];
                   const occupied = occupiedByRoom[key];
+                  const guest = guestByRoom[key];
+                  const stay = stayLabel(statusByRoom[key]);
                   const cls = included
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : occupied
@@ -476,7 +479,13 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       : 'bg-card border-border text-muted-foreground';
                   return (
                     <div key={rn} className={`rounded-lg border p-2 text-center ${cls}`}>
-                      <p className="font-bold text-sm">{rn}</p>
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="font-bold text-sm">{rn}</p>
+                        {stay && <span className={`text-[9px] font-semibold ${stay.tone}`}>{stay.label}</span>}
+                      </div>
+                      {guest && (
+                        <p className="text-[10px] truncate text-foreground/80" title={guest}>{guest}</p>
+                      )}
                       <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
                         {included ? (<><Check className="h-3 w-3" /> Inclus</>) : occupied ? 'Non inclus' : '—'}
                       </p>
