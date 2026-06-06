@@ -99,6 +99,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'housekeeper_access_requests' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'governess_access_requests' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_access_requests' }, loadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cafetiere_access_requests' }, loadCounts)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -112,7 +113,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     );
   }
 
-  const totalPending = counts.housekeepers.pending + counts.governesses.pending + counts.technicians.pending;
+  const totalPending = counts.housekeepers.pending + counts.governesses.pending + counts.technicians.pending + counts.cafetieres.pending;
 
   return (
     <div className="space-y-6">
@@ -125,7 +126,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">>
         {/* Femmes de chambre */}
         <Card 
           className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50 group"
