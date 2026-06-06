@@ -86,7 +86,12 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
       </div>
 
       {config.is_active && (
-        <BreakfastBilledSection hotelId={currentHotelId} currency={config.currency || 'EUR'} />
+        <BreakfastBilledSection
+          hotelId={currentHotelId}
+          currency={config.currency || 'EUR'}
+          breakfastTypes={config.breakfast_types}
+          pricePerPerson={config.price_per_person}
+        />
       )}
 
 
