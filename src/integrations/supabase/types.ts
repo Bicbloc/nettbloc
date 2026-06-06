@@ -519,6 +519,100 @@ export type Database = {
           },
         ]
       }
+      cafetiere_access_requests: {
+        Row: {
+          cafetiere_profile_id: string
+          created_at: string | null
+          hotel_code: string
+          hotel_id: string | null
+          id: string
+          requested_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cafetiere_profile_id: string
+          created_at?: string | null
+          hotel_code: string
+          hotel_id?: string | null
+          id?: string
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cafetiere_profile_id?: string
+          created_at?: string | null
+          hotel_code?: string
+          hotel_id?: string | null
+          id?: string
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cafetiere_access_requests_cafetiere_profile_id_fkey"
+            columns: ["cafetiere_profile_id"]
+            isOneToOne: false
+            referencedRelation: "cafetiere_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cafetiere_access_requests_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cafetiere_access_requests_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cafetiere_profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          total_hotels_worked: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          total_hotels_worked?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          total_hotels_worked?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       common_spaces: {
         Row: {
           area_sqm: number | null
@@ -6632,6 +6726,15 @@ export type Database = {
           message_en: string
           starts_at: string
           title: string
+        }[]
+      }
+      get_approved_hotels_for_cafetiere: {
+        Args: { p_cafetiere_profile_id: string }
+        Returns: {
+          approved_at: string
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
         }[]
       }
       get_approved_hotels_for_housekeeper: {
