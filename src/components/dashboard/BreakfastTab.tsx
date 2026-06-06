@@ -492,8 +492,44 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                 </span>
                 <span className="ml-auto text-muted-foreground">En séjour : {occupiedCount}</span>
               </div>
+
+              {/* Recherche + filtres par statut de séjour */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={roomSearch}
+                    onChange={(e) => setRoomSearch(e.target.value)}
+                    placeholder="Rechercher une chambre ou un client…"
+                    className="pl-9 h-9"
+                  />
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {([
+                    { key: 'all', label: 'Toutes' },
+                    { key: 'current', label: 'En cours' },
+                    { key: 'arrival', label: 'Arrivée' },
+                    { key: 'departure', label: 'Départ' },
+                  ] as const).map((f) => (
+                    <Button
+                      key={f.key}
+                      size="sm"
+                      variant={roomStatusFilter === f.key ? 'default' : 'outline'}
+                      className="shrink-0 h-9"
+                      onClick={() => setRoomStatusFilter(f.key)}
+                    >
+                      {f.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredGridRooms.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Aucune chambre ne correspond au filtre.</p>
+              ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {gridRooms.map((rn) => {
+                {filteredGridRooms.map((rn) => {
+
                   const key = rn.trim().toLowerCase();
                   const included = inclusionByRoom[key];
                   const occupied = occupiedByRoom[key];
