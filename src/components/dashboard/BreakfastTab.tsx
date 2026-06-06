@@ -507,7 +507,14 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         breakfastTypes={config.breakfast_types}
         pricePerPerson={config.price_per_person}
         availableRooms={availableRooms}
+        roomMeta={Object.fromEntries(
+          availableRooms.map((rn) => {
+            const key = rn.trim().toLowerCase();
+            return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
+          })
+        )}
       />
+
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-lg">
