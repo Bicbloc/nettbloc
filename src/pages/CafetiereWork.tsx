@@ -264,7 +264,7 @@ export default function CafetiereWork() {
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
       ) : rooms.length === 0 ? (
-        <p className="p-6 text-muted-foreground">Aucune chambre.</p>
+        <p className="p-6 text-muted-foreground">Aucune chambre en cours de séjour.</p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-3">
           {rooms.map((room) => {
