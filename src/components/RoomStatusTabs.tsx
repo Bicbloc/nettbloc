@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Check, Clock, Trash2, Bed, LogOut, Layers } from "lucide-react";
+import { Check, Clock, Trash2, Bed, LogOut, Layers, Moon } from "lucide-react";
 import { isFullCleaning, isQuickCleaning } from "@/utils/cleaningTypeUtils";
 
-export type RoomFilterTab = 'all' | 'clean' | 'in_progress' | 'dirty' | 'stayover' | 'checkout';
+export type RoomFilterTab = 'all' | 'clean' | 'in_progress' | 'dirty' | 'stayover' | 'checkout' | 'dnd';
 
 interface RoomStatusTabsProps {
   activeTab: RoomFilterTab;
@@ -14,6 +14,7 @@ interface RoomStatusTabsProps {
     dirty: number;
     stayover: number;
     checkout: number;
+    dnd: number;
   };
   compact?: boolean;
 }
@@ -26,6 +27,7 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
     { value: 'dirty', label: 'À nettoyer', icon: Trash2, count: counts.dirty, color: 'bg-yellow-500' },
     { value: 'stayover', label: 'Recouche', icon: Bed, count: counts.stayover, color: 'bg-purple-500' },
     { value: 'checkout', label: 'Client sorti', icon: LogOut, count: counts.checkout, color: 'bg-red-500' },
+    { value: 'dnd', label: 'Ne pas déranger', icon: Moon, count: counts.dnd, color: 'bg-rose-500' },
   ];
 
   const handleTabChange = (value: string) => {
