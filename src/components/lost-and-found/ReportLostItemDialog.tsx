@@ -125,21 +125,14 @@ export function ReportLostItemDialog({
   // Pre-fill guest info when dialog opens or guest selection changes
   useEffect(() => {
     if (!open) return;
+    if (selectedGuest === 'manual') return;
 
+    // Si plusieurs clients sont proposés, on suit la sélection radio
     let guestToUse: GuestInfo | undefined;
-
-    if (hasMultipleGuests) {
-      if (selectedGuest === 'arrival') {
-        guestToUse = guestArrival;
-      } else if (selectedGuest === 'departure') {
-        guestToUse = guestDeparture;
-      }
-    } else if (guestStaying) {
-      guestToUse = guestStaying;
-    } else if (guestArrival) {
-      guestToUse = guestArrival;
-    } else if (guestDeparture) {
-      guestToUse = guestDeparture;
+    if (guestOptions.length > 1) {
+      guestToUse = guestOptions.find((g) => g.key === selectedGuest)?.info;
+    } else if (guestOptions.length === 1) {
+      guestToUse = guestOptions[0].info;
     }
 
     if (guestToUse) {
@@ -148,14 +141,15 @@ export function ReportLostItemDialog({
       setGuestCheckIn(guestToUse.checkIn || "");
       setGuestCheckOut(guestToUse.checkOut || "");
     }
-  }, [open, selectedGuest, hasMultipleGuests, guestArrival, guestDeparture, guestStaying]);
+  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
 
-  // Auto-select departure guest by default when there are multiple (most likely the lost item owner)
+  // Sélection par défaut : le client en départ (check-out), le plus probable propriétaire
   useEffect(() => {
-    if (open && hasMultipleGuests && !selectedGuest) {
-      setSelectedGuest('departure');
+    if (open && guestOptions.length > 1 && !selectedGuest) {
+      setSelectedGuest(guestOptions[0].key);
     }
-  }, [open, hasMultipleGuests, selectedGuest]);
+  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
+
 
   const createItemMutation = useMutation({
     mutationFn: async () => {
