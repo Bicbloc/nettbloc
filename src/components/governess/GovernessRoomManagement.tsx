@@ -445,6 +445,46 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       ) : (
       <>
 
+      {/* Femmes de chambre disponibles aujourd'hui */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-sm">Femmes de chambre disponibles aujourd'hui</h3>
+          <Badge variant="secondary" className="ml-auto">{availableHousekeepers.length}</Badge>
+        </div>
+        {housekeepers.filter(h => h.is_active).length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucune femme de chambre active. Ajoutez-les depuis l'espace établissement.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {housekeepers.filter(h => h.is_active).map(h => {
+              const on = availableIds.has(h.id);
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => toggleAvailable(h.id)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                    on
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {on ? <Check className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}
+                  {h.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Seules les femmes de chambre cochées peuvent recevoir des chambres à nettoyer.
+        </p>
+      </Card>
+
+
+
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <Card className="p-3 text-center">
