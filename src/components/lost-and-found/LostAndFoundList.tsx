@@ -74,6 +74,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
   const [adminNotes, setAdminNotes] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestCheckIn, setGuestCheckIn] = useState("");
+  const [guestCheckOut, setGuestCheckOut] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
