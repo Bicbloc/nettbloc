@@ -1,0 +1,1 @@
+ALTER TABLE public.rooms ADD COLUMN IF NOT EXISTS do_not_disturb boolean NOT NULL DEFAULT false;

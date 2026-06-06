@@ -5025,6 +5025,7 @@ export type Database = {
           cleaning_priority: number | null
           cleaning_type: string | null
           created_at: string
+          do_not_disturb: boolean
           estimated_time: number | null
           floor: number | null
           hotel_id: string
@@ -5046,6 +5047,7 @@ export type Database = {
           cleaning_priority?: number | null
           cleaning_type?: string | null
           created_at?: string
+          do_not_disturb?: boolean
           estimated_time?: number | null
           floor?: number | null
           hotel_id: string
@@ -5067,6 +5069,7 @@ export type Database = {
           cleaning_priority?: number | null
           cleaning_type?: string | null
           created_at?: string
+          do_not_disturb?: boolean
           estimated_time?: number | null
           floor?: number | null
           hotel_id?: string
