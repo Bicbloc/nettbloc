@@ -549,19 +549,35 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   const occupied = occupiedByRoom[key];
                   const guest = guestByRoom[key];
                   const stay = stayLabel(statusByRoom[key]);
+                  const range = stayRange(checkInByRoom[key], checkOutByRoom[key]);
+                  const pmsComment = commentByRoom[key];
                   const cls = included
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : occupied
                       ? 'bg-amber-50 border-amber-200 text-amber-700'
                       : 'bg-card border-border text-muted-foreground';
                   return (
-                    <div key={rn} className={`rounded-lg border p-2 text-center ${cls}`}>
+                    <div key={rn} className={`relative rounded-lg border p-2 text-center ${cls}`}>
+                      {pmsComment && (
+                        <MessageSquare
+                          className="absolute top-1 left-1 h-3 w-3 opacity-70"
+                          title={pmsComment}
+                        />
+                      )}
                       <div className="flex items-center justify-center gap-1">
                         <p className="font-bold text-sm">{rn}</p>
                         {stay && <span className={`text-[9px] font-semibold ${stay.tone}`}>{stay.label}</span>}
                       </div>
                       {guest && (
                         <p className="text-[10px] truncate text-foreground/80" title={guest}>{guest}</p>
+                      )}
+                      {range && (
+                        <p className="text-[9px] tabular-nums text-muted-foreground">{range}</p>
+                      )}
+                      {pmsComment && (
+                        <p className="text-[9px] italic truncate text-foreground/70" title={pmsComment}>
+                          {pmsComment}
+                        </p>
                       )}
                       <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
                         {included ? (<><Check className="h-3 w-3" /> Inclus</>) : occupied ? 'Non inclus' : '—'}
