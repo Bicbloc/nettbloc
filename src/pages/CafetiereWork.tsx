@@ -164,7 +164,7 @@ export default function CafetiereWork() {
   };
 
   // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
-  const validateRoom = async () => {
+  const doSaveRoom = async () => {
     if (!selected || !hotelId) { setSelected(null); return; }
     setSavingRoom(true);
     const items = (config?.breakfast_types || [])
@@ -208,6 +208,21 @@ export default function CafetiereWork() {
     setSavingRoom(false);
     setSelected(null);
   };
+
+  const validateRoom = async () => {
+    if (!selected || !hotelId) { setSelected(null); return; }
+    const room = rooms.find((r) => r.room_number === selected);
+    const peopleCount = (config?.breakfast_types || [])
+      .reduce((s, t) => s + (draftItems[t.name] || 0), 0);
+    // La chambre a déjà le petit-déjeuner inclus mais on tente de la facturer :
+    // demander une reconfirmation avant de facturer quand même.
+    if (room?.breakfast_included && !draftIncluded && peopleCount > 0) {
+      setConfirmBillIncluded(true);
+      return;
+    }
+    await doSaveRoom();
+  };
+
 
   const handleSendPms = async () => {
     if (!hotelId) return;
