@@ -85,11 +85,6 @@ export default function CafetiereWork() {
     return () => { supabase.removeChannel(channel); };
   }, [hotelId, refreshLogs]);
 
-  const priceFor = (type: string): number => {
-    if (!config) return 0;
-    const found = config.breakfast_types.find((t) => t.name === type);
-    return found ? found.price : config.price_per_person;
-  };
 
   const openRoom = (room: SimpleRoom) => {
     const existing = logs[room.room_number];
