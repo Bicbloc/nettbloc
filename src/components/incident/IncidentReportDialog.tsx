@@ -432,9 +432,7 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
                   value={formData.location_reference}
                   onChange={(e) => setFormData(prev => ({ ...prev, location_reference: e.target.value }))}
                   placeholder={
-                    formData.location_type === 'room' 
-                      ? "Ex: 102, 205..." 
-                      : formData.location_type === 'common_area'
+                    formData.location_type === 'common_area'
                       ? "Ex: Hall, Restaurant..."
                       : "Précisez la localisation"
                   }
