@@ -44,7 +44,7 @@ export interface GuestInfo {
   lastName?: string;
   checkIn?: string;
   checkOut?: string;
-  type?: 'arrival' | 'departure' | 'staying';
+  type?: 'arrival' | 'departure' | 'staying' | 'checked_out';
 }
 
 export interface LostItemReportWizardProps {

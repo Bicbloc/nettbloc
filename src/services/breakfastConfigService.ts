@@ -348,3 +348,31 @@ export async function fetchPmsRooms(
 }
 
 
+export interface PmsRoomGuest {
+  room_number: string;
+  guest_name: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  status: string; // 'inhouse' | 'arrival' | 'departure' | 'checked_out'
+}
+
+/**
+ * Récupère les clients (chambre + nom + dates de séjour) depuis le PMS (Mews/Apaleo),
+ * incluant les clients en séjour ET ceux ayant récemment fait leur check-out.
+ * Utilisé par les Objets trouvés pour proposer le client ayant oublié un objet.
+ */
+export async function fetchPmsRoomGuests(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; guests: PmsRoomGuest[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_room_guests' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, guests: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucun client trouvé', guests: [] };
+  }
+  return { ok: true, guests: (data.guests || []) as PmsRoomGuest[] };
+}
+

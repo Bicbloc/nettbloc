@@ -301,6 +301,97 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
   return rooms
 }
 
+// Guests (room + name + stay dates) for the Lost & Found feature: includes
+// in-house guests AND those who already checked out over a recent window.
+interface PmsRoomGuest {
+  room_number: string
+  guest_name: string | null
+  check_in: string | null
+  check_out: string | null
+  status: string // 'inhouse' | 'arrival' | 'departure' | 'checked_out'
+}
+
+async function fetchMewsRoomGuests(creds: PmsCredentials, daysBack = 30): Promise<PmsRoomGuest[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const auth = mewsAuth(creds)
+  const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const start = new Date(Date.now() - daysBack * 86400000).toISOString().split('T')[0]
+
+  const res = await mewsFetch(`${baseUrl}/reservations/getAll`, {
+    ...auth,
+    StartUtc: `${start}T00:00:00Z`,
+    EndUtc: `${tomorrow}T23:59:59Z`,
+    TimeFilter: 'Colliding',
+    Extent: { Reservations: true, Customers: true, Resources: true },
+    // Started = in-house, Processed = checked out, Confirmed = upcoming/arrival
+    States: ['Started', 'Processed', 'Confirmed'],
+  })
+  if (!res.ok) throw new Error(`Mews reservations/getAll [${res.status}]: ${await res.text()}`)
+  const data = await res.json()
+
+  const resourceName: Record<string, string> = {}
+  for (const r of data.Resources || []) resourceName[r.Id] = r.Name || r.Id
+  const customerName: Record<string, string> = {}
+  for (const c of data.Customers || []) {
+    customerName[c.Id] = `${c.LastName || ''} ${c.FirstName || ''}`.trim()
+  }
+
+  const guests: PmsRoomGuest[] = []
+  for (const r of data.Reservations || []) {
+    const rid = r.AssignedResourceId || r.AssignedSpaceId
+    const name = rid ? resourceName[rid] : undefined
+    if (!name) continue
+    const account = r.CustomerId || r.OwnerId || r.AccountId
+    const checkIn = r.StartUtc?.split('T')[0] || null
+    const checkOut = r.EndUtc?.split('T')[0] || null
+    const state = String(r.State || '')
+    let status = 'inhouse'
+    if (state === 'Processed' || (checkOut && checkOut < today)) status = 'checked_out'
+    else if (checkOut === today) status = 'departure'
+    else if (checkIn === today) status = 'arrival'
+    guests.push({
+      room_number: String(name).trim(),
+      guest_name: account ? (customerName[account] || null) : null,
+      check_in: checkIn,
+      check_out: checkOut,
+      status,
+    })
+  }
+  return guests
+}
+
+async function fetchApaleoRoomGuests(token: string, propertyId: string): Promise<PmsRoomGuest[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const res = await fetch(
+    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&status=CheckedOut&pageSize=200&expand=timeSlices,booker`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
+  const data = await res.json()
+  const guests: PmsRoomGuest[] = []
+  for (const r of data.reservations || []) {
+    const slices = r.timeSlices || []
+    const unitName = slices.map((s: any) => s.unit?.name || s.unit?.id).find(Boolean)
+    if (!unitName) continue
+    const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
+    const checkIn = r.arrival?.split('T')[0] || null
+    const checkOut = r.departure?.split('T')[0] || null
+    let status = 'inhouse'
+    if (String(r.status) === 'CheckedOut' || (checkOut && checkOut < today)) status = 'checked_out'
+    else if (checkOut === today) status = 'departure'
+    else if (checkIn === today) status = 'arrival'
+    guests.push({
+      room_number: String(unitName).trim(),
+      guest_name: guest || null,
+      check_in: checkIn,
+      check_out: checkOut,
+      status,
+    })
+  }
+  return guests
+}
+
 
 
 async function postMewsOrder(
@@ -456,6 +547,31 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
+
+    // ─── FETCH ROOM GUESTS MODE (Objets trouvés) ──────────────────
+    // Returns guests with their stay dates for in-house AND recently
+    // checked-out reservations, used to suggest the guest who lost an item.
+    if (mode === 'fetch_room_guests') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', guests: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const guests = await fetchMewsRoomGuests(creds)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const guests = await fetchApaleoRoomGuests(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+
 
 
 

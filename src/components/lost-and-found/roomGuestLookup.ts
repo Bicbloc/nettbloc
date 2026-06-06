@@ -1,15 +1,15 @@
-import { fetchPmsRooms, todayDate } from "@/services/breakfastConfigService";
+import { fetchPmsRoomGuests } from "@/services/breakfastConfigService";
 
 export interface RoomGuestInfo {
   firstName?: string;
   lastName?: string;
   checkIn?: string;
   checkOut?: string;
-  type?: "arrival" | "departure" | "staying";
+  type?: "arrival" | "departure" | "staying" | "checked_out";
 }
 
 export interface RoomGuestOption {
-  key: "arrival" | "departure" | "staying";
+  key: "arrival" | "departure" | "staying" | "checked_out";
   label: string;
   info: RoomGuestInfo;
 }
@@ -25,63 +25,64 @@ const parseGuestName = (guestName: string | null) => {
     return { firstName: "", lastName: parts[0] };
   }
 
+  // Mews/Apaleo renvoient "Nom Prénom" → le dernier mot est le prénom.
   return {
     firstName: parts[parts.length - 1],
     lastName: parts.slice(0, -1).join(" "),
   };
 };
 
-const getGuestKeyFromStatus = (status: string | null): RoomGuestOption["key"] => {
-  const normalizedStatus = (status || "").toLowerCase();
-
-  if (normalizedStatus.includes("depart") || normalizedStatus.includes("checkout")) {
-    return "departure";
+const mapStatusToKey = (status: string | null): RoomGuestOption["key"] => {
+  const s = (status || "").toLowerCase();
+  if (s.includes("checked_out") || s.includes("checkout") || s.includes("depart")) {
+    return s.includes("depart") && !s.includes("checked_out") ? "departure" : "checked_out";
   }
-
-  if (normalizedStatus.includes("arrival")) {
-    return "arrival";
-  }
-
+  if (s === "departure") return "departure";
+  if (s === "arrival") return "arrival";
   return "staying";
 };
 
 const getGuestLabel = (key: RoomGuestOption["key"]) => {
-  if (key === "departure") return "Départ (check-out)";
+  if (key === "checked_out") return "Parti (check-out)";
+  if (key === "departure") return "Départ aujourd'hui";
   if (key === "arrival") return "Arrivée";
   return "En cours (séjour)";
 };
 
-export async function fetchRoomGuestOptions(hotelId: string, roomNumber: string): Promise<RoomGuestOption[]> {
+export async function fetchRoomGuestOptions(
+  hotelId: string,
+  roomNumber: string,
+): Promise<RoomGuestOption[]> {
   const normalizedRoom = normalizeRoomNumber(roomNumber);
   if (!hotelId || !normalizedRoom) return [];
 
-  const response = await fetchPmsRooms(hotelId);
+  const response = await fetchPmsRoomGuests(hotelId);
   if (!response.ok) return [];
 
   const seen = new Set<string>();
-  const orderedKeys: RoomGuestOption["key"][] = ["departure", "staying", "arrival"];
+  // Priorité d'affichage : parti récemment > départ du jour > en séjour > arrivée.
+  const orderedKeys: RoomGuestOption["key"][] = ["checked_out", "departure", "staying", "arrival"];
 
-  const options = response.rooms
-    .filter((room) => normalizeRoomNumber(room.room_number) === normalizedRoom)
-    .map((room) => {
-      const key = getGuestKeyFromStatus(room.status);
-      const name = parseGuestName(room.guest_name);
-
+  const options = response.guests
+    .filter((g) => normalizeRoomNumber(g.room_number) === normalizedRoom)
+    .map((g) => {
+      const key = mapStatusToKey(g.status);
+      const name = parseGuestName(g.guest_name);
       return {
         key,
         label: getGuestLabel(key),
         info: {
           firstName: name.firstName,
           lastName: name.lastName,
-          checkIn: key === "arrival" ? todayDate() : "",
-          checkOut: key === "departure" ? todayDate() : "",
+          checkIn: g.check_in || "",
+          checkOut: g.check_out || "",
           type: key,
         },
       } satisfies RoomGuestOption;
     })
     .filter((option) => option.info.firstName || option.info.lastName)
     .filter((option) => {
-      const dedupeKey = `${option.key}:${option.info.firstName || ""}:${option.info.lastName || ""}`;
+      const dedupeKey = `${option.key}:${option.info.firstName || ""}:${option.info.lastName || ""}:${option.info.checkOut || ""}`;
       if (seen.has(dedupeKey)) return false;
       seen.add(dedupeKey);
       return true;
