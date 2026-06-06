@@ -59,12 +59,22 @@ export default function CafetiereWork() {
   const loadAll = useCallback(async () => {
     if (!hotelId) { setLoading(false); return; }
     setLoading(true);
+    // Les chambres proviennent OBLIGATOIREMENT du registre des chambres
+    // (alimenté en temps réel par la connexion API PMS configurée dans « Chambres »).
     const [{ data: roomData }, cfg, pmsOk] = await Promise.all([
-      supabase.from('rooms').select('room_number, breakfast_included').eq('hotel_id', hotelId).order('room_number'),
+      supabase.from('hotel_rooms_registry')
+        .select('room_number')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .order('room_number'),
       loadBreakfastConfig(hotelId),
       hasActivePmsConfig(hotelId),
     ]);
-    setRooms((roomData || []) as SimpleRoom[]);
+    const list: SimpleRoom[] = (roomData || []).map((r) => ({
+      room_number: r.room_number,
+      breakfast_included: false,
+    }));
+    setRooms(list);
     setConfig(cfg);
     setPmsConfigured(pmsOk);
     await refreshLogs();
@@ -73,7 +83,7 @@ export default function CafetiereWork() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Realtime sync of breakfast logs
+  // Realtime sync of breakfast logs + room registry
   useEffect(() => {
     if (!hotelId) return;
     const channel = supabase
@@ -81,9 +91,13 @@ export default function CafetiereWork() {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'breakfast_logs', filter: `hotel_id=eq.${hotelId}` },
         () => refreshLogs())
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'hotel_rooms_registry', filter: `hotel_id=eq.${hotelId}` },
+        () => loadAll())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [hotelId, refreshLogs]);
+  }, [hotelId, refreshLogs, loadAll]);
+
 
 
   const openRoom = (room: SimpleRoom) => {

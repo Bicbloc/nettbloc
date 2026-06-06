@@ -261,40 +261,15 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Facturation PMS (Mews / Apaleo)</CardTitle>
+          <CardTitle className="text-lg">Facturation PMS</CardTitle>
           <CardDescription>
-            Les petits-déjeuners facturables sont envoyés sur la facture du client dans le PMS.
-            Pour Mews, renseignez l'identifiant du service et le code de taxe ci-dessous.
+            La facturation utilise directement la connexion PMS configurée dans
+            « Chambres → Connexion API PMS ». Le service et le code de taxe (Mews) sont
+            détectés automatiquement — aucune configuration séparée nécessaire ici.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="bf-service">Identifiant du service Mews (Service ID)</Label>
-            <Input
-              id="bf-service"
-              placeholder="ex. bd26d8db-86da-4f96-9efc-e5a4654a4a94"
-              value={config.pms_service_id || ''}
-              onChange={(e) => update({ pms_service_id: e.target.value.trim() || null })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Service Mews de type « Orderable » actif. Laissez vide pour une sélection
-              automatique. Utilisez « Tester la connexion » pour découvrir les services disponibles.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="bf-tax">Code de taxe Mews (Tax code)</Label>
-            <Input
-              id="bf-tax"
-              placeholder="ex. FR-2024-N"
-              value={config.pms_tax_code || ''}
-              onChange={(e) => update({ pms_tax_code: e.target.value.trim() || null })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Code de TVA appliqué à la charge. Apaleo n'en a pas besoin.
-            </p>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t">
             <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
               <Plug className="h-4 w-4" />
               {testing ? 'Test en cours…' : 'Tester la connexion PMS'}
@@ -314,16 +289,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                         {'orderable_services' in testResult && ` (dont ${String(testResult.orderable_services)} facturables)`}
                       </p>
                     )}
-                    {testResult.suggested_service_id && (
-                      <p className="flex items-center flex-wrap gap-2">
-                        Service suggéré : <span className="font-medium">{String(testResult.suggested_service_name)}</span>
-                        <Button
-                          size="sm" variant="secondary" className="h-6 px-2 text-xs"
-                          onClick={() => update({ pms_service_id: String(testResult.suggested_service_id) })}
-                        >
-                          Utiliser
-                        </Button>
-                      </p>
+                    {testResult.suggested_service_name && (
+                      <p>Service utilisé : <span className="font-medium">{String(testResult.suggested_service_name)}</span></p>
                     )}
                     {'billable_rooms' in testResult && (
                       <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
@@ -345,6 +312,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           </div>
         </CardContent>
       </Card>
+
 
 
       <Button onClick={handleSave} disabled={saving} className="gap-2">
