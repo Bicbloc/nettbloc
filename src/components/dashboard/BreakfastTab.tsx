@@ -50,6 +50,10 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [registryRooms, setRegistryRooms] = useState<string[]>([]);
   const [pmsRooms, setPmsRooms] = useState<PmsRoom[] | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomSearch, setRoomSearch] = useState('');
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
+
+
 
   useEffect(() => {
     if (!currentHotelId) return;
