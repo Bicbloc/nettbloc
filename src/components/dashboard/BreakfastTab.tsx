@@ -215,8 +215,16 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         <CardHeader>
           <CardTitle className="text-lg">Types de petit-déjeuner</CardTitle>
           <CardDescription>
-            Optionnel : proposez plusieurs formules (ex. Continental, Buffet).
+            Importez les prestations directement depuis votre PMS (Mews / Apaleo) — une seule
+            configuration — ou ajoutez-les manuellement (ex. Continental, Buffet).
           </CardDescription>
+          <Button
+            variant="secondary" size="sm" className="gap-2 mt-2 w-fit"
+            onClick={handleImportProducts} disabled={importing}
+          >
+            <Download className="h-4 w-4" />
+            {importing ? 'Import en cours…' : 'Importer les prestations depuis le PMS'}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           {config.breakfast_types.length === 0 && (
