@@ -191,6 +191,25 @@ function pickOrderableService(services: MewsService[]): MewsService | undefined 
   )
 }
 
+// Fetch the products (prestations) of a Mews service — these are the breakfast formulas.
+async function fetchMewsProducts(creds: PmsCredentials, serviceId: string): Promise<PmsProduct[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const res = await mewsFetch(`${baseUrl}/products/getAll`, { ...mewsAuth(creds), ServiceIds: [serviceId] })
+  if (!res.ok) return []
+  const data = await res.json()
+  const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
+    (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
+  return (data.Products || [])
+    .filter((p: any) => p.IsActive !== false)
+    .map((p: any) => ({
+      id: p.Id,
+      name: pickName(p.Names, p.ShortNames ? pickName(p.ShortNames) : ''),
+      price: Number(p.Price?.GrossValue ?? p.Price?.Value ?? 0),
+      currency: p.Price?.Currency ?? null,
+      taxCode: p.Price?.TaxValues?.[0]?.Code ?? p.Price?.TaxCodes?.[0] ?? null,
+    }))
+}
+
 async function postMewsOrder(
   creds: PmsCredentials,
   serviceId: string,
@@ -206,19 +225,43 @@ async function postMewsOrder(
     ServiceId: serviceId,
     AccountId: accountId,
     LinkedReservationId: reservationId,
-    Items: items.map((it) => ({
-      Name: `Petit-déjeuner ${it.name}`.trim(),
-      UnitCount: it.qty,
-      UnitAmount: {
-        Currency: currency,
-        GrossValue: Number(it.price),
-        ...(taxCode ? { TaxCodes: [taxCode] } : {}),
-      },
-    })),
+    Items: items.map((it) => {
+      const itemTax = it.taxCode || taxCode
+      const base: Record<string, unknown> = {
+        Name: `Petit-déjeuner ${it.name}`.trim(),
+        UnitCount: it.qty,
+        UnitAmount: {
+          Currency: currency,
+          GrossValue: Number(it.price),
+          ...(itemTax ? { TaxCodes: [itemTax] } : {}),
+        },
+      }
+      // When the item maps to a real Mews product, link it for correct reporting.
+      if (it.productId) base.ProductId = it.productId
+      return base
+    }),
   }
   const res = await mewsFetch(`${baseUrl}/orders/add`, body)
   if (!res.ok) throw new Error(`Mews orders/add [${res.status}]: ${await res.text()}`)
 }
+
+// Fetch Apaleo services (prestations) with their default gross price.
+async function fetchApaleoProducts(token: string, propertyId: string): Promise<PmsProduct[]> {
+  const res = await fetch(
+    `https://api.apaleo.com/rateplan/v1/services?propertyIds=${propertyId}&pageSize=200`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) return []
+  const data = await res.json()
+  return (data.services || []).map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    price: Number(s.defaultGrossPrice?.amount ?? 0),
+    currency: s.defaultGrossPrice?.currency ?? null,
+    taxCode: null,
+  }))
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
