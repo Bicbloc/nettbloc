@@ -704,7 +704,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="mt-2 text-muted-foreground">Chargement des archives...</p>
         </Card>
-      ) : dailyReports.length === 0 && archivedLogs.length === 0 && incidents.length === 0 ? (
+      ) : dailyReports.length === 0 && archivedLogs.length === 0 && incidents.length === 0 && breakfastLogs.length === 0 ? (
         <Card className="p-8 text-center">
           <Archive className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold text-lg mb-2">Aucune archive pour cette date</h3>
