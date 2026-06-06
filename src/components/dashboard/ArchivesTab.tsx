@@ -84,7 +84,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
       const start = startOfMonth(selectedDate);
       const end = endOfMonth(selectedDate);
 
-      const [reportsRes, logsRes] = await Promise.all([
+      const [reportsRes, logsRes, breakfastRes] = await Promise.all([
         supabase
           .from('daily_reports')
           .select('report_date')
@@ -96,12 +96,19 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           .select('archive_date')
           .eq('hotel_id', currentHotelId)
           .gte('archive_date', format(start, 'yyyy-MM-dd'))
-          .lte('archive_date', format(end, 'yyyy-MM-dd'))
+          .lte('archive_date', format(end, 'yyyy-MM-dd')),
+        supabase
+          .from('breakfast_logs')
+          .select('log_date')
+          .eq('hotel_id', currentHotelId)
+          .gte('log_date', format(start, 'yyyy-MM-dd'))
+          .lte('log_date', format(end, 'yyyy-MM-dd'))
       ]);
 
       const dates = new Set<string>();
       (reportsRes.data || []).forEach((r: any) => dates.add(r.report_date));
       (logsRes.data || []).forEach((l: any) => dates.add(l.archive_date));
+      (breakfastRes.data || []).forEach((b: any) => dates.add(b.log_date));
 
       setAvailableDates(Array.from(dates).map(d => parseISO(d)));
     };
