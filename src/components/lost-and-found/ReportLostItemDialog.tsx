@@ -88,32 +88,50 @@ export function ReportLostItemDialog({
   const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<string>("");
+  const [availableRooms, setAvailableRooms] = useState<string[]>([]);
+  const [manualRoom, setManualRoom] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Charger les chambres existantes de l'hôtel pour les proposer dans une liste
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("rooms")
+        .select("room_number")
+        .eq("hotel_id", hotelId)
+        .order("room_number");
+      if (!cancelled && data) {
+        setAvailableRooms(data.map((r) => r.room_number));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, hotelId]);
+
+  // Options de clients à proposer (départ = check-out, en cours = staying, arrivée)
+  const guestOptions = [
+    guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
+    guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
+    guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
+  ].filter(Boolean) as { key: string; label: string; info: GuestInfo }[];
+
   // Determine available guests
-  const hasMultipleGuests = guestArrival && guestDeparture;
   const hasSingleGuest = guestStaying || (guestArrival && !guestDeparture) || (guestDeparture && !guestArrival);
 
   // Pre-fill guest info when dialog opens or guest selection changes
   useEffect(() => {
     if (!open) return;
+    if (selectedGuest === 'manual') return;
 
+    // Si plusieurs clients sont proposés, on suit la sélection radio
     let guestToUse: GuestInfo | undefined;
-
-    if (hasMultipleGuests) {
-      if (selectedGuest === 'arrival') {
-        guestToUse = guestArrival;
-      } else if (selectedGuest === 'departure') {
-        guestToUse = guestDeparture;
-      }
-    } else if (guestStaying) {
-      guestToUse = guestStaying;
-    } else if (guestArrival) {
-      guestToUse = guestArrival;
-    } else if (guestDeparture) {
-      guestToUse = guestDeparture;
+    if (guestOptions.length > 1) {
+      guestToUse = guestOptions.find((g) => g.key === selectedGuest)?.info;
+    } else if (guestOptions.length === 1) {
+      guestToUse = guestOptions[0].info;
     }
 
     if (guestToUse) {
@@ -122,14 +140,15 @@ export function ReportLostItemDialog({
       setGuestCheckIn(guestToUse.checkIn || "");
       setGuestCheckOut(guestToUse.checkOut || "");
     }
-  }, [open, selectedGuest, hasMultipleGuests, guestArrival, guestDeparture, guestStaying]);
+  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
 
-  // Auto-select departure guest by default when there are multiple (most likely the lost item owner)
+  // Sélection par défaut : le client en départ (check-out), le plus probable propriétaire
   useEffect(() => {
-    if (open && hasMultipleGuests && !selectedGuest) {
-      setSelectedGuest('departure');
+    if (open && guestOptions.length > 1 && !selectedGuest) {
+      setSelectedGuest(guestOptions[0].key);
     }
-  }, [open, hasMultipleGuests, selectedGuest]);
+  }, [open, selectedGuest, guestArrival, guestDeparture, guestStaying]);
+
 
   const createItemMutation = useMutation({
     mutationFn: async () => {
@@ -217,6 +236,7 @@ export function ReportLostItemDialog({
     setGuestCheckOut("");
     setImageUrl("");
     setSelectedGuest("");
+    setManualRoom(false);
   };
 
   const formatDate = (dateStr?: string) => {
@@ -293,16 +313,42 @@ export function ReportLostItemDialog({
             </Select>
           </div>
 
-          {/* Room Number (if room) */}
+          {/* Room Number (if room) - liste des chambres existantes */}
           {locationType === "room" && (
             <div className="space-y-2">
-              <Label htmlFor="roomNumber">Numéro de chambre</Label>
-              <Input
-                id="roomNumber"
-                placeholder="Ex: 101"
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-              />
+              <Label htmlFor="roomNumber">Chambre</Label>
+              {availableRooms.length > 0 && !manualRoom ? (
+                <Select
+                  value={availableRooms.includes(roomNumber) ? roomNumber : ""}
+                  onValueChange={(v) => {
+                    if (v === "__manual__") {
+                      setManualRoom(true);
+                      setRoomNumber("");
+                    } else {
+                      setRoomNumber(v);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une chambre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((rn) => (
+                      <SelectItem key={rn} value={rn}>
+                        Chambre {rn}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__manual__">Autre / saisir manuellement…</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="roomNumber"
+                  placeholder="Ex: 101"
+                  value={roomNumber}
+                  onChange={(e) => setRoomNumber(e.target.value)}
+                />
+              )}
             </div>
           )}
 
@@ -317,53 +363,43 @@ export function ReportLostItemDialog({
             />
           </div>
 
-          {/* Guest Selection (when multiple guests) */}
-          {locationType === "room" && hasMultipleGuests && (
+          {/* Guest Selection - propose les clients (départ/en cours/arrivée) */}
+          {locationType === "room" && guestOptions.length > 0 && (
             <div className="space-y-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Sélectionner le client concerné
+                Quel client a oublié l'objet ?
               </h4>
               <RadioGroup value={selectedGuest} onValueChange={setSelectedGuest} className="space-y-2">
-                {/* Departure guest option */}
-                <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
-                  <RadioGroupItem value="departure" id="guest-departure" />
-                  <Label htmlFor="guest-departure" className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ArrowLeft className="h-4 w-4 text-orange-500" />
-                        <span className="font-medium">Départ</span>
-                        <span className="text-muted-foreground">
-                          {guestDeparture?.firstName} {guestDeparture?.lastName}
-                        </span>
+                {guestOptions.map((g) => (
+                  <div
+                    key={g.key}
+                    className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer"
+                  >
+                    <RadioGroupItem value={g.key} id={`guest-${g.key}`} />
+                    <Label htmlFor={`guest-${g.key}`} className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {g.key === 'departure' ? (
+                            <ArrowLeft className="h-4 w-4 text-orange-500" />
+                          ) : g.key === 'arrival' ? (
+                            <ArrowRight className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <User className="h-4 w-4 text-blue-500" />
+                          )}
+                          <span className="font-medium">{g.label}</span>
+                          <span className="text-muted-foreground">
+                            {g.info.firstName} {g.info.lastName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(g.key === 'arrival' ? g.info.checkIn : g.info.checkOut)}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(guestDeparture?.checkOut)}
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-                
-                {/* Arrival guest option */}
-                <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
-                  <RadioGroupItem value="arrival" id="guest-arrival" />
-                  <Label htmlFor="guest-arrival" className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ArrowRight className="h-4 w-4 text-green-500" />
-                        <span className="font-medium">Arrivée</span>
-                        <span className="text-muted-foreground">
-                          {guestArrival?.firstName} {guestArrival?.lastName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(guestArrival?.checkIn)}
-                      </div>
-                    </div>
-                  </Label>
-                </div>
+                    </Label>
+                  </div>
+                ))}
 
                 {/* Manual entry option */}
                 <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
@@ -390,8 +426,8 @@ export function ReportLostItemDialog({
                     id="guestFirstName"
                     value={guestFirstName}
                     onChange={(e) => setGuestFirstName(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
                 <div className="space-y-2">
@@ -400,8 +436,8 @@ export function ReportLostItemDialog({
                     id="guestName"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
               </div>
@@ -413,8 +449,8 @@ export function ReportLostItemDialog({
                     type="date"
                     value={guestCheckIn}
                     onChange={(e) => setGuestCheckIn(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
                 <div className="space-y-2">
@@ -424,8 +460,8 @@ export function ReportLostItemDialog({
                     type="date"
                     value={guestCheckOut}
                     onChange={(e) => setGuestCheckOut(e.target.value)}
-                    readOnly={hasMultipleGuests && selectedGuest !== 'manual'}
-                    className={hasMultipleGuests && selectedGuest !== 'manual' ? 'bg-muted' : ''}
+                    readOnly={!!selectedGuest && selectedGuest !== 'manual'}
+                    className={!!selectedGuest && selectedGuest !== 'manual' ? 'bg-muted' : ''}
                   />
                 </div>
               </div>
