@@ -331,6 +331,27 @@ const Auth = () => {
                 <ArrowRight className="h-4 w-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/cafetiere/login')}
+              className="w-full p-4 sm:p-5 rounded-xl border-2 border-amber-200 bg-card hover:bg-amber-50 hover:border-amber-400 transition-all text-left group active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md">
+                    <Coffee className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{language === 'en' ? 'Coffee staff' : 'Cafetière'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'en' ? 'Breakfasts & tasks' : 'Petits-déjeuners & tâches'}
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-amber-500 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
           </div>
 
           <p className="text-center text-xs text-muted-foreground pt-4">
