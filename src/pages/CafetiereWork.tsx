@@ -14,6 +14,11 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { stayLabel } from '@/utils/stayStatus';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
