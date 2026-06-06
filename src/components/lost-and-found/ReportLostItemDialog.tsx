@@ -363,53 +363,43 @@ export function ReportLostItemDialog({
             />
           </div>
 
-          {/* Guest Selection (when multiple guests) */}
-          {locationType === "room" && hasMultipleGuests && (
+          {/* Guest Selection - propose les clients (départ/en cours/arrivée) */}
+          {locationType === "room" && guestOptions.length > 0 && (
             <div className="space-y-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Sélectionner le client concerné
+                Quel client a oublié l'objet ?
               </h4>
               <RadioGroup value={selectedGuest} onValueChange={setSelectedGuest} className="space-y-2">
-                {/* Departure guest option */}
-                <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
-                  <RadioGroupItem value="departure" id="guest-departure" />
-                  <Label htmlFor="guest-departure" className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ArrowLeft className="h-4 w-4 text-orange-500" />
-                        <span className="font-medium">Départ</span>
-                        <span className="text-muted-foreground">
-                          {guestDeparture?.firstName} {guestDeparture?.lastName}
-                        </span>
+                {guestOptions.map((g) => (
+                  <div
+                    key={g.key}
+                    className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer"
+                  >
+                    <RadioGroupItem value={g.key} id={`guest-${g.key}`} />
+                    <Label htmlFor={`guest-${g.key}`} className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {g.key === 'departure' ? (
+                            <ArrowLeft className="h-4 w-4 text-orange-500" />
+                          ) : g.key === 'arrival' ? (
+                            <ArrowRight className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <User className="h-4 w-4 text-blue-500" />
+                          )}
+                          <span className="font-medium">{g.label}</span>
+                          <span className="text-muted-foreground">
+                            {g.info.firstName} {g.info.lastName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(g.key === 'arrival' ? g.info.checkIn : g.info.checkOut)}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(guestDeparture?.checkOut)}
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-                
-                {/* Arrival guest option */}
-                <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
-                  <RadioGroupItem value="arrival" id="guest-arrival" />
-                  <Label htmlFor="guest-arrival" className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ArrowRight className="h-4 w-4 text-green-500" />
-                        <span className="font-medium">Arrivée</span>
-                        <span className="text-muted-foreground">
-                          {guestArrival?.firstName} {guestArrival?.lastName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(guestArrival?.checkIn)}
-                      </div>
-                    </div>
-                  </Label>
-                </div>
+                    </Label>
+                  </div>
+                ))}
 
                 {/* Manual entry option */}
                 <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-amber-100 hover:border-amber-300 cursor-pointer">
