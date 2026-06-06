@@ -897,7 +897,9 @@ const HousekeeperWorkContent: React.FC = () => {
           notes: a.rooms.notes,
           cleaning_priority: a.rooms.cleaning_priority || 5,
           cleaning_type: a.rooms.cleaning_type || ((a.rooms.status === 'ready-to-clean' || a.rooms.status === 'checkout') ? 'a_blanc' : undefined),
-          is_twin: a.rooms.is_twin || false
+          is_twin: a.rooms.is_twin || false,
+          do_not_disturb: a.rooms.do_not_disturb || false
+
         }));
 
       // Log détaillé pour debug
@@ -923,7 +925,7 @@ const HousekeeperWorkContent: React.FC = () => {
 
       const { data: checkoutRooms } = await supabase
         .from('rooms')
-        .select('id, room_number, status, notes, cleaning_priority, cleaning_type, is_twin')
+        .select('id, room_number, status, notes, cleaning_priority, cleaning_type, is_twin, do_not_disturb')
         .eq('hotel_id', hotelId)
         .in('status', ['ready-to-clean', 'checkout'])
         .order('updated_at', { ascending: false });
@@ -936,6 +938,7 @@ const HousekeeperWorkContent: React.FC = () => {
         cleaning_priority: room.cleaning_priority || 5,
         cleaning_type: room.cleaning_type || 'a_blanc',
         is_twin: room.is_twin || false,
+        do_not_disturb: room.do_not_disturb || false,
       }));
 
       setAvailableRooms(
