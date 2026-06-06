@@ -42,6 +42,7 @@ const HousekeeperHotels = React.lazy(() => import("./pages/HousekeeperHotels"));
 const GuestMode = React.lazy(() => import("./pages/GuestMode"));
 const HousekeeperProfile = React.lazy(() => import("./pages/HousekeeperProfile"));
 const HousekeeperWorkSimple = React.lazy(() => import("./components/HousekeeperWorkSimple").then(m => ({ default: m.HousekeeperWorkSimple })));
+const BreakfastWork = React.lazy(() => import("./pages/BreakfastWork"));
 const TechnicianLogin = React.lazy(() => import("./pages/TechnicianLogin"));
 const TechnicianSignup = React.lazy(() => import("./pages/TechnicianSignup"));
 const TechnicianDashboard = React.lazy(() => import("./pages/TechnicianDashboard"));
@@ -133,6 +134,7 @@ const App = () => (
                               <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
                               <Route path="/housekeeper/mobile" element={<Navigate to="/housekeeper/work" replace />} />
                               <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
+                              <Route path="/breakfast/work" element={<BreakfastWork />} />
                               <Route path="/technician/signup" element={<TechnicianSignup />} />
                               <Route path="/technician/login" element={<TechnicianLogin />} />
                               <Route path="/technician/hotels" element={<TechnicianHotels />} />
