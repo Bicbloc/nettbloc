@@ -241,7 +241,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
               onChange={(e) => update({ pms_service_id: e.target.value.trim() || null })}
             />
             <p className="text-xs text-muted-foreground">
-              Service Mews sous lequel facturer (Espace « Additional services » ou équivalent).
+              Service Mews de type « Orderable » actif. Laissez vide pour une sélection
+              automatique. Utilisez « Tester la connexion » pour découvrir les services disponibles.
             </p>
           </div>
           <div className="space-y-2">
