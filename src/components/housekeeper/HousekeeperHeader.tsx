@@ -1,8 +1,9 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Wifi, WifiOff, ScrollText, LogOut, ChevronRight } from 'lucide-react';
+import { Building2, Wifi, WifiOff, ScrollText, LogOut, ChevronRight, Coffee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { storageService } from '@/services/storageService';
 
 interface HousekeeperHeaderProps {
   hotelName: string;
@@ -74,6 +75,19 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
               onClick={() => navigate('/housekeeper/hotels')}
             >
               <Building2 className="h-4 w-4" />
+            </Button>
+
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+              title="Petit-déjeuner"
+              onClick={() => {
+                const id = storageService.getHousekeeperHotelId() || storageService.getHotelId();
+                navigate(`/breakfast/work${id ? `?hotel=${id}` : ''}`);
+              }}
+            >
+              <Coffee className="h-4 w-4" />
             </Button>
 
             <Button 
