@@ -126,7 +126,7 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Femmes de chambre */}
         <Card 
           className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50 group"
