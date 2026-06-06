@@ -423,6 +423,57 @@ export type Database = {
           },
         ]
       }
+      breakfast_logs: {
+        Row: {
+          breakfast_type: string | null
+          created_at: string
+          hotel_id: string
+          id: string
+          included: boolean
+          log_date: string
+          logged_by: string | null
+          people_count: number
+          pms_status: string
+          room_number: string
+          source: string
+          total_amount: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          breakfast_type?: string | null
+          created_at?: string
+          hotel_id: string
+          id?: string
+          included?: boolean
+          log_date?: string
+          logged_by?: string | null
+          people_count?: number
+          pms_status?: string
+          room_number: string
+          source?: string
+          total_amount?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          breakfast_type?: string | null
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          included?: boolean
+          log_date?: string
+          logged_by?: string | null
+          people_count?: number
+          pms_status?: string
+          room_number?: string
+          source?: string
+          total_amount?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       buildings: {
         Row: {
           created_at: string
@@ -1394,6 +1445,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hotel_breakfast_configs: {
+        Row: {
+          breakfast_types: Json
+          created_at: string
+          currency: string
+          default_included: boolean
+          hotel_id: string
+          id: string
+          is_active: boolean
+          price_per_person: number
+          pricing_source: string
+          updated_at: string
+        }
+        Insert: {
+          breakfast_types?: Json
+          created_at?: string
+          currency?: string
+          default_included?: boolean
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          price_per_person?: number
+          pricing_source?: string
+          updated_at?: string
+        }
+        Update: {
+          breakfast_types?: Json
+          created_at?: string
+          currency?: string
+          default_included?: boolean
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          price_per_person?: number
+          pricing_source?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       hotel_cleaning_rules: {
         Row: {
@@ -5022,6 +5112,7 @@ export type Database = {
       }
       rooms: {
         Row: {
+          breakfast_included: boolean
           cleaning_priority: number | null
           cleaning_type: string | null
           created_at: string
@@ -5044,6 +5135,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          breakfast_included?: boolean
           cleaning_priority?: number | null
           cleaning_type?: string | null
           created_at?: string
@@ -5066,6 +5158,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          breakfast_included?: boolean
           cleaning_priority?: number | null
           cleaning_type?: string | null
           created_at?: string

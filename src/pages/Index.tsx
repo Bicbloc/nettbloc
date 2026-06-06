@@ -56,6 +56,7 @@ const IncidentsTab = lazy(() => import("@/components/dashboard/IncidentsTab").th
 const ReportsTab = lazy(() => import("@/components/dashboard/ReportsTab").then(m => ({ default: m.ReportsTab })));
 const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then(m => ({ default: m.TrainingTab })));
 const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
+const BreakfastTab = lazy(() => import("@/components/dashboard/BreakfastTab").then(m => ({ default: m.BreakfastTab })));
 
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { NewDayBanner } from "@/components/dashboard/NewDayBanner";
@@ -1010,6 +1011,11 @@ const IndexDashboard = () => {
           {/* Templates Tab */}
           {activeTab === 'templates' && currentHotelId && (
             <TaskTemplateManager hotelId={currentHotelId} />
+          )}
+
+          {/* Breakfast Tab */}
+          {activeTab === 'breakfast' && (
+            <BreakfastTab currentHotelId={currentHotelId} />
           )}
 
           {/* Tickets Tab */}

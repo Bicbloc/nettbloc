@@ -242,6 +242,7 @@ type TranslationSchema = {
     linenShort: string;
     found: string;
     ia: string;
+    breakfast: string;
   };
   stats: {
     totalRooms: string;
@@ -563,6 +564,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       linenShort: "Linge",
       found: "Trouvés",
       ia: "IA",
+      breakfast: "Petit-déjeuner",
     },
     
     // Stats
@@ -895,6 +897,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       linenShort: "Linen",
       found: "Found",
       ia: "AI",
+      breakfast: "Breakfast",
     },
     
     // Stats
