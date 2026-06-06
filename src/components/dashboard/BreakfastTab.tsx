@@ -559,10 +559,9 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   return (
                     <div key={rn} className={`relative rounded-lg border p-2 text-center ${cls}`}>
                       {pmsComment && (
-                        <MessageSquare
-                          className="absolute top-1 left-1 h-3 w-3 opacity-70"
-                          title={pmsComment}
-                        />
+                        <span title={pmsComment} className="absolute top-1 left-1">
+                          <MessageSquare className="h-3 w-3 opacity-70" />
+                        </span>
                       )}
                       <div className="flex items-center justify-center gap-1">
                         <p className="font-bold text-sm">{rn}</p>
