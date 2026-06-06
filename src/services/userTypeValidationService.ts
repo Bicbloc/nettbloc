@@ -93,7 +93,7 @@ export async function validateUserAccessToInterface(
       return { allowed: true, correctInterface: null };
     }
 
-    const priority: UserType[] = ['establishment', 'housekeeper', 'governess', 'technician'];
+    const priority: UserType[] = ['establishment', 'housekeeper', 'governess', 'technician', 'cafetiere'];
     const foundRoles = Array.from(new Set(data.map((row: any) => row.found_in as UserType)));
 
     // Si l'interface courante fait partie des rôles détectés, on l'autorise.
@@ -138,6 +138,10 @@ export function getRedirectMessage(correctInterface: UserType, language: 'fr' | 
     technician: {
       fr: "Cette adresse email est liée à un compte Technicien. Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
       en: "This email is linked to a Technician account. No redirection performed — please use the matching interface to sign in."
+    },
+    cafetiere: {
+      fr: "Cette adresse email est liée à un compte Cafetière. Aucune redirection effectuée — utilisez l'interface correspondante pour vous connecter.",
+      en: "This email is linked to a Cafetière account. No redirection performed — please use the matching interface to sign in."
     }
   };
   
@@ -152,7 +156,8 @@ export function getInterfaceUrl(userType: UserType): string {
     establishment: '/auth/establishment',
     housekeeper: '/housekeeper/auth',
     governess: '/governess/auth',
-    technician: '/technician/login'
+    technician: '/technician/login',
+    cafetiere: '/cafetiere/login'
   };
   
   return urls[userType];
