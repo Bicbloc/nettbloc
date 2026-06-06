@@ -1,8 +1,13 @@
 /**
- * Onglet admin : configuration de la facturation des petits-déjeuners.
+ * Onglet admin : page Petit-déjeuner.
+ * Page principale = chambres (registre / Mews) + petits-déjeuners du jour.
+ * La configuration (facturation, types, PMS) est regroupée dans un panneau réglages.
  */
-import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble, RefreshCw, Check } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble,
+  RefreshCw, Check, Settings,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,14 +19,16 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger,
+} from '@/components/ui/sheet';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
   fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
-
-
 
 interface BreakfastTabProps {
   currentHotelId: string | null;
@@ -37,7 +44,11 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [previewProducts, setPreviewProducts] = useState<PmsProduct[] | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [rooms, setRooms] = useState<PmsRoom[] | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Chambres : registre (canonique) + inclusion PDJ depuis le PMS.
+  const [registryRooms, setRegistryRooms] = useState<string[]>([]);
+  const [pmsRooms, setPmsRooms] = useState<PmsRoom[] | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
 
   useEffect(() => {
@@ -47,6 +58,25 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
       .then(setConfig)
       .finally(() => setLoading(false));
   }, [currentHotelId]);
+
+  // Charge les chambres du registre + l'inclusion PDJ récupérée du PMS.
+  const loadRooms = useCallback(async () => {
+    if (!currentHotelId) return;
+    setRoomsLoading(true);
+    const [{ data: reg }, pms] = await Promise.all([
+      supabase.from('hotel_rooms_registry')
+        .select('room_number')
+        .eq('hotel_id', currentHotelId)
+        .eq('is_active', true)
+        .order('room_number'),
+      fetchPmsRooms(currentHotelId),
+    ]);
+    setRegistryRooms((reg || []).map((r) => r.room_number));
+    setPmsRooms(pms.ok ? pms.rooms : []);
+    setRoomsLoading(false);
+  }, [currentHotelId]);
+
+  useEffect(() => { loadRooms(); }, [loadRooms]);
 
   if (!currentHotelId) {
     return <p className="text-muted-foreground">Sélectionnez un hôtel.</p>;
@@ -137,22 +167,27 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     setPreviewProducts(res.products);
   };
 
-  const handleLoadRooms = async () => {
-    if (!currentHotelId) return;
-    setRoomsLoading(true);
-    const res = await fetchPmsRooms(currentHotelId);
-    setRoomsLoading(false);
-    if (!res.ok) {
-      toast.error(res.error || 'Récupération des chambres impossible');
-      setRooms([]);
-      return;
-    }
-    setRooms(res.rooms);
-    toast.success(`${res.rooms.length} chambre(s) en séjour récupérée(s) depuis le PMS.`);
-  };
+  // Liste des chambres disponibles pour la sélection (registre, sinon Mews).
+  const availableRooms = (registryRooms.length > 0
+    ? registryRooms
+    : (pmsRooms || []).map((r) => r.room_number)
+  )
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
+  const inclusionByRoom: Record<string, boolean> = {};
+  const occupiedByRoom: Record<string, boolean> = {};
+  for (const r of pmsRooms || []) {
+    const key = String(r.room_number).trim().toLowerCase();
+    inclusionByRoom[key] = r.breakfast_included;
+    occupiedByRoom[key] = r.occupied;
+  }
 
-
+  const gridRooms = (availableRooms.length > 0
+    ? availableRooms
+    : (pmsRooms || []).map((r) => r.room_number)
+  );
+  const includedCount = gridRooms.filter((rn) => inclusionByRoom[rn.trim().toLowerCase()]).length;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -161,211 +196,214 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           <Coffee className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold">Petit-déjeuner</h2>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => window.open(`/cafetiere?hotel=${currentHotelId}`, '_blank')}
-        >
-          <ExternalLink className="h-4 w-4" /> Ouvrir l'interface Cafetière
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline" size="sm" className="gap-2"
+            onClick={() => window.open(`/cafetiere?hotel=${currentHotelId}`, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4" /> Interface Cafetière
+          </Button>
+          <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="secondary" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" /> Configuration
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Configuration petit-déjeuner</SheetTitle>
+                <SheetDescription>
+                  Facturation, types de prestations et connexion PMS.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="space-y-6 py-4">
+                {/* Facturation */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Facturation</CardTitle>
+                    <CardDescription>
+                      Activez la facturation et choisissez la source des tarifs.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="bf-active">Activer la facturation petit-déjeuner</Label>
+                      <Switch
+                        id="bf-active"
+                        checked={config.is_active}
+                        onCheckedChange={(v) => update({ is_active: v })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Source du prix</Label>
+                      <Select
+                        value={config.pricing_source}
+                        onValueChange={(v) => update({ pricing_source: v as 'manual' | 'pms' })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Configuré par le client</SelectItem>
+                          <SelectItem value="pms">Récupéré depuis le PMS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="bf-price">Prix par personne</Label>
+                        <Input
+                          id="bf-price"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={config.price_per_person}
+                          disabled={config.pricing_source === 'pms'}
+                          onChange={(e) => update({ price_per_person: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="bf-currency">Devise</Label>
+                        <Input
+                          id="bf-currency"
+                          value={config.currency}
+                          onChange={(e) => update({ currency: e.target.value.toUpperCase() })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="bf-incl">Chambres incluses par défaut</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Marque les nouvelles déclarations comme « inclus » (non facturé).
+                        </p>
+                      </div>
+                      <Switch
+                        id="bf-incl"
+                        checked={config.default_included}
+                        onCheckedChange={(v) => update({ default_included: v })}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Types de petit-déjeuner */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Types de petit-déjeuner</CardTitle>
+                    <CardDescription>
+                      Importez les prestations directement depuis votre PMS (Mews / Apaleo) —
+                      une seule configuration — ou ajoutez-les manuellement.
+                    </CardDescription>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button
+                        variant="secondary" size="sm" className="gap-2 w-fit"
+                        onClick={handleImportProducts} disabled={importing}
+                      >
+                        <Download className="h-4 w-4" />
+                        {importing ? 'Import en cours…' : 'Importer depuis le PMS'}
+                      </Button>
+                      <Button
+                        variant="outline" size="sm" className="gap-2 w-fit"
+                        onClick={handlePreviewProducts} disabled={previewLoading}
+                        title="Voir les prestations récupérables depuis le PMS"
+                      >
+                        <Eye className="h-4 w-4" />
+                        {previewLoading ? 'Test…' : 'Tester / voir'}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {config.breakfast_types.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Aucun type. Le prix par personne est utilisé par défaut.
+                      </p>
+                    )}
+                    {config.breakfast_types.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          placeholder="Nom"
+                          value={t.name}
+                          onChange={(e) => updateType(i, { name: e.target.value })}
+                        />
+                        <Input
+                          className="w-28"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Prix"
+                          value={t.price}
+                          onChange={(e) => updateType(i, { price: Number(e.target.value) })}
+                        />
+                        <Button variant="ghost" size="icon" onClick={() => removeType(i)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addType} className="gap-2">
+                      <Plus className="h-4 w-4" /> Ajouter un type
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Facturation PMS */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Connexion PMS</CardTitle>
+                    <CardDescription>
+                      La facturation utilise la connexion PMS configurée dans
+                      « Chambres → Connexion API PMS ». Service et code de taxe (Mews)
+                      détectés automatiquement.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
+                      <Plug className="h-4 w-4" />
+                      {testing ? 'Test en cours…' : 'Tester la connexion PMS'}
+                    </Button>
+                    {testResult && (
+                      <div className="rounded-lg border p-3 text-xs bg-muted/40 space-y-1">
+                        {testResult.ok ? (
+                          <>
+                            <p className="font-medium text-emerald-600">
+                              Connexion {String(testResult.pms || '').toUpperCase()} : OK
+                            </p>
+                            {'reservations_in_house' in testResult && (
+                              <p>Réservations en cours : {String(testResult.reservations_in_house)}</p>
+                            )}
+                            {'services' in testResult && (
+                              <p>Services PMS détectés : {String(testResult.services)}
+                                {'orderable_services' in testResult && ` (dont ${String(testResult.orderable_services)} facturables)`}
+                              </p>
+                            )}
+                            {testResult.suggested_service_name && (
+                              <p>Service utilisé : <span className="font-medium">{String(testResult.suggested_service_name)}</span></p>
+                            )}
+                            {'billable_rooms' in testResult && (
+                              <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-destructive">{String(testResult.error || 'Erreur')}</p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Button onClick={handleSave} disabled={saving} className="gap-2 w-full">
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Enregistrement…' : 'Enregistrer la configuration'}
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
-      {config.is_active && (
-        <BreakfastBilledSection
-          hotelId={currentHotelId}
-          currency={config.currency || 'EUR'}
-          breakfastTypes={config.breakfast_types}
-          pricePerPerson={config.price_per_person}
-        />
-      )}
-
-
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Facturation</CardTitle>
-          <CardDescription>
-            Activez la facturation et choisissez la source des tarifs.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="bf-active">Activer la facturation petit-déjeuner</Label>
-            <Switch
-              id="bf-active"
-              checked={config.is_active}
-              onCheckedChange={(v) => update({ is_active: v })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Source du prix</Label>
-            <Select
-              value={config.pricing_source}
-              onValueChange={(v) => update({ pricing_source: v as 'manual' | 'pms' })}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">Configuré par le client</SelectItem>
-                <SelectItem value="pms">Récupéré depuis le PMS</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="bf-price">Prix par personne</Label>
-              <Input
-                id="bf-price"
-                type="number"
-                min={0}
-                step="0.01"
-                value={config.price_per_person}
-                disabled={config.pricing_source === 'pms'}
-                onChange={(e) => update({ price_per_person: Number(e.target.value) })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bf-currency">Devise</Label>
-              <Input
-                id="bf-currency"
-                value={config.currency}
-                onChange={(e) => update({ currency: e.target.value.toUpperCase() })}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="bf-incl">Chambres incluses par défaut</Label>
-              <p className="text-xs text-muted-foreground">
-                Marque les nouvelles déclarations comme « inclus » (non facturé).
-              </p>
-            </div>
-            <Switch
-              id="bf-incl"
-              checked={config.default_included}
-              onCheckedChange={(v) => update({ default_included: v })}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Types de petit-déjeuner</CardTitle>
-          <CardDescription>
-            Importez les prestations directement depuis votre PMS (Mews / Apaleo) — une seule
-            configuration — ou ajoutez-les manuellement (ex. Continental, Buffet).
-          </CardDescription>
-          <div className="flex flex-wrap gap-2 mt-2">
-            <Button
-              variant="secondary" size="sm" className="gap-2 w-fit"
-              onClick={handleImportProducts} disabled={importing}
-            >
-              <Download className="h-4 w-4" />
-              {importing ? 'Import en cours…' : 'Importer les prestations depuis le PMS'}
-            </Button>
-            <Button
-              variant="outline" size="sm" className="gap-2 w-fit"
-              onClick={handlePreviewProducts} disabled={previewLoading}
-              title="Voir les prestations récupérables depuis le PMS"
-            >
-              <Eye className="h-4 w-4" />
-              {previewLoading ? 'Test…' : 'Tester / voir les prestations'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {config.breakfast_types.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Aucun type. Le prix par personne est utilisé par défaut.
-            </p>
-          )}
-          {config.breakfast_types.map((t, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                placeholder="Nom"
-                value={t.name}
-                onChange={(e) => updateType(i, { name: e.target.value })}
-              />
-              <Input
-                className="w-28"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="Prix"
-                value={t.price}
-                onChange={(e) => updateType(i, { price: Number(e.target.value) })}
-              />
-              <Button variant="ghost" size="icon" onClick={() => removeType(i)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
-          <Button variant="outline" size="sm" onClick={addType} className="gap-2">
-            <Plus className="h-4 w-4" /> Ajouter un type
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Facturation PMS</CardTitle>
-          <CardDescription>
-            La facturation utilise directement la connexion PMS configurée dans
-            « Chambres → Connexion API PMS ». Le service et le code de taxe (Mews) sont
-            détectés automatiquement — aucune configuration séparée nécessaire ici.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
-              <Plug className="h-4 w-4" />
-              {testing ? 'Test en cours…' : 'Tester la connexion PMS'}
-            </Button>
-            {testResult && (
-              <div className="rounded-lg border p-3 text-xs bg-muted/40 space-y-1">
-                {testResult.ok ? (
-                  <>
-                    <p className="font-medium text-emerald-600">
-                      Connexion {String(testResult.pms || '').toUpperCase()} : OK
-                    </p>
-                    {'reservations_in_house' in testResult && (
-                      <p>Réservations en cours : {String(testResult.reservations_in_house)}</p>
-                    )}
-                    {'services' in testResult && (
-                      <p>Services PMS détectés : {String(testResult.services)}
-                        {'orderable_services' in testResult && ` (dont ${String(testResult.orderable_services)} facturables)`}
-                      </p>
-                    )}
-                    {testResult.suggested_service_name && (
-                      <p>Service utilisé : <span className="font-medium">{String(testResult.suggested_service_name)}</span></p>
-                    )}
-                    {'billable_rooms' in testResult && (
-                      <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
-                    )}
-                    {Array.isArray(testResult.rooms_matched) && (
-                      <p>Chambres rapprochées : {(testResult.rooms_matched as string[]).join(', ') || '—'}</p>
-                    )}
-                    {Array.isArray(testResult.rooms_unmatched) && (testResult.rooms_unmatched as string[]).length > 0 && (
-                      <p className="text-amber-600">
-                        Sans réservation : {(testResult.rooms_unmatched as string[]).join(', ')}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-destructive">{String(testResult.error || 'Erreur')}</p>
-                )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-
-
+      {/* Page principale : chambres + petits-déjeuners du jour */}
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -373,66 +411,71 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
               <BedDouble className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Chambres &amp; petit-déjeuner</CardTitle>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleLoadRooms} disabled={roomsLoading}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={loadRooms} disabled={roomsLoading}>
               <RefreshCw className={`h-4 w-4 ${roomsLoading ? 'animate-spin' : ''}`} />
-              {roomsLoading ? 'Chargement…' : 'Récupérer les chambres'}
+              {roomsLoading ? 'Chargement…' : 'Actualiser'}
             </Button>
           </div>
           <CardDescription>
-            Chambres en séjour récupérées depuis le PMS. En vert : le petit-déjeuner est
-            déjà inclus dans la réservation ; en ambre : non inclus (à déclarer / facturer).
+            Chambres du registre (synchronisées avec le PMS). En vert : petit-déjeuner
+            déjà inclus dans la réservation ; en ambre : occupée non incluse ; en gris : libre.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {rooms === null ? (
+          {roomsLoading && pmsRooms === null ? (
+            <p className="text-sm text-muted-foreground">Chargement des chambres…</p>
+          ) : gridRooms.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Cliquez sur « Récupérer les chambres » pour afficher l'occupation du jour.
+              Aucune chambre. Importez le registre des chambres ou configurez la connexion PMS.
             </p>
-          ) : rooms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune chambre en séjour aujourd'hui.</p>
           ) : (
             <>
               <div className="flex flex-wrap gap-4 mb-3 text-xs">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded-full bg-emerald-500 inline-block" />
-                  Inclus ({rooms.filter((r) => r.breakfast_included).length})
+                  Inclus ({includedCount})
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded-full bg-amber-500 inline-block" />
-                  Non inclus ({rooms.filter((r) => !r.breakfast_included).length})
+                  Occupée non incluse
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-muted inline-block border" />
+                  Libre
                 </span>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {rooms
-                  .slice()
-                  .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
-                  .map((r) => (
-                    <div
-                      key={r.room_number}
-                      title={r.guest_name || undefined}
-                      className={[
-                        'rounded-lg border p-2 text-center',
-                        r.breakfast_included
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                          : 'bg-amber-50 border-amber-200 text-amber-700',
-                      ].join(' ')}
-                    >
-                      <p className="font-bold text-sm">{r.room_number}</p>
+                {gridRooms.map((rn) => {
+                  const key = rn.trim().toLowerCase();
+                  const included = inclusionByRoom[key];
+                  const occupied = occupiedByRoom[key];
+                  const cls = included
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : occupied
+                      ? 'bg-amber-50 border-amber-200 text-amber-700'
+                      : 'bg-card border-border text-muted-foreground';
+                  return (
+                    <div key={rn} className={`rounded-lg border p-2 text-center ${cls}`}>
+                      <p className="font-bold text-sm">{rn}</p>
                       <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
-                        {r.breakfast_included ? (<><Check className="h-3 w-3" /> Inclus</>) : 'Non inclus'}
+                        {included ? (<><Check className="h-3 w-3" /> Inclus</>) : occupied ? 'Non inclus' : '—'}
                       </p>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave} disabled={saving} className="gap-2">
-        <Save className="h-4 w-4" />
-        {saving ? 'Enregistrement…' : 'Enregistrer'}
-      </Button>
+      <BreakfastBilledSection
+        hotelId={currentHotelId}
+        currency={config.currency || 'EUR'}
+        breakfastTypes={config.breakfast_types}
+        pricePerPerson={config.price_per_person}
+        availableRooms={availableRooms}
+      />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-lg">
@@ -460,7 +503,6 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           )}
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
