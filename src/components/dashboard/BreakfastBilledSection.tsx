@@ -74,15 +74,24 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
       items,
       loggedBy: 'Admin',
     });
-    setAdding(false);
-    if (ok) {
-      toast.success(`Chambre ${room} ajoutée`);
-      setAddRoom('');
-      setAddQty(1);
-      refresh();
-    } else {
+    if (!ok) {
+      setAdding(false);
       toast.error("Échec de l'ajout");
+      return;
     }
+    // Envoi automatique au PMS (Mews/Apaleo) dès la saisie de la charge par l'admin.
+    const res = await sendBreakfastsToPms(hotelId, todayDate(), room);
+    setAdding(false);
+    if (res.ok && res.sent > 0) {
+      toast.success(`Chambre ${room} ajoutée et envoyée au PMS`);
+    } else if (res.ok) {
+      toast.success(`Chambre ${room} ajoutée`);
+    } else {
+      toast.warning(`Chambre ${room} ajoutée — envoi PMS échoué`);
+    }
+    setAddRoom('');
+    setAddQty(1);
+    refresh();
   };
 
 
