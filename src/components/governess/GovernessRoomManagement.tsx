@@ -534,6 +534,14 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           <MapIcon className="h-4 w-4" />
           Plan
         </Button>
+        <Button
+          onClick={() => { setBulkSelectedIds(new Set()); setBulkDialog(true); }}
+          className="gap-2"
+          disabled={availableHousekeepers.length === 0}
+        >
+          <Layers className="h-4 w-4" />
+          Attribution groupée
+        </Button>
       </div>
 
       {showPlan ? (
