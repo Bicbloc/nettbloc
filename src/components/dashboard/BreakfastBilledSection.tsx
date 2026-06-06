@@ -4,7 +4,7 @@
  * et permet d'envoyer les facturables au PMS. Mise à jour en temps réel.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Send, RefreshCw, Plus } from 'lucide-react';
+import { RefreshCw, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +43,7 @@ const stayText = (status: string | null | undefined): string => {
 export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [], roomMeta = {} }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  
 
   // Ajout manuel par l'admin
   const [addRoom, setAddRoom] = useState('');
@@ -74,15 +74,24 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
       items,
       loggedBy: 'Admin',
     });
-    setAdding(false);
-    if (ok) {
-      toast.success(`Chambre ${room} ajoutée`);
-      setAddRoom('');
-      setAddQty(1);
-      refresh();
-    } else {
+    if (!ok) {
+      setAdding(false);
       toast.error("Échec de l'ajout");
+      return;
     }
+    // Envoi automatique au PMS (Mews/Apaleo) dès la saisie de la charge par l'admin.
+    const res = await sendBreakfastsToPms(hotelId, todayDate(), room);
+    setAdding(false);
+    if (res.ok && res.sent > 0) {
+      toast.success(`Chambre ${room} ajoutée et envoyée au PMS`);
+    } else if (res.ok) {
+      toast.success(`Chambre ${room} ajoutée`);
+    } else {
+      toast.warning(`Chambre ${room} ajoutée — envoi PMS échoué`);
+    }
+    setAddRoom('');
+    setAddQty(1);
+    refresh();
   };
 
 
@@ -113,19 +122,8 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
     () => billed.reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [billed]
   );
-  const pendingPms = billed.filter((l) => l.pms_status !== 'sent').length;
 
-  const handleSend = async () => {
-    setSending(true);
-    const res = await sendBreakfastsToPms(hotelId);
-    setSending(false);
-    if (res.ok) {
-      toast.success(`${res.sent} envoyé(s) au PMS${res.failed ? `, ${res.failed} échec(s)` : ''}`);
-      refresh();
-    } else {
-      toast.error(res.error || "Échec de l'envoi au PMS");
-    }
-  };
+
 
   const statusBadge = (s: string) => {
     if (s === 'sent') return <Badge>Facturé PMS</Badge>;
@@ -231,10 +229,6 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
                 </div>
               ))}
             </div>
-            <Button onClick={handleSend} disabled={sending || pendingPms === 0} className="gap-2">
-              <Send className="h-4 w-4" />
-              {sending ? 'Envoi…' : `Envoyer au PMS (${pendingPms})`}
-            </Button>
           </>
         )}
       </CardContent>
