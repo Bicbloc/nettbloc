@@ -121,6 +121,38 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     toast.success(`${types.length} prestation(s) importée(s) depuis le PMS. Pensez à enregistrer.`);
   };
 
+  // Prévisualise les prestations récupérables depuis le PMS, sans les importer.
+  const handlePreviewProducts = async () => {
+    if (!currentHotelId) return;
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewProducts(null);
+    const res = await fetchPmsProducts(currentHotelId);
+    setPreviewLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération impossible');
+      setPreviewProducts([]);
+      return;
+    }
+    setPreviewProducts(res.products);
+  };
+
+  const handleLoadRooms = async () => {
+    if (!currentHotelId) return;
+    setRoomsLoading(true);
+    const res = await fetchPmsRooms(currentHotelId);
+    setRoomsLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération des chambres impossible');
+      setRooms([]);
+      return;
+    }
+    setRooms(res.rooms);
+    toast.success(`${res.rooms.length} chambre(s) en séjour récupérée(s) depuis le PMS.`);
+  };
+
+
+
 
   return (
     <div className="space-y-6 max-w-2xl">
