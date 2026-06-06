@@ -23,6 +23,9 @@ import {
 interface SimpleRoom {
   room_number: string;
   breakfast_included: boolean;
+  guest_name: string | null;
+  occupied: boolean;
+  status: string | null;
 }
 
 export default function CafetiereWork() {
