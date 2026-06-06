@@ -32,6 +32,8 @@ export interface BreakfastLogItem {
   name: string;
   qty: number;
   price: number;
+  pms_product_id?: string | null;
+  pms_tax_code?: string | null;
 }
 
 export interface BreakfastLog {
