@@ -77,6 +77,7 @@ export interface Room {
   priority?: 'high' | 'medium' | 'low';
   assignedTo?: string;
   isTwin?: boolean;
+  doNotDisturb?: boolean;
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;

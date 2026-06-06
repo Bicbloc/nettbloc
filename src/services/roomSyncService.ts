@@ -38,6 +38,7 @@ export class RoomSyncService {
         status: safeStatus,
         // Ne PAS toucher aux notes - elles sont gérées manuellement par le client
         is_twin: room.isTwin || false,
+        do_not_disturb: room.doNotDisturb || false,
         updated_at: new Date().toISOString()
       };
 
