@@ -330,6 +330,9 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+
 
   const handleUnassign = async (room: Room) => {
     const assignment = assignments.get(room.id);
