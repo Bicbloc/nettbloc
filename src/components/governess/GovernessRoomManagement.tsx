@@ -22,6 +22,7 @@ import { deduceFloorFromRoomNumber, formatFloorLabel } from '@/utils/floorUtils'
 interface GovernessRoomManagementProps {
   hotelId: string;
   governessName: string;
+  governessId?: string;
 }
 
 interface Room {
@@ -56,14 +57,26 @@ interface Inspection {
   cleanliness_score: number | null;
 }
 
+interface DailyGovernessAssignment {
+  id: string;
+  governess_name: string;
+  governess_profile_id: string | null;
+  assignment_type: string;
+  assigned_floors: number[] | null;
+  assigned_housekeepers: string[] | null;
+  notes: string | null;
+}
+
 export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = ({
   hotelId,
-  governessName
+  governessName,
+  governessId
 }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignments, setAssignments] = useState<Map<string, Assignment>>(new Map());
   const [inspections, setInspections] = useState<Map<string, Inspection>>(new Map());
   const [housekeepers, setHousekeepers] = useState<Housekeeper[]>([]);
+  const [governessAssignments, setGovernessAssignments] = useState<DailyGovernessAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -135,10 +148,18 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
         .eq('hotel_id', hotelId)
         .eq('inspection_date', today);
 
+      const { data: governessAssignmentsData } = await supabase
+        .from('daily_governess_assignments')
+        .select('id, governess_name, governess_profile_id, assignment_type, assigned_floors, assigned_housekeepers, notes')
+        .eq('hotel_id', hotelId)
+        .eq('assignment_date', today)
+        .order('governess_name');
+
       const inspectionMap = new Map(
         inspectionsData?.map(i => [i.room_id, i]) || []
       );
       setInspections(inspectionMap);
+      setGovernessAssignments((governessAssignmentsData as DailyGovernessAssignment[]) || []);
 
       // Charger les femmes de chambre
       const { data: housekeepersData } = await supabase
@@ -168,7 +189,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
 
   useRealtimeSync({
     hotelId,
-    tables: ['rooms', 'assignments', 'room_inspections'],
+    tables: ['rooms', 'assignments', 'room_inspections', 'daily_governess_assignments'],
     onUpdate: handleRealtimeUpdate
   });
 
@@ -459,6 +480,22 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     return matchesSearch;
   });
 
+  const formatAssignmentScope = (assignment: DailyGovernessAssignment) => {
+    if (assignment.assignment_type === 'housekeeper') {
+      const names = assignment.assigned_housekeepers || [];
+      return names.length > 0 ? names.join(', ') : 'Aucune femme de chambre liée';
+    }
+
+    const floors = assignment.assigned_floors || [];
+    return floors.length > 0
+      ? floors.map((floor) => formatFloorLabel(floor)).join(', ')
+      : 'Aucun étage lié';
+  };
+
+  const currentGovernessAssignment = governessAssignments.find((assignment) =>
+    (governessId && assignment.governess_profile_id === governessId) || assignment.governess_name === governessName
+  );
+
   const getStatusBadge = (room: Room, assignment?: Assignment) => {
     const inspection = inspections.get(room.id);
     
@@ -549,11 +586,50 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       ) : (
       <>
 
+      {/* Assignation gouvernante du jour */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-sm">Assignation gouvernante du jour</h3>
+          <Badge variant="secondary" className="ml-auto">{governessAssignments.length}</Badge>
+        </div>
+
+        {governessAssignments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucune assignation gouvernante visible pour aujourd'hui.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {governessAssignments.map((assignment) => {
+              const isCurrent = currentGovernessAssignment?.id === assignment.id;
+
+              return (
+                <div key={assignment.id} className="rounded-lg border border-border p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{assignment.governess_name}</span>
+                    {isCurrent && <Badge>Vous</Badge>}
+                    <Badge variant="outline">
+                      {assignment.assignment_type === 'housekeeper' ? 'Par femmes de chambre' : 'Par étage'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {assignment.assignment_type === 'housekeeper' ? 'Équipe suivie' : 'Étages suivis'} : {formatAssignmentScope(assignment)}
+                  </p>
+                  {assignment.notes && (
+                    <p className="text-sm text-muted-foreground">Note : {assignment.notes}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
       {/* Femmes de chambre disponibles aujourd'hui */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-primary" />
-          <h3 className="font-semibold text-sm">Femmes de chambre disponibles aujourd'hui</h3>
+          <h3 className="font-semibold text-sm">Présences femmes de chambre du jour</h3>
           <Badge variant="secondary" className="ml-auto">{availableHousekeepers.length}</Badge>
         </div>
         {housekeepers.filter(h => h.is_active).length === 0 ? (

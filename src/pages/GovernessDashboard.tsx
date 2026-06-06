@@ -596,11 +596,11 @@ function GovernessDashboardContent() {
                 {activeTab === 'rooms' && (
                   <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
                     <div className="p-4 border-b">
-                      <h2 className="font-semibold">Gestion des chambres</h2>
-                      <p className="text-xs text-muted-foreground">Visualisez et assignez les chambres</p>
+                      <h2 className="font-semibold">Chambres & assignations</h2>
+                      <p className="text-xs text-muted-foreground">Assignation gouvernante du jour et attribution des chambres</p>
                     </div>
                     <div className="p-4">
-                      <GovernessRoomManagement hotelId={selectedHotel.id} governessName={profile.name} />
+                      <GovernessRoomManagement hotelId={selectedHotel.id} governessName={profile.name} governessId={profile.id} />
                     </div>
                   </div>
                 )}
