@@ -2,7 +2,7 @@
  * Onglet admin : configuration de la facturation des petits-déjeuners.
  */
 import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save, ExternalLink, Plug } from 'lucide-react';
+import { Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
-  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
+  BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity, fetchPmsProducts,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 
@@ -28,6 +28,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
@@ -82,6 +83,33 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     } else {
       toast.error(res.error || 'Connexion PMS impossible');
     }
+  };
+
+  const handleImportProducts = async () => {
+    if (!currentHotelId) return;
+    setImporting(true);
+    const res = await fetchPmsProducts(currentHotelId);
+    setImporting(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Import des prestations impossible');
+      return;
+    }
+    if (res.products.length === 0) {
+      toast.warning('Aucune prestation trouvée dans le PMS pour ce service.');
+      return;
+    }
+    const types: BreakfastType[] = res.products.map((p) => ({
+      name: p.name,
+      price: p.price,
+      pms_product_id: p.id,
+      pms_tax_code: p.taxCode,
+    }));
+    update({
+      breakfast_types: types,
+      pricing_source: 'pms',
+      ...(res.service_id ? { pms_service_id: res.service_id } : {}),
+    });
+    toast.success(`${types.length} prestation(s) importée(s) depuis le PMS. Pensez à enregistrer.`);
   };
 
 
@@ -187,8 +215,16 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         <CardHeader>
           <CardTitle className="text-lg">Types de petit-déjeuner</CardTitle>
           <CardDescription>
-            Optionnel : proposez plusieurs formules (ex. Continental, Buffet).
+            Importez les prestations directement depuis votre PMS (Mews / Apaleo) — une seule
+            configuration — ou ajoutez-les manuellement (ex. Continental, Buffet).
           </CardDescription>
+          <Button
+            variant="secondary" size="sm" className="gap-2 mt-2 w-fit"
+            onClick={handleImportProducts} disabled={importing}
+          >
+            <Download className="h-4 w-4" />
+            {importing ? 'Import en cours…' : 'Importer les prestations depuis le PMS'}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           {config.breakfast_types.length === 0 && (

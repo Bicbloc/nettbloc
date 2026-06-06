@@ -14,6 +14,16 @@ interface BreakfastItem {
   name: string
   qty: number
   price: number
+  productId?: string | null
+  taxCode?: string | null
+}
+
+interface PmsProduct {
+  id: string
+  name: string
+  price: number
+  currency: string | null
+  taxCode: string | null
 }
 
 // ─── Apaleo ────────────────────────────────────────────────────────
@@ -181,6 +191,25 @@ function pickOrderableService(services: MewsService[]): MewsService | undefined 
   )
 }
 
+// Fetch the products (prestations) of a Mews service — these are the breakfast formulas.
+async function fetchMewsProducts(creds: PmsCredentials, serviceId: string): Promise<PmsProduct[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const res = await mewsFetch(`${baseUrl}/products/getAll`, { ...mewsAuth(creds), ServiceIds: [serviceId] })
+  if (!res.ok) return []
+  const data = await res.json()
+  const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
+    (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
+  return (data.Products || [])
+    .filter((p: any) => p.IsActive !== false)
+    .map((p: any) => ({
+      id: p.Id,
+      name: pickName(p.Names, p.ShortNames ? pickName(p.ShortNames) : ''),
+      price: Number(p.Price?.GrossValue ?? p.Price?.Value ?? 0),
+      currency: p.Price?.Currency ?? null,
+      taxCode: p.Price?.TaxValues?.[0]?.Code ?? p.Price?.TaxCodes?.[0] ?? null,
+    }))
+}
+
 async function postMewsOrder(
   creds: PmsCredentials,
   serviceId: string,
@@ -196,19 +225,43 @@ async function postMewsOrder(
     ServiceId: serviceId,
     AccountId: accountId,
     LinkedReservationId: reservationId,
-    Items: items.map((it) => ({
-      Name: `Petit-déjeuner ${it.name}`.trim(),
-      UnitCount: it.qty,
-      UnitAmount: {
-        Currency: currency,
-        GrossValue: Number(it.price),
-        ...(taxCode ? { TaxCodes: [taxCode] } : {}),
-      },
-    })),
+    Items: items.map((it) => {
+      const itemTax = it.taxCode || taxCode
+      const base: Record<string, unknown> = {
+        Name: `Petit-déjeuner ${it.name}`.trim(),
+        UnitCount: it.qty,
+        UnitAmount: {
+          Currency: currency,
+          GrossValue: Number(it.price),
+          ...(itemTax ? { TaxCodes: [itemTax] } : {}),
+        },
+      }
+      // When the item maps to a real Mews product, link it for correct reporting.
+      if (it.productId) base.ProductId = it.productId
+      return base
+    }),
   }
   const res = await mewsFetch(`${baseUrl}/orders/add`, body)
   if (!res.ok) throw new Error(`Mews orders/add [${res.status}]: ${await res.text()}`)
 }
+
+// Fetch Apaleo services (prestations) with their default gross price.
+async function fetchApaleoProducts(token: string, propertyId: string): Promise<PmsProduct[]> {
+  const res = await fetch(
+    `https://api.apaleo.com/rateplan/v1/services?propertyIds=${propertyId}&pageSize=200`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) return []
+  const data = await res.json()
+  return (data.services || []).map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    price: Number(s.defaultGrossPrice?.amount ?? 0),
+    currency: s.defaultGrossPrice?.currency ?? null,
+    taxCode: null,
+  }))
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -259,7 +312,37 @@ Deno.serve(async (req) => {
       .maybeSingle()
     const currency = bfCfg?.currency || 'EUR'
 
+    // ─── FETCH PRODUCTS / PRESTATIONS MODE ────────────────────────
+    // Returns the breakfast prestations directly from the PMS (single config),
+    // so the establishment doesn't re-type them manually.
+    if (mode === 'fetch_products') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = (config.credentials || {}) as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const services = await fetchMewsServices(creds)
+        const serviceId = bfCfg?.pms_service_id || pickOrderableService(services)?.id || null
+        if (!serviceId) {
+          return new Response(JSON.stringify({ ok: false, message: 'Aucun service Mews facturable trouvé.' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        const products = await fetchMewsProducts(creds, serviceId)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', service_id: serviceId, products }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const products = await fetchApaleoProducts(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', service_id: null, products }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
     // ─── TEST / DIAGNOSTIC MODE ───────────────────────────────────
+
     if (mode === 'test') {
       if (!config) {
         return new Response(JSON.stringify({
@@ -346,13 +429,24 @@ Deno.serve(async (req) => {
 
     const itemsOf = (log: any): BreakfastItem[] => {
       const items = Array.isArray(log.items) ? log.items : []
-      if (items.length > 0) return items.filter((i: any) => i && Number(i.qty) > 0)
+      if (items.length > 0) {
+        return items
+          .filter((i: any) => i && Number(i.qty) > 0)
+          .map((i: any) => ({
+            name: i.name || '',
+            qty: Number(i.qty),
+            price: Number(i.price),
+            productId: i.pms_product_id ?? i.productId ?? null,
+            taxCode: i.pms_tax_code ?? i.taxCode ?? null,
+          }))
+      }
       return [{
         name: log.breakfast_type || '',
         qty: Number(log.people_count) || 1,
         price: Number(log.unit_price) || Number(log.total_amount),
       }]
     }
+
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id

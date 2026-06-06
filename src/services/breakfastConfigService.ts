@@ -7,6 +7,10 @@ import { supabase } from '@/integrations/supabase/client';
 export interface BreakfastType {
   name: string;
   price: number;
+  /** Identifiant du produit PMS (Mews) lié à cette prestation, si importé. */
+  pms_product_id?: string | null;
+  /** Code de taxe PMS propre à cette prestation, si importé. */
+  pms_tax_code?: string | null;
 }
 
 export interface BreakfastConfig {
@@ -28,6 +32,8 @@ export interface BreakfastLogItem {
   name: string;
   qty: number;
   price: number;
+  pms_product_id?: string | null;
+  pms_tax_code?: string | null;
 }
 
 export interface BreakfastLog {
@@ -272,4 +278,30 @@ export async function testPmsConnectivity(
   return data as { ok: boolean; [key: string]: unknown };
 }
 
+export interface PmsProduct {
+  id: string;
+  name: string;
+  price: number;
+  currency: string | null;
+  taxCode: string | null;
+}
+
+/**
+ * Récupère les prestations (produits) directement depuis le PMS (Mews/Apaleo)
+ * en réutilisant l'unique configuration PMS de l'hôtel.
+ */
+export async function fetchPmsProducts(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; service_id?: string | null; products: PmsProduct[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_products' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, products: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucune prestation trouvée', products: [] };
+  }
+  return { ok: true, service_id: data.service_id ?? null, products: (data.products || []) as PmsProduct[] };
+}
 
