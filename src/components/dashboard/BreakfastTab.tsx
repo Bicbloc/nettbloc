@@ -167,13 +167,16 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     setPreviewProducts(res.products);
   };
 
-  // Liste des chambres disponibles pour la sélection (registre, sinon Mews).
-  const availableRooms = (registryRooms.length > 0
-    ? registryRooms
-    : (pmsRooms || []).map((r) => r.room_number)
+  // Pour la facturation, on ne propose QUE les chambres en cours de séjour
+  // (occupées dans le PMS). À défaut de PMS, on retombe sur le registre.
+  const inStayRooms = (pmsRooms || []).filter((r) => r.occupied).map((r) => r.room_number);
+  const availableRooms = (inStayRooms.length > 0
+    ? inStayRooms
+    : registryRooms
   )
     .filter((v, i, a) => a.indexOf(v) === i)
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
 
   const inclusionByRoom: Record<string, boolean> = {};
   const occupiedByRoom: Record<string, boolean> = {};
