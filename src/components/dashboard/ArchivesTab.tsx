@@ -781,6 +781,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                       {renderIncidents()}
                       {renderComments(selectedReport.summary)}
                       {renderLinenInventory(selectedReport.summary)}
+                      {renderBreakfast()}
 
                       {selectedReport.notes && (
                         <div className="space-y-2">
