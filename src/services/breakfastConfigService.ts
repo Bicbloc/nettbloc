@@ -54,6 +54,8 @@ const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
   currency: 'EUR',
   breakfast_types: [],
   default_included: false,
+  pms_service_id: null,
+  pms_tax_code: null,
 });
 
 export function todayDate(): string {
