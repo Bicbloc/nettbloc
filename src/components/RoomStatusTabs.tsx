@@ -73,13 +73,16 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
  * - cleaning_type: 'full'/'a_blanc' (À blanc) ou 'quick'/'recouche' (Recouche) ou 'none'
  * - status: 'checkout', 'clean', 'needs-cleaning', 'ready-to-clean', 'stayover', 'in_progress', etc.
  */
-export function filterRoomsByTab<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
+export function filterRoomsByTab<T extends { status?: string; cleaning_type?: string; cleaningType?: string; doNotDisturb?: boolean; do_not_disturb?: boolean }>(
   rooms: T[],
   tab: RoomFilterTab
 ): T[] {
   if (tab === 'all') return rooms;
-  
-  
+
+  if (tab === 'dnd') {
+    return rooms.filter((room) => room.doNotDisturb === true || room.do_not_disturb === true);
+  }
+
   const result = rooms.filter((room) => {
     const status = (room.status || '').toLowerCase().replace(/-/g, '_');
     const rawCleaningType = (room.cleaning_type || room.cleaningType || '').toLowerCase();
