@@ -216,6 +216,9 @@ interface PmsRoom {
   breakfast_included: boolean
   guest_name: string | null
   status: string | null
+  check_in: string | null
+  check_out: string | null
+  comment: string | null
 }
 
 const BREAKFAST_RE = /breakfast|petit.?d[eé]j|petit.?dej|p\.?d\.?j|déjeuner|dejeuner|\bb&b\b|\bbb\b|bed.*breakfast/i
