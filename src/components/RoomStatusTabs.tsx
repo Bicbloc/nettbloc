@@ -167,6 +167,7 @@ export function calculateRoomCounts<T extends { status?: string; cleaning_type?:
       const isCheckoutLikeStatus = s === 'checkout' || s === 'ready_to_clean';
       return isCheckoutLikeStatus;
     }).length,
+    dnd: rooms.filter(r => r.doNotDisturb === true || r.do_not_disturb === true).length,
   };
   
   return counts;
