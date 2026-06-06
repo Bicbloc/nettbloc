@@ -43,6 +43,7 @@ const GuestMode = React.lazy(() => import("./pages/GuestMode"));
 const HousekeeperProfile = React.lazy(() => import("./pages/HousekeeperProfile"));
 const HousekeeperWorkSimple = React.lazy(() => import("./components/HousekeeperWorkSimple").then(m => ({ default: m.HousekeeperWorkSimple })));
 const BreakfastWork = React.lazy(() => import("./pages/BreakfastWork"));
+const CafetiereWork = React.lazy(() => import("./pages/CafetiereWork"));
 const TechnicianLogin = React.lazy(() => import("./pages/TechnicianLogin"));
 const TechnicianSignup = React.lazy(() => import("./pages/TechnicianSignup"));
 const TechnicianDashboard = React.lazy(() => import("./pages/TechnicianDashboard"));
