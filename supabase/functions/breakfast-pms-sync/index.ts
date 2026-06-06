@@ -210,6 +210,99 @@ async function fetchMewsProducts(creds: PmsCredentials, serviceId: string): Prom
     }))
 }
 
+interface PmsRoom {
+  room_number: string
+  occupied: boolean
+  breakfast_included: boolean
+  guest_name: string | null
+  status: string | null
+}
+
+const BREAKFAST_RE = /breakfast|petit.?d[eé]j|petit.?dej|p\.?d\.?j|déjeuner|dejeuner|\bb&b\b|\bbb\b|bed.*breakfast/i
+
+// Build the room occupancy + breakfast-inclusion list for in-house guests today (Mews).
+async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const auth = mewsAuth(creds)
+  const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
+  const res = await mewsFetch(`${baseUrl}/reservations/getAll`, {
+    ...auth,
+    StartUtc: `${today}T00:00:00Z`,
+    EndUtc: `${tomorrow}T23:59:59Z`,
+    TimeFilter: 'Colliding',
+    Extent: { Reservations: true, Customers: true, Resources: true, Items: true },
+    States: ['Started', 'Confirmed', 'Processed'],
+  })
+  if (!res.ok) throw new Error(`Mews reservations/getAll [${res.status}]: ${await res.text()}`)
+  const data = await res.json()
+
+  const resourceName: Record<string, string> = {}
+  for (const r of data.Resources || []) resourceName[r.Id] = r.Name || r.Id
+
+  const customerName: Record<string, string> = {}
+  for (const c of data.Customers || []) {
+    customerName[c.Id] = `${c.LastName || ''} ${c.FirstName || ''}`.trim()
+  }
+
+  // Accounts that already have a breakfast product/charge.
+  const breakfastAccounts = new Set<string>()
+  for (const it of data.Items || []) {
+    if (it.AccountId && BREAKFAST_RE.test(String(it.Name || ''))) breakfastAccounts.add(it.AccountId)
+  }
+
+  const rooms: PmsRoom[] = []
+  for (const r of data.Reservations || []) {
+    const rid = r.AssignedResourceId || r.AssignedSpaceId
+    const name = rid ? resourceName[rid] : undefined
+    if (!name) continue
+    const account = r.CustomerId || r.OwnerId || r.AccountId
+    const checkIn = r.StartUtc?.split('T')[0]
+    const checkOut = r.EndUtc?.split('T')[0]
+    let status = 'inhouse'
+    if (checkOut === today) status = 'departure'
+    else if (checkIn === today) status = 'arrival'
+    rooms.push({
+      room_number: String(name).trim(),
+      occupied: true,
+      breakfast_included: account ? breakfastAccounts.has(account) : false,
+      guest_name: account ? (customerName[account] || null) : null,
+      status,
+    })
+  }
+  return rooms
+}
+
+// Apaleo rooms with breakfast inclusion detected from reservation services.
+async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsRoom[]> {
+  const res = await fetch(
+    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices,services,booker`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
+  const data = await res.json()
+  const rooms: PmsRoom[] = []
+  for (const r of data.reservations || []) {
+    const slices = r.timeSlices || []
+    const unitName = slices.map((s: any) => s.unit?.name || s.unit?.id).find(Boolean)
+    if (!unitName) continue
+    const services = r.services || []
+    const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
+    const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
+    rooms.push({
+      room_number: String(unitName).trim(),
+      occupied: true,
+      breakfast_included: breakfast,
+      guest_name: guest || null,
+      status: 'inhouse',
+    })
+  }
+  return rooms
+}
+
+
+
 async function postMewsOrder(
   creds: PmsCredentials,
   serviceId: string,
