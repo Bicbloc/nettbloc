@@ -7,6 +7,10 @@ import { supabase } from '@/integrations/supabase/client';
 export interface BreakfastType {
   name: string;
   price: number;
+  /** Identifiant du produit PMS (Mews) lié à cette prestation, si importé. */
+  pms_product_id?: string | null;
+  /** Code de taxe PMS propre à cette prestation, si importé. */
+  pms_tax_code?: string | null;
 }
 
 export interface BreakfastConfig {
