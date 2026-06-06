@@ -52,7 +52,7 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
   const [items, setItems] = useState<any[]>([]);
   const [types, setTypes] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [registeredRooms, setRegisteredRooms] = useState<Array<{ room_number: string; id: string }>>([]);
+  const [registeredRooms, setRegisteredRooms] = useState<Array<{ room_number: string; id: string; guest: string | null; status: string | null; occupied: boolean }>>([]);
 
   // Form
   const [formData, setFormData] = useState({
