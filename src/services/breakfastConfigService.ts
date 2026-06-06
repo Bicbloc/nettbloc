@@ -278,4 +278,30 @@ export async function testPmsConnectivity(
   return data as { ok: boolean; [key: string]: unknown };
 }
 
+export interface PmsProduct {
+  id: string;
+  name: string;
+  price: number;
+  currency: string | null;
+  taxCode: string | null;
+}
+
+/**
+ * Récupère les prestations (produits) directement depuis le PMS (Mews/Apaleo)
+ * en réutilisant l'unique configuration PMS de l'hôtel.
+ */
+export async function fetchPmsProducts(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; service_id?: string | null; products: PmsProduct[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_products' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, products: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucune prestation trouvée', products: [] };
+  }
+  return { ok: true, service_id: data.service_id ?? null, products: (data.products || []) as PmsProduct[] };
+}
 
