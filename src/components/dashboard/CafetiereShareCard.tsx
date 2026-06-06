@@ -77,17 +77,34 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
     }
     setSharing(true);
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase
+    const reviewedBy = userData.user?.id ?? null;
+    const now = new Date().toISOString();
+
+    // Pas de contrainte unique sur (cafetiere, hotel) : on met à jour s'il existe
+    // déjà une demande, sinon on en crée une approuvée.
+    const { data: existing } = await supabase
       .from('cafetiere_access_requests')
-      .upsert({
-        cafetiere_profile_id: selected,
-        hotel_id: hotelId,
-        hotel_code: hotelCode || '—',
-        status: 'approved',
-        requested_at: new Date().toISOString(),
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: userData.user?.id ?? null,
-      }, { onConflict: 'cafetiere_profile_id,hotel_id' });
+      .select('id')
+      .eq('cafetiere_profile_id', selected)
+      .eq('hotel_id', hotelId)
+      .maybeSingle();
+
+    const { error } = existing
+      ? await supabase
+          .from('cafetiere_access_requests')
+          .update({ status: 'approved', reviewed_at: now, reviewed_by: reviewedBy })
+          .eq('id', existing.id)
+      : await supabase
+          .from('cafetiere_access_requests')
+          .insert({
+            cafetiere_profile_id: selected,
+            hotel_id: hotelId,
+            hotel_code: hotelCode || '—',
+            status: 'approved',
+            requested_at: now,
+            reviewed_at: now,
+            reviewed_by: reviewedBy,
+          });
     setSharing(false);
     if (error) {
       console.error('[cafetiere] share error:', error);
