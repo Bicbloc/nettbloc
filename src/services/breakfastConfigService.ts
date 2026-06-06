@@ -87,6 +87,8 @@ export async function loadBreakfastConfig(hotelId: string): Promise<BreakfastCon
       ? (data.breakfast_types as unknown as BreakfastType[])
       : [],
     default_included: !!data.default_included,
+    pms_service_id: (data as { pms_service_id?: string | null }).pms_service_id ?? null,
+    pms_tax_code: (data as { pms_tax_code?: string | null }).pms_tax_code ?? null,
   };
 }
 
