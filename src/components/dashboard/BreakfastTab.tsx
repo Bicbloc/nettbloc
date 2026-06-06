@@ -206,6 +206,42 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Facturation PMS (Mews / Apaleo)</CardTitle>
+          <CardDescription>
+            Les petits-déjeuners facturables sont envoyés sur la facture du client dans le PMS.
+            Pour Mews, renseignez l'identifiant du service et le code de taxe ci-dessous.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="bf-service">Identifiant du service Mews (Service ID)</Label>
+            <Input
+              id="bf-service"
+              placeholder="ex. bd26d8db-86da-4f96-9efc-e5a4654a4a94"
+              value={config.pms_service_id || ''}
+              onChange={(e) => update({ pms_service_id: e.target.value.trim() || null })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Service Mews sous lequel facturer (Espace « Additional services » ou équivalent).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bf-tax">Code de taxe Mews (Tax code)</Label>
+            <Input
+              id="bf-tax"
+              placeholder="ex. FR-2024-N"
+              value={config.pms_tax_code || ''}
+              onChange={(e) => update({ pms_tax_code: e.target.value.trim() || null })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Code de TVA appliqué à la charge. Apaleo n'en a pas besoin.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Button onClick={handleSave} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" />
         {saving ? 'Enregistrement…' : 'Enregistrer'}
