@@ -28,6 +28,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
