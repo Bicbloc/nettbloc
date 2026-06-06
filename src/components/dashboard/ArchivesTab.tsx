@@ -41,6 +41,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
   const [archivedLogs, setArchivedLogs] = useState<ArchivedLog[]>([]);
   const [incidents, setIncidents] = useState<any[]>([]);
+  const [breakfastLogs, setBreakfastLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'reports' | 'logs'>('reports');
@@ -83,7 +84,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
       const start = startOfMonth(selectedDate);
       const end = endOfMonth(selectedDate);
 
-      const [reportsRes, logsRes] = await Promise.all([
+      const [reportsRes, logsRes, breakfastRes] = await Promise.all([
         supabase
           .from('daily_reports')
           .select('report_date')
@@ -95,12 +96,19 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           .select('archive_date')
           .eq('hotel_id', currentHotelId)
           .gte('archive_date', format(start, 'yyyy-MM-dd'))
-          .lte('archive_date', format(end, 'yyyy-MM-dd'))
+          .lte('archive_date', format(end, 'yyyy-MM-dd')),
+        supabase
+          .from('breakfast_logs')
+          .select('log_date')
+          .eq('hotel_id', currentHotelId)
+          .gte('log_date', format(start, 'yyyy-MM-dd'))
+          .lte('log_date', format(end, 'yyyy-MM-dd'))
       ]);
 
       const dates = new Set<string>();
       (reportsRes.data || []).forEach((r: any) => dates.add(r.report_date));
       (logsRes.data || []).forEach((l: any) => dates.add(l.archive_date));
+      (breakfastRes.data || []).forEach((b: any) => dates.add(b.log_date));
 
       setAvailableDates(Array.from(dates).map(d => parseISO(d)));
     };
@@ -117,7 +125,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       try {
-        const [reportsRes, logsRes, incidentsRes] = await Promise.all([
+        const [reportsRes, logsRes, incidentsRes, breakfastRes] = await Promise.all([
           supabase
             .from('daily_reports')
             .select('*')
@@ -136,12 +144,19 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
             .eq('hotel_id', currentHotelId)
             .gte('created_at', dateStr + 'T00:00:00')
             .lte('created_at', dateStr + 'T23:59:59')
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('breakfast_logs')
+            .select('*')
+            .eq('hotel_id', currentHotelId)
+            .eq('log_date', dateStr)
+            .order('room_number', { ascending: true })
         ]);
 
         setDailyReports(reportsRes.data || []);
         setArchivedLogs(logsRes.data || []);
         setIncidents(incidentsRes.data || []);
+        setBreakfastLogs(breakfastRes.data || []);
 
         // Sélectionner automatiquement le premier rapport
         if (reportsRes.data && reportsRes.data.length > 0) {
@@ -569,6 +584,55 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     );
   };
 
+  const renderBreakfast = () => {
+    if (!breakfastLogs || breakfastLogs.length === 0) return null;
+    const billable = breakfastLogs.filter((b) => !b.included);
+    const totalPeople = breakfastLogs.reduce((sum, b) => sum + (b.people_count || 0), 0);
+    const totalAmount = billable.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
+    return (
+      <div className="space-y-3">
+        <h4 className="font-medium flex items-center gap-2">
+          <Package className="h-4 w-4 text-emerald-600" />
+          Petits-déjeuners ({breakfastLogs.length})
+        </h4>
+        <div className="flex gap-2 flex-wrap">
+          <Badge variant="secondary">{totalPeople} couverts</Badge>
+          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700">
+            {totalAmount.toFixed(2)} € facturés
+          </Badge>
+        </div>
+        <div className="space-y-2">
+          {breakfastLogs.map((b) => (
+            <Card key={b.id} className="p-3 bg-muted/30">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {b.room_number && (
+                    <Badge variant="secondary" className="text-xs">Chambre {b.room_number}</Badge>
+                  )}
+                  <span className="text-sm font-medium">{b.people_count || 0} pers.</span>
+                  {b.breakfast_type && (
+                    <Badge variant="outline" className="text-xs">{b.breakfast_type}</Badge>
+                  )}
+                  {b.included ? (
+                    <Badge variant="outline" className="text-xs">Inclus</Badge>
+                  ) : (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700 text-xs">
+                      {Number(b.total_amount || 0).toFixed(2)} €
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {b.source || ''}{b.created_at ? ` • ${format(parseISO(b.created_at), 'HH:mm', { locale: fr })}` : ''}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+
   if (!currentHotelId) {
     return (
       <Card className="p-8 text-center">
@@ -626,7 +690,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
               variant="default"
               className="gap-2"
               onClick={handleExportPdf}
-              disabled={isExporting || (dailyReports.length === 0 && incidents.length === 0)}
+              disabled={isExporting || (dailyReports.length === 0 && incidents.length === 0 && breakfastLogs.length === 0)}
             >
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Télécharger PDF
@@ -640,7 +704,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="mt-2 text-muted-foreground">Chargement des archives...</p>
         </Card>
-      ) : dailyReports.length === 0 && archivedLogs.length === 0 && incidents.length === 0 ? (
+      ) : dailyReports.length === 0 && archivedLogs.length === 0 && incidents.length === 0 && breakfastLogs.length === 0 ? (
         <Card className="p-8 text-center">
           <Archive className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold text-lg mb-2">Aucune archive pour cette date</h3>
@@ -679,6 +743,16 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                     </CardContent>
                   </Card>
                 )}
+                {breakfastLogs.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Petits-déjeuners du jour</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {renderBreakfast()}
+                    </CardContent>
+                  </Card>
+                )}
               </>
             ) : (
               <>
@@ -707,6 +781,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
                       {renderIncidents()}
                       {renderComments(selectedReport.summary)}
                       {renderLinenInventory(selectedReport.summary)}
+                      {renderBreakfast()}
 
                       {selectedReport.notes && (
                         <div className="space-y-2">

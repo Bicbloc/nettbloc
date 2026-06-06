@@ -74,6 +74,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
   const [adminNotes, setAdminNotes] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestCheckIn, setGuestCheckIn] = useState("");
+  const [guestCheckOut, setGuestCheckOut] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -123,6 +127,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
           admin_notes: adminNotes || item?.admin_notes,
           tracking_number: trackingNumber || item?.tracking_number,
           shipping_address: shippingAddress || item?.shipping_address,
+          guest_first_name: guestFirstName || null,
+          guest_name: guestName || null,
+          guest_check_in: guestCheckIn || null,
+          guest_check_out: guestCheckOut || null,
         })
         .eq("id", itemId);
 
@@ -344,6 +352,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
                         setAdminNotes(item.admin_notes || "");
                         setTrackingNumber(item.tracking_number || "");
                         setShippingAddress(item.shipping_address || "");
+                        setGuestFirstName(item.guest_first_name || "");
+                        setGuestName(item.guest_name || "");
+                        setGuestCheckIn(item.guest_check_in || "");
+                        setGuestCheckOut(item.guest_check_out || "");
                       }}
                     >
                       <Eye className="h-4 w-4" />
@@ -414,23 +426,44 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
                       Client
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    {selectedItem.guest_name || selectedItem.guest_first_name ? (
-                      <>
-                        <p>
-                          {selectedItem.guest_first_name} {selectedItem.guest_name}
-                        </p>
-                        {selectedItem.guest_check_in && (
-                          <p className="text-sm text-muted-foreground">
-                            Séjour: {format(new Date(selectedItem.guest_check_in), "dd/MM/yyyy")}
-                            {selectedItem.guest_check_out &&
-                              ` - ${format(new Date(selectedItem.guest_check_out), "dd/MM/yyyy")}`}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground">Aucune information</p>
-                    )}
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+                        <Input
+                          value={guestFirstName}
+                          onChange={(e) => setGuestFirstName(e.target.value)}
+                          placeholder="Prénom du client"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Nom</label>
+                        <Input
+                          value={guestName}
+                          onChange={(e) => setGuestName(e.target.value)}
+                          placeholder="Nom du client"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Arrivée</label>
+                        <Input
+                          type="date"
+                          value={guestCheckIn}
+                          onChange={(e) => setGuestCheckIn(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Départ</label>
+                        <Input
+                          type="date"
+                          value={guestCheckOut}
+                          onChange={(e) => setGuestCheckOut(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Modifiable manuellement par l'établissement.
+                    </p>
                   </CardContent>
                 </Card>
               </div>
