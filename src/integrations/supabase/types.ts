@@ -426,6 +426,7 @@ export type Database = {
       breakfast_logs: {
         Row: {
           breakfast_type: string | null
+          comment: string | null
           created_at: string
           hotel_id: string
           id: string
@@ -443,6 +444,7 @@ export type Database = {
         }
         Insert: {
           breakfast_type?: string | null
+          comment?: string | null
           created_at?: string
           hotel_id: string
           id?: string
@@ -460,6 +462,7 @@ export type Database = {
         }
         Update: {
           breakfast_type?: string | null
+          comment?: string | null
           created_at?: string
           hotel_id?: string
           id?: string

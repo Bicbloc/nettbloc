@@ -1,0 +1,1 @@
+ALTER TABLE public.breakfast_logs ADD COLUMN IF NOT EXISTS comment text;

@@ -6,10 +6,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Coffee, Minus, Plus, ArrowLeft, Check, Send } from 'lucide-react';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
@@ -48,15 +50,17 @@ export default function CafetiereWork() {
   const [config, setConfig] = useState<BreakfastConfig | null>(null);
   const [logs, setLogs] = useState<Record<string, BreakfastLog>>({});
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [savingRoom, setSavingRoom] = useState(false);
   const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmBillIncluded, setConfirmBillIncluded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
 
   // Quantité par prestation (clé = nom du type) + inclus dans le séjour
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
+  const [draftComment, setDraftComment] = useState('');
 
   const refreshLogs = useCallback(async () => {
     if (!hotelId) return;
@@ -153,6 +157,7 @@ export default function CafetiereWork() {
     setDraftIncluded(
       existing ? existing.included : (room.breakfast_included || config?.default_included || false)
     );
+    setDraftComment(existing?.comment || '');
     setSelected(room.room_number);
   };
 
@@ -189,11 +194,13 @@ export default function CafetiereWork() {
       included: draftIncluded,
       items,
       loggedBy: 'Cafetière',
+      comment: draftComment.trim() || null,
     });
     await refreshLogs();
 
-    // Envoi direct au PMS si configuré et facturable
-    if (pmsConfigured && !draftIncluded && peopleCount > 0) {
+    // Anti-doublon : on n'envoie au PMS que si la chambre n'a pas déjà été envoyée.
+    const alreadySent = logs[selected]?.pms_status === 'sent';
+    if (pmsConfigured && !draftIncluded && peopleCount > 0 && !alreadySent) {
       const res = await sendBreakfastsToPms(hotelId, todayDate(), selected);
       if (res.ok && res.sent > 0) {
         toast.success(`Chambre ${selected} enregistrée et envoyée au PMS`);
@@ -202,6 +209,8 @@ export default function CafetiereWork() {
       } else {
         toast.warning(`Chambre ${selected} enregistrée — envoi PMS échoué`);
       }
+    } else if (alreadySent) {
+      toast.success(`Chambre ${selected} mise à jour (déjà envoyée au PMS)`);
     } else {
       toast.success(`Chambre ${selected} enregistrée`);
     }
@@ -224,18 +233,6 @@ export default function CafetiereWork() {
   };
 
 
-  const handleSendPms = async () => {
-    if (!hotelId) return;
-    setSending(true);
-    const res = await sendBreakfastsToPms(hotelId);
-    setSending(false);
-    if (res.ok) {
-      toast.success(`${res.sent} petit(s)-déjeuner(s) envoyé(s) au PMS${res.failed ? `, ${res.failed} échec(s)` : ''}`);
-      refreshLogs();
-    } else {
-      toast.error(res.error || "Échec de l'envoi au PMS");
-    }
-  };
 
   const currency = config?.currency || 'EUR';
   const draftTotal = draftIncluded
@@ -247,14 +244,32 @@ export default function CafetiereWork() {
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [logs]
   );
-  const pendingPms = useMemo(
-    () => Object.values(logs).filter((l) => !l.included && Number(l.total_amount) > 0 && l.pms_status !== 'sent').length,
-    [logs]
-  );
   const selectedGuestName = useMemo(
     () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
     [rooms, selected]
   );
+
+  // Filtre par statut de séjour + recherche par numéro/nom de client.
+  const filteredRooms = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rooms.filter((room) => {
+      if (statusFilter !== 'all') {
+        const s = (room.status || '').toLowerCase();
+        const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+        const isArrival = s.includes('arriv') || s.includes('reserved');
+        const isCurrent = !isDeparture && !isArrival && (room.occupied || s.length > 0);
+        if (statusFilter === 'departure' && !isDeparture) return false;
+        if (statusFilter === 'arrival' && !isArrival) return false;
+        if (statusFilter === 'current' && !isCurrent) return false;
+      }
+      if (q) {
+        const hay = `${room.room_number} ${room.guest_name || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rooms, search, statusFilter]);
+
 
   if (!hotelId) {
     return (
@@ -282,13 +297,46 @@ export default function CafetiereWork() {
         </div>
       </header>
 
+      {/* Recherche + filtres par statut de séjour */}
+      <div className="px-3 pt-3 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher une chambre ou un client…"
+            className="pl-9"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {([
+            { key: 'all', label: 'Toutes' },
+            { key: 'current', label: 'En cours' },
+            { key: 'arrival', label: 'Arrivée' },
+            { key: 'departure', label: 'Départ' },
+          ] as const).map((f) => (
+            <Button
+              key={f.key}
+              size="sm"
+              variant={statusFilter === f.key ? 'default' : 'outline'}
+              className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0' : 'shrink-0'}
+              onClick={() => setStatusFilter(f.key)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
       ) : rooms.length === 0 ? (
         <p className="p-6 text-muted-foreground">Aucune chambre en cours de séjour.</p>
+      ) : filteredRooms.length === 0 ? (
+        <p className="p-6 text-muted-foreground">Aucune chambre ne correspond au filtre.</p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-3">
-          {rooms.map((room) => {
+          {filteredRooms.map((room) => {
             const log = logs[room.room_number];
             const isIncluded = log ? log.included : room.breakfast_included;
             const hasCount = log && !log.included && log.people_count > 0;
@@ -309,6 +357,9 @@ export default function CafetiereWork() {
               >
                 {sent && (
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
+                )}
+                {log?.comment && (
+                  <MessageSquare className="absolute top-1 left-1 h-3 w-3 opacity-70" />
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
                 {room.guest_name && (
@@ -339,17 +390,6 @@ export default function CafetiereWork() {
         </div>
       )}
 
-      {/* Send to PMS bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-card px-4 py-3">
-        <Button
-          className="w-full bg-amber-700 hover:bg-amber-800"
-          disabled={sending || pendingPms === 0}
-          onClick={handleSendPms}
-        >
-          <Send className="h-4 w-4 mr-2" />
-          {sending ? 'Envoi…' : `Envoyer au PMS (${pendingPms})`}
-        </Button>
-      </div>
 
       {/* Bottom sheet for entry */}
       <Sheet open={!!selected} onOpenChange={(o) => { if (!o && !savingRoom) setSelected(null); }}>
@@ -413,9 +453,22 @@ export default function CafetiereWork() {
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <MessageSquare className="h-3.5 w-3.5" /> Commentaire
+              </label>
+              <Textarea
+                value={draftComment}
+                onChange={(e) => setDraftComment(e.target.value)}
+                placeholder="Remarque (optionnel)…"
+                rows={2}
+              />
+            </div>
+
             <p className="text-center text-lg font-semibold">
               Total : {draftTotal.toFixed(2)} {currency}
             </p>
+
 
             <Button
               className="w-full bg-amber-700 hover:bg-amber-800"

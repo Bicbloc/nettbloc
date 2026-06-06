@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble,
-  RefreshCw, Check, Settings,
+  RefreshCw, Check, Settings, Search,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,10 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [registryRooms, setRegistryRooms] = useState<string[]>([]);
   const [pmsRooms, setPmsRooms] = useState<PmsRoom[] | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomSearch, setRoomSearch] = useState('');
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
+
+
 
   useEffect(() => {
     if (!currentHotelId) return;
@@ -208,6 +212,26 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     const ob = occupiedByRoom[b.trim().toLowerCase()] ? 0 : 1;
     if (oa !== ob) return oa - ob;
     return a.localeCompare(b, undefined, { numeric: true });
+  });
+
+  // Filtre par statut de séjour + recherche (numéro de chambre / nom du client).
+  const filteredGridRooms = gridRooms.filter((rn) => {
+    const key = rn.trim().toLowerCase();
+    if (roomStatusFilter !== 'all') {
+      const s = (statusByRoom[key] || '').toLowerCase();
+      const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+      const isArrival = s.includes('arriv') || s.includes('reserved');
+      const isCurrent = !isDeparture && !isArrival && (occupiedByRoom[key] || s.length > 0);
+      if (roomStatusFilter === 'departure' && !isDeparture) return false;
+      if (roomStatusFilter === 'arrival' && !isArrival) return false;
+      if (roomStatusFilter === 'current' && !isCurrent) return false;
+    }
+    const q = roomSearch.trim().toLowerCase();
+    if (q) {
+      const hay = `${rn} ${guestByRoom[key] || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
   });
   const includedCount = gridRooms.filter((rn) => inclusionByRoom[rn.trim().toLowerCase()]).length;
   const occupiedCount = gridRooms.filter((rn) => occupiedByRoom[rn.trim().toLowerCase()]).length;
@@ -468,8 +492,44 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                 </span>
                 <span className="ml-auto text-muted-foreground">En séjour : {occupiedCount}</span>
               </div>
+
+              {/* Recherche + filtres par statut de séjour */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={roomSearch}
+                    onChange={(e) => setRoomSearch(e.target.value)}
+                    placeholder="Rechercher une chambre ou un client…"
+                    className="pl-9 h-9"
+                  />
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {([
+                    { key: 'all', label: 'Toutes' },
+                    { key: 'current', label: 'En cours' },
+                    { key: 'arrival', label: 'Arrivée' },
+                    { key: 'departure', label: 'Départ' },
+                  ] as const).map((f) => (
+                    <Button
+                      key={f.key}
+                      size="sm"
+                      variant={roomStatusFilter === f.key ? 'default' : 'outline'}
+                      className="shrink-0 h-9"
+                      onClick={() => setRoomStatusFilter(f.key)}
+                    >
+                      {f.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredGridRooms.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Aucune chambre ne correspond au filtre.</p>
+              ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {gridRooms.map((rn) => {
+                {filteredGridRooms.map((rn) => {
+
                   const key = rn.trim().toLowerCase();
                   const included = inclusionByRoom[key];
                   const occupied = occupiedByRoom[key];
@@ -496,7 +556,9 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   );
                 })}
               </div>
+              )}
             </>
+
           )}
         </CardContent>
       </Card>

@@ -49,6 +49,7 @@ export interface BreakfastLog {
   source: string;
   logged_by: string | null;
   pms_status: string;
+  comment: string | null;
   items: BreakfastLogItem[];
 }
 
@@ -165,6 +166,7 @@ interface UpsertLogParams {
   items?: BreakfastLogItem[];
   loggedBy?: string | null;
   logDate?: string;
+  comment?: string | null;
 }
 
 /** Crée ou met à jour la déclaration petit-déjeuner d'une chambre (1 par jour). */
@@ -179,12 +181,24 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     items = [],
     loggedBy = null,
     logDate = todayDate(),
+    comment = null,
   } = params;
 
   const cleanItems = items.filter((i) => i.qty > 0);
   const total = included
     ? 0
     : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
+
+  // Anti-doublon PMS : si la chambre a déjà été envoyée au PMS aujourd'hui,
+  // on conserve le statut « sent » pour ne JAMAIS renvoyer la même charge.
+  const { data: existing } = await supabase
+    .from('breakfast_logs')
+    .select('pms_status')
+    .eq('hotel_id', hotelId)
+    .eq('room_number', roomNumber)
+    .eq('log_date', logDate)
+    .maybeSingle();
+  const alreadySent = existing?.pms_status === 'sent';
 
   const payload = {
     hotel_id: hotelId,
@@ -198,7 +212,8 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     items: cleanItems as unknown as never,
     source: 'manual',
     logged_by: loggedBy,
-    pms_status: 'pending',
+    comment,
+    pms_status: alreadySent ? 'sent' : 'pending',
   };
 
   const { error } = await supabase
