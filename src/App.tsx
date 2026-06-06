@@ -15,6 +15,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { HotelProvider } from "./contexts/HotelContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
 import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
+import { CafetiereAuthProvider } from "./contexts/CafetiereAuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
@@ -44,6 +45,10 @@ const HousekeeperProfile = React.lazy(() => import("./pages/HousekeeperProfile")
 const HousekeeperWorkSimple = React.lazy(() => import("./components/HousekeeperWorkSimple").then(m => ({ default: m.HousekeeperWorkSimple })));
 const BreakfastWork = React.lazy(() => import("./pages/BreakfastWork"));
 const CafetiereWork = React.lazy(() => import("./pages/CafetiereWork"));
+const CafetiereLogin = React.lazy(() => import("./pages/CafetiereLogin"));
+const CafetiereSignup = React.lazy(() => import("./pages/CafetiereSignup"));
+const CafetiereHotels = React.lazy(() => import("./pages/CafetiereHotels"));
+const CafetiereAccessPage = React.lazy(() => import("./pages/access/CafetiereAccessPage"));
 const TechnicianLogin = React.lazy(() => import("./pages/TechnicianLogin"));
 const TechnicianSignup = React.lazy(() => import("./pages/TechnicianSignup"));
 const TechnicianDashboard = React.lazy(() => import("./pages/TechnicianDashboard"));
@@ -94,6 +99,7 @@ const App = () => (
             <HotelProvider>
               <HousekeeperAuthProvider>
                 <TechnicianAuthProvider>
+                  <CafetiereAuthProvider>
                   <NotificationProvider>
                     <HousekeepingProvider>
                       <TooltipProvider>
@@ -137,6 +143,11 @@ const App = () => (
                               <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
                               <Route path="/breakfast/work" element={<BreakfastWork />} />
                               <Route path="/cafetiere" element={<CafetiereWork />} />
+                              <Route path="/cafetiere/login" element={<CafetiereLogin />} />
+                              <Route path="/cafetiere/signup" element={<CafetiereSignup />} />
+                              <Route path="/cafetiere/hotels" element={<CafetiereHotels />} />
+                              <Route path="/cafetiere/work" element={<CafetiereWork />} />
+                              <Route path="/access/cafetieres" element={<CafetiereAccessPage />} />
                               <Route path="/technician/signup" element={<TechnicianSignup />} />
                               <Route path="/technician/login" element={<TechnicianLogin />} />
                               <Route path="/technician/hotels" element={<TechnicianHotels />} />
@@ -167,6 +178,7 @@ const App = () => (
                       </TooltipProvider>
                     </HousekeepingProvider>
                   </NotificationProvider>
+                  </CafetiereAuthProvider>
                 </TechnicianAuthProvider>
               </HousekeeperAuthProvider>
             </HotelProvider>
