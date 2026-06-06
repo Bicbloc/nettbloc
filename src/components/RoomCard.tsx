@@ -244,6 +244,11 @@ export function RoomCard({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
+          {room.doNotDisturb && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-rose-100 text-rose-700 border border-rose-300 flex items-center gap-0.5">
+              <Moon className="h-2.5 w-2.5" /> {t.rooms.doNotDisturb}
+            </span>
+          )}
           {(room.cleaningType === 'full' || room.cleaningType === 'a_blanc') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-700 border border-purple-200">
               {t.rooms.fullCleanShort}
