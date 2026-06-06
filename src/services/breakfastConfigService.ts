@@ -49,6 +49,7 @@ export interface BreakfastLog {
   source: string;
   logged_by: string | null;
   pms_status: string;
+  comment: string | null;
   items: BreakfastLogItem[];
 }
 
