@@ -1,36 +1,63 @@
-## Goal
-Connect the app to the Mews **demo** environment using the public demo tokens Mews shared, and make the Demo vs Production choice a proper, reusable setting (so production works later with real tokens).
+# Facturation Petit-déjeuner
 
-## Why a change is needed
-The Mews demo tokens only work against `https://api.mews-demo.com`. Today the sync edge function always calls the production host `https://api.mews.com` and ignores the saved `base_url`. So the demo credentials would fail with an auth error until we route requests to the demo host.
+Objectif : permettre à la femme de chambre / cafetière de déclarer en un minimum de clics les petits-déjeuners consommés par chambre, éviter la double facturation des chambres déjà « inclus », et laisser l'admin configurer prix et type. L'envoi automatique vers le PMS sera branché dans une 2ᵉ étape (choix « Nettobloc d'abord »).
 
-## What I'll build
+## 1. Base de données (migration)
 
-### 1. Mews environment selector in the config panel
-`src/components/pms/PmsApiConfigPanel.tsx`
-- When PMS type = Mews, show an **Environment** dropdown: `Demo` / `Production`.
-- Selecting it sets `base_url`:
-  - Demo → `https://api.mews-demo.com/api/connector/v1`
-  - Production → `https://api.mews.com/api/connector/v1`
-- Add a one-click "Load Mews demo credentials" helper that fills the Client Token + Access Token for the demo enterprise (defaulting to the **Gross / UK** set; I'll note the Net/US option too).
+**Nouvelle table `hotel_breakfast_configs`** (1 ligne par hôtel) :
+- `hotel_id`, `is_active` (bool), `pricing_source` ('manual' | 'pms'), `price_per_person` (numeric), `currency` (text, défaut EUR)
+- `breakfast_types` (jsonb : liste de `{ name, price }`, ex. Continental, Buffet)
+- `default_included` (bool : nouvelles chambres considérées incluses par défaut)
+- timestamps + trigger updated_at
 
-### 2. Route the edge function to the saved host
-`supabase/functions/pms-sync/index.ts`
-- In `extractRoomsForConfig` / the `test` + `sync` paths, pass the config's `base_url` into the Mews call (e.g. merge `baseUrl: pmsConfig.base_url` into `credentials`).
-- `fetchMewsRooms` keeps `credentials.baseUrl || 'https://api.mews.com/api/connector/v1'` as fallback.
-- Add 429 handling: respect the `Retry-After` header, fall back to exponential backoff (Mews enforces 200 req / 30s per AccessToken).
+**Nouvelle table `breakfast_logs`** (une déclaration par chambre / jour) :
+- `hotel_id`, `room_number`, `log_date` (date)
+- `people_count` (int), `breakfast_type` (text), `unit_price`, `total_amount`
+- `included` (bool : marqué comme déjà inclus → 0 facturé)
+- `source` ('manual' | 'pms'), `logged_by` (text), `pms_status` ('pending'|'sent'|'not_required')
+- contrainte unique `(hotel_id, room_number, log_date)` → un toggle/édition par chambre par jour
+- timestamps
 
-### 3. Connect & verify
-- Save the config for the current hotel with `pms_type = mews`, the demo tokens, and `base_url` = demo host.
-- Run the panel's existing **Test connection** (`action: 'test'`) which calls `spaces/getAll` + `reservations/getAll` and returns the room count — confirming the live demo connection works.
+**Colonne sur `rooms`** : `breakfast_included` (bool, défaut false) — alimenté manuellement et/ou depuis le PMS, sert à pré-cocher « inclus » dans l'interface.
 
-## Things to confirm
-- **Which demo enterprise?** Mews gave a **Gross (UK)** and a **Net (US)** demo. I'll default to Gross/UK unless you prefer Net/US.
-- These are public demo tokens, so it's fine to keep them in the app for testing. Real **production** tokens (per enterprise) should be entered through the panel by the establishment, never committed to code.
+GRANT + RLS sur les deux nouvelles tables (cohérent avec le modèle `auth.email()` / accès hôtel existant).
 
-## Technical notes
-- No DB migration needed — `hotel_pms_configs` already has `base_url` and `credentials` columns.
-- The config is per-hotel (scoped by `hotel_id`), so connecting happens for the currently selected hotel via the panel.
-- After the edge function edit I'll redeploy `pms-sync`.
-</parameter>
-</invoke>
+## 2. Configuration Admin (établissement)
+
+Nouvel onglet **« Petit-déjeuner »** dans la sidebar (section *Opérations*) :
+- Activer/désactiver la facturation petit-déjeuner
+- Source du prix : **Configuré par le client** (saisie manuelle) ou **Récupéré du PMS** (choix par hôtel)
+- Si manuel : prix par personne + gestion des types (nom + prix)
+- Option « chambres incluses par défaut »
+- Service `breakfastConfigService.ts` (pattern load/save de `reportConfigService.ts`)
+
+## 3. Interface de saisie (femme de chambre / cafetière) — ultra simple
+
+Nouvelle page `/breakfast/work` + intégration dans la vue femme de chambre :
+- Grille de **toutes les chambres de l'hôtel** (pas seulement les assignées)
+- Une chambre = une carte. Chambre « inclus » → badge vert « Inclus », pas de facturation.
+- Clic sur une chambre → mini-feuille : **− / nombre / +** pour le nb de personnes, choix du type si plusieurs, et un bouton **Inclus** (bascule sans facturer). Validation auto à la fermeture. Aucun bouton superflu.
+- Carte affiche le nb déclaré + montant. Re-clic pour modifier.
+- Temps réel : les déclarations se synchronisent (Supabase Realtime) comme les chambres.
+
+```text
+┌───────── Chambre 204 ─────────┐
+│   Petit-déjeuner               │
+│     −     2 pers.     +        │
+│   Type: [Continental ▾]        │
+│   [ Inclus dans le séjour ]    │
+│   Total: 18,00 €               │
+└────────────────────────────────┘
+```
+
+## 4. PMS (préparé, phase 2)
+
+- `breakfast_logs.pms_status` reste `pending`.
+- Réutilisation du modèle existant (`hotel_pms_configs` + file `pms_sync_queue` + edge function) lors de la phase 2 pour pousser les charges et, à l'inverse, lire le statut « inclus » depuis le PMS.
+- Aucun appel PMS réel dans cette première étape.
+
+## Détails techniques
+- i18n : nouvelles clés (`breakfast`, `breakfastBilling`, `peoplePerRoom`, `includedInStay`, etc.), pas de français en dur.
+- Réutilise `getHotelId()` côté housekeeper et `useHotel()` côté admin.
+- Lazy route ajoutée dans `App.tsx` ; nouvel onglet dans `AppSidebar.tsx` + rendu dans `Index.tsx`.
+- Couleur d'identité violette pour la vue femme de chambre.
