@@ -76,6 +76,23 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const [noteText, setNoteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Femmes de chambre disponibles aujourd'hui (présence gérée par la gouvernante).
+  const today = new Date().toISOString().split('T')[0];
+  const availableStorageKey = `gov_available_${hotelId}_${today}`;
+  const [availableIds, setAvailableIds] = useState<Set<string>>(new Set());
+  const [availableInitialized, setAvailableInitialized] = useState(false);
+
+  const toggleAvailable = (id: string) => {
+    setAvailableIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(availableStorageKey, JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const availableHousekeepers = housekeepers.filter(h => h.is_active && availableIds.has(h.id));
+
   const loadData = useCallback(async () => {
     try {
       // Charger toutes les chambres
