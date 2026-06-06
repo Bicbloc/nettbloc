@@ -52,7 +52,7 @@ export interface HousekeeperProfile {
   currentHotelId?: string;
 }
 
-export type AppPortal = 'establishment' | 'housekeeper' | 'governess' | 'technician';
+export type AppPortal = 'establishment' | 'housekeeper' | 'governess' | 'technician' | 'cafetiere';
 
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserType = 'establishment' | 'housekeeper' | 'governess' | 'technician';
+export type UserType = 'establishment' | 'housekeeper' | 'governess' | 'technician' | 'cafetiere';
 
 interface ValidationResult {
   isValid: boolean;
@@ -12,7 +12,8 @@ const ERROR_MESSAGES: Record<UserType, string> = {
   establishment: "Cette adresse email est liée à un compte Établissement. Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Établissement.",
   housekeeper: "Cette adresse email est liée à un compte Femme de chambre (Housekeeper). Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Housekeeper.",
   governess: "Cette adresse email est liée à un compte Gouvernante. Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Gouvernante.",
-  technician: "Cette adresse email est liée à un compte Technicien. Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Technicien."
+  technician: "Cette adresse email est liée à un compte Technicien. Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Technicien.",
+  cafetiere: "Cette adresse email est liée à un compte Cafetière. Aucune redirection effectuée — utilisez une autre adresse ou connectez-vous sur l'interface Cafetière."
 };
 
 /**
