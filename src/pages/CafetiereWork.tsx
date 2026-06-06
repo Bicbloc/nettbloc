@@ -293,6 +293,7 @@ export default function CafetiereWork() {
             const isIncluded = log ? log.included : room.breakfast_included;
             const hasCount = log && !log.included && log.people_count > 0;
             const sent = log?.pms_status === 'sent';
+            const stay = stayLabel(room.status, room.occupied);
             return (
               <button
                 key={room.room_number}
