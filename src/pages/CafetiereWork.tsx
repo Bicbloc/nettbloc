@@ -316,6 +316,14 @@ export default function CafetiereWork() {
                     {room.guest_name}
                   </span>
                 )}
+                {stay.label && (
+                  <span className={[
+                    'text-[8px] font-semibold uppercase tracking-wide',
+                    hasCount ? 'text-white/90' : stay.className,
+                  ].join(' ')}>
+                    {stay.label}
+                  </span>
+                )}
                 {hasCount ? (
                   <span className="text-xs font-medium">{log.people_count} pers.</span>
                 ) : isIncluded ? (
