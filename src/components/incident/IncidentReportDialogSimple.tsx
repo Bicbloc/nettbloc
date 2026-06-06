@@ -321,12 +321,16 @@ export function IncidentReportDialogSimple({
       // Determine priority from AI suggestion or default
       const priority = aiSuggestion?.severity || "medium";
 
+      const guestMeta = roomMeta[String(values.location_reference).trim().toLowerCase()];
+      const descriptionWithGuest = guestMeta?.guest
+        ? `${values.description ? values.description + "\n\n" : ""}Client : ${guestMeta.guest}`
+        : values.description;
       const { data: incident, error: incidentError } = await supabase
         .from("incidents")
         .insert({
           hotel_id: hotelId,
           title: values.title,
-          description: values.description,
+          description: descriptionWithGuest,
           category_id: item?.category_id,
           item_id: values.item_id,
           type_id: values.type_id,
