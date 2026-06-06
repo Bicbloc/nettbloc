@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble,
-  RefreshCw, Check, Settings, Search,
+  RefreshCw, Check, Settings, Search, MessageSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -187,13 +187,23 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const occupiedByRoom: Record<string, boolean> = {};
   const guestByRoom: Record<string, string | null> = {};
   const statusByRoom: Record<string, string | null> = {};
+  const checkInByRoom: Record<string, string | null> = {};
+  const checkOutByRoom: Record<string, string | null> = {};
+  const commentByRoom: Record<string, string | null> = {};
   for (const r of pmsRooms || []) {
     const key = String(r.room_number).trim().toLowerCase();
     inclusionByRoom[key] = r.breakfast_included;
     occupiedByRoom[key] = r.occupied;
     guestByRoom[key] = r.guest_name;
     statusByRoom[key] = r.status;
+    checkInByRoom[key] = r.check_in;
+    checkOutByRoom[key] = r.check_out;
+    commentByRoom[key] = r.comment;
   }
+  const fmtDate = (d: string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '';
+  const stayRange = (ci: string | null | undefined, co: string | null | undefined) =>
+    ci || co ? `${fmtDate(ci)}${co ? ` → ${fmtDate(co)}` : ''}` : '';
 
   // Étiquette d'occupation : « En cours » pour les chambres pas encore parties,
   // « Arrivée » pour les check-in du jour, « Check-out » pour les départs.
@@ -539,19 +549,34 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   const occupied = occupiedByRoom[key];
                   const guest = guestByRoom[key];
                   const stay = stayLabel(statusByRoom[key]);
+                  const range = stayRange(checkInByRoom[key], checkOutByRoom[key]);
+                  const pmsComment = commentByRoom[key];
                   const cls = included
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : occupied
                       ? 'bg-amber-50 border-amber-200 text-amber-700'
                       : 'bg-card border-border text-muted-foreground';
                   return (
-                    <div key={rn} className={`rounded-lg border p-2 text-center ${cls}`}>
+                    <div key={rn} className={`relative rounded-lg border p-2 text-center ${cls}`}>
+                      {pmsComment && (
+                        <span title={pmsComment} className="absolute top-1 left-1">
+                          <MessageSquare className="h-3 w-3 opacity-70" />
+                        </span>
+                      )}
                       <div className="flex items-center justify-center gap-1">
                         <p className="font-bold text-sm">{rn}</p>
                         {stay && <span className={`text-[9px] font-semibold ${stay.tone}`}>{stay.label}</span>}
                       </div>
                       {guest && (
                         <p className="text-[10px] truncate text-foreground/80" title={guest}>{guest}</p>
+                      )}
+                      {range && (
+                        <p className="text-[9px] tabular-nums text-muted-foreground">{range}</p>
+                      )}
+                      {pmsComment && (
+                        <p className="text-[9px] italic truncate text-foreground/70" title={pmsComment}>
+                          {pmsComment}
+                        </p>
                       )}
                       <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
                         {included ? (<><Check className="h-3 w-3" /> Inclus</>) : occupied ? 'Non inclus' : '—'}

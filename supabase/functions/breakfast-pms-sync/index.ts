@@ -216,6 +216,9 @@ interface PmsRoom {
   breakfast_included: boolean
   guest_name: string | null
   status: string | null
+  check_in: string | null
+  check_out: string | null
+  comment: string | null
 }
 
 const BREAKFAST_RE = /breakfast|petit.?d[eé]j|petit.?dej|p\.?d\.?j|déjeuner|dejeuner|\bb&b\b|\bbb\b|bed.*breakfast/i
@@ -258,17 +261,22 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
     const name = rid ? resourceName[rid] : undefined
     if (!name) continue
     const account = r.CustomerId || r.OwnerId || r.AccountId
-    const checkIn = r.StartUtc?.split('T')[0]
-    const checkOut = r.EndUtc?.split('T')[0]
+    const checkIn = r.StartUtc?.split('T')[0] || null
+    const checkOut = r.EndUtc?.split('T')[0] || null
     let status = 'inhouse'
     if (checkOut === today) status = 'departure'
     else if (checkIn === today) status = 'arrival'
+    const comment = [r.Notes, r.ChannelManagerNumber ? null : null]
+      .filter(Boolean).join(' ').trim() || null
     rooms.push({
       room_number: String(name).trim(),
       occupied: true,
       breakfast_included: account ? breakfastAccounts.has(account) : false,
       guest_name: account ? (customerName[account] || null) : null,
       status,
+      check_in: checkIn,
+      check_out: checkOut,
+      comment,
     })
   }
   return rooms
@@ -290,12 +298,17 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     const services = r.services || []
     const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
     const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
+    const checkIn = r.arrival?.split('T')[0] || null
+    const checkOut = r.departure?.split('T')[0] || null
     rooms.push({
       room_number: String(unitName).trim(),
       occupied: true,
       breakfast_included: breakfast,
       guest_name: guest || null,
       status: 'inhouse',
+      check_in: checkIn,
+      check_out: checkOut,
+      comment: r.comment || null,
     })
   }
   return rooms

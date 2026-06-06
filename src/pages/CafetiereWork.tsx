@@ -34,6 +34,9 @@ interface SimpleRoom {
   guest_name: string | null;
   occupied: boolean;
   status: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  pms_comment: string | null;
 }
 
 export default function CafetiereWork() {
@@ -109,6 +112,9 @@ export default function CafetiereWork() {
           guest_name: r.guest_name,
           occupied: true,
           status: r.status,
+          check_in: r.check_in,
+          check_out: r.check_out,
+          pms_comment: r.comment,
         }))
         .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
     } else {
@@ -119,6 +125,9 @@ export default function CafetiereWork() {
         guest_name: null,
         occupied: false,
         status: null,
+        check_in: null,
+        check_out: null,
+        pms_comment: null,
       }));
     }
     setRooms(list);
@@ -235,6 +244,10 @@ export default function CafetiereWork() {
 
 
   const currency = config?.currency || 'EUR';
+  const fmtDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '';
+  const stayRange = (ci: string | null, co: string | null) =>
+    ci || co ? `${fmtDate(ci)}${co ? ` → ${fmtDate(co)}` : ''}` : '';
   const draftTotal = draftIncluded
     ? 0
     : (config?.breakfast_types || []).reduce((s, t) => s + (draftItems[t.name] || 0) * t.price, 0);
@@ -244,10 +257,11 @@ export default function CafetiereWork() {
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [logs]
   );
-  const selectedGuestName = useMemo(
-    () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
+  const selectedRoom = useMemo(
+    () => rooms.find((r) => r.room_number === selected) ?? null,
     [rooms, selected]
   );
+  const selectedGuestName = selectedRoom?.guest_name ?? null;
 
   // Filtre par statut de séjour + recherche par numéro/nom de client.
   const filteredRooms = useMemo(() => {
@@ -358,13 +372,21 @@ export default function CafetiereWork() {
                 {sent && (
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
                 )}
-                {log?.comment && (
+                {(log?.comment || room.pms_comment) && (
                   <MessageSquare className="absolute top-1 left-1 h-3 w-3 opacity-70" />
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
                 {room.guest_name && (
                   <span className="text-[9px] leading-tight text-center px-0.5 line-clamp-2 opacity-90">
                     {room.guest_name}
+                  </span>
+                )}
+                {stayRange(room.check_in, room.check_out) && (
+                  <span className={[
+                    'text-[8px] tabular-nums',
+                    hasCount ? 'text-white/80' : 'text-muted-foreground',
+                  ].join(' ')}>
+                    {stayRange(room.check_in, room.check_out)}
                   </span>
                 )}
                 {stay.label && (
@@ -399,9 +421,23 @@ export default function CafetiereWork() {
             {selectedGuestName && (
               <p className="text-center text-sm text-muted-foreground">{selectedGuestName}</p>
             )}
+            {stayRange(selectedRoom?.check_in ?? null, selectedRoom?.check_out ?? null) && (
+              <p className="text-center text-xs text-muted-foreground">
+                Séjour : {stayRange(selectedRoom?.check_in ?? null, selectedRoom?.check_out ?? null)}
+              </p>
+            )}
           </SheetHeader>
 
           <div className="py-6 space-y-5">
+            {selectedRoom?.pms_comment && (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm flex gap-2">
+                <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Commentaire PMS</p>
+                  <p>{selectedRoom.pms_comment}</p>
+                </div>
+              </div>
+            )}
             {rooms.find((r) => r.room_number === selected)?.breakfast_included && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
                 Cette chambre a le petit-déjeuner <strong>inclus</strong> dans le séjour.
