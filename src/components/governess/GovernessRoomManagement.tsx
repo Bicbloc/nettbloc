@@ -11,12 +11,13 @@ import { toast } from '@/hooks/use-toast';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { 
   Home, Loader2, RefreshCw, Search, User, UserX, Clock, Check, 
-  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package
+  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package, Layers
 } from 'lucide-react';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { Map as MapIcon } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
+import { deduceFloorFromRoomNumber, formatFloorLabel } from '@/utils/floorUtils';
 
 interface GovernessRoomManagementProps {
   hotelId: string;
