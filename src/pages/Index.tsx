@@ -1018,6 +1018,13 @@ const IndexDashboard = () => {
             <BreakfastTab currentHotelId={currentHotelId} />
           )}
 
+          {/* Integrations Tab */}
+          {activeTab === 'integrations' && (
+            <IntegrationsTab currentHotelId={currentHotelId} />
+          )}
+
+
+
           {/* Tickets Tab */}
           {activeTab === 'tickets' && currentHotelId && (
             <ManualTaskManager
