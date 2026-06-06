@@ -73,20 +73,43 @@ export default function CafetiereWork() {
       loadBreakfastConfig(hotelId),
       hasActivePmsConfig(hotelId),
     ]);
-    // Inclusion du petit-déjeuner récupérée en temps réel depuis le PMS (Mews/Apaleo).
-    let includedMap: Record<string, boolean> = {};
+    // Inclusion + occupation récupérées en temps réel depuis le PMS (Mews/Apaleo).
+    // On ne facture QUE les chambres en cours de séjour : par défaut on affiche
+    // les chambres occupées du PMS, avec le nom du client.
+    let pmsMap: Record<string, PmsRoom> = {};
+    let hasPmsRooms = false;
     if (pmsOk) {
       const pmsRooms = await fetchPmsRooms(hotelId);
-      if (pmsRooms.ok) {
-        includedMap = Object.fromEntries(
-          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r.breakfast_included])
+      if (pmsRooms.ok && pmsRooms.rooms.length > 0) {
+        hasPmsRooms = true;
+        pmsMap = Object.fromEntries(
+          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
         );
       }
     }
-    const list: SimpleRoom[] = (roomData || []).map((r) => ({
-      room_number: r.room_number,
-      breakfast_included: includedMap[String(r.room_number).trim().toLowerCase()] ?? false,
-    }));
+
+    let list: SimpleRoom[];
+    if (hasPmsRooms) {
+      // Source principale : les chambres en séjour remontées par le PMS.
+      list = Object.values(pmsMap)
+        .map((r) => ({
+          room_number: r.room_number,
+          breakfast_included: r.breakfast_included,
+          guest_name: r.guest_name,
+          occupied: true,
+          status: r.status,
+        }))
+        .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
+    } else {
+      // Repli : registre des chambres (aucune occupation PMS disponible).
+      list = (roomData || []).map((r) => ({
+        room_number: r.room_number,
+        breakfast_included: false,
+        guest_name: null,
+        occupied: false,
+        status: null,
+      }));
+    }
     setRooms(list);
     setConfig(cfg);
     setPmsConfigured(pmsOk);
