@@ -352,6 +352,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
                         setAdminNotes(item.admin_notes || "");
                         setTrackingNumber(item.tracking_number || "");
                         setShippingAddress(item.shipping_address || "");
+                        setGuestFirstName(item.guest_first_name || "");
+                        setGuestName(item.guest_name || "");
+                        setGuestCheckIn(item.guest_check_in || "");
+                        setGuestCheckOut(item.guest_check_out || "");
                       }}
                     >
                       <Eye className="h-4 w-4" />
