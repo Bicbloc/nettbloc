@@ -1045,10 +1045,13 @@ const IndexDashboard = () => {
               description="Inspectez et validez le nettoyage des chambres avec la version Premium."
             >
               {currentHotelId && (
-                <GovernessInspectionInterface
-                  hotelId={currentHotelId}
-                  governessName="Gouvernante"
-                />
+                <div className="space-y-6">
+                  <GovernessAssignmentManager hotelId={currentHotelId} />
+                  <GovernessInspectionInterface
+                    hotelId={currentHotelId}
+                    governessName="Gouvernante"
+                  />
+                </div>
               )}
             </PremiumLimitGuard>
           )}
