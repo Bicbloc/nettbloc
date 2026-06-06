@@ -29,6 +29,7 @@ import {
   fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
+import { CafetiereShareCard } from '@/components/dashboard/CafetiereShareCard';
 
 interface BreakfastTabProps {
   currentHotelId: string | null;
@@ -449,6 +450,9 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           </Sheet>
         </div>
       </div>
+
+      {/* Partage des chambres avec une cafetière existante */}
+      <CafetiereShareCard hotelId={currentHotelId} />
 
       {/* Page principale : chambres + petits-déjeuners du jour */}
       <Card>
