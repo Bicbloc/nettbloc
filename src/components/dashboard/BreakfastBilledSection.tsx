@@ -43,7 +43,7 @@ const stayText = (status: string | null | undefined): string => {
 export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [], roomMeta = {} }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  
 
   // Ajout manuel par l'admin
   const [addRoom, setAddRoom] = useState('');
