@@ -158,13 +158,13 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
                 onChange={(e) => setAddQty(Math.max(1, Number(e.target.value)))}
               />
             </div>
-            {breakfastTypes.length > 0 && (
+            {breakfastTypes.filter((t) => t.name?.trim()).length > 0 && (
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Type</label>
                 <Select value={addType} onValueChange={setAddType}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Type" /></SelectTrigger>
                   <SelectContent>
-                    {breakfastTypes.map((t) => (
+                    {breakfastTypes.filter((t) => t.name?.trim()).map((t) => (
                       <SelectItem key={t.name} value={t.name}>
                         {t.name} — {t.price.toFixed(2)} {currency}
                       </SelectItem>
