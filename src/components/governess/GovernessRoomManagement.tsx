@@ -820,6 +820,136 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog Attribution groupée */}
+      <Dialog open={bulkDialog} onOpenChange={setBulkDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attribution groupée des chambres</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-4">
+            {/* Femme de chambre */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Femme de chambre</label>
+              {availableHousekeepers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aucune femme de chambre disponible. Sélectionnez d'abord les présentes du jour.
+                </p>
+              ) : (
+                <Select value={bulkHousekeeper} onValueChange={setBulkHousekeeper}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une femme de chambre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableHousekeepers.map(h => (
+                      <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Mode */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Méthode d'attribution</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { v: 'cleaning', label: 'Par type' },
+                  { v: 'floor', label: 'Par étage' },
+                  { v: 'manual', label: 'Manuelle' },
+                ] as const).map(opt => (
+                  <Button
+                    key={opt.v}
+                    type="button"
+                    variant={bulkMode === opt.v ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setBulkMode(opt.v)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Critère selon le mode */}
+            {bulkMode === 'cleaning' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Type de nettoyage</label>
+                <Select value={bulkCleaningType} onValueChange={setBulkCleaningType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a_blanc">🚪 À blanc (départ)</SelectItem>
+                    <SelectItem value="recouche">🛏️ Recouche</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkMode === 'floor' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Étage</label>
+                <Select value={bulkFloor} onValueChange={setBulkFloor}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un étage" /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from(new Set(rooms.map(r => deduceFloorFromRoomNumber(r.room_number))))
+                      .filter((f): f is number => f !== null)
+                      .sort((a, b) => a - b)
+                      .map(f => (
+                        <SelectItem key={f} value={String(f)}>{formatFloorLabel(f)}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkMode === 'manual' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Chambres ({bulkSelectedIds.size} sélectionnée(s))</label>
+                <div className="max-h-48 overflow-y-auto border rounded-md p-2 grid grid-cols-3 gap-1.5">
+                  {rooms.map(room => {
+                    const on = bulkSelectedIds.has(room.id);
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => toggleBulkRoom(room.id)}
+                        className={`rounded-md border px-2 py-1 text-sm transition ${
+                          on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'
+                        }`}
+                      >
+                        {room.room_number}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {bulkMode !== 'manual' && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={bulkOnlyUnassigned}
+                  onChange={(e) => setBulkOnlyUnassigned(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Seulement les chambres non assignées
+              </label>
+            )}
+
+            <p className="text-sm text-muted-foreground">
+              {getBulkTargetRooms().length} chambre(s) seront attribuée(s).
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialog(false)}>Annuler</Button>
+            <Button onClick={handleBulkAssign} disabled={!bulkHousekeeper || isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Attribuer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </>
       )}
     </div>
