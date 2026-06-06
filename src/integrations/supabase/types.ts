@@ -2049,6 +2049,42 @@ export type Database = {
           },
         ]
       }
+      hotel_webhooks: {
+        Row: {
+          created_at: string
+          events: string[]
+          hotel_id: string
+          id: string
+          is_active: boolean
+          name: string
+          provider: string
+          target_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          events?: string[]
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          provider?: string
+          target_url: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          events?: string[]
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          provider?: string
+          target_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hotels: {
         Row: {
           address: string | null
@@ -6161,6 +6197,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      webhook_deliveries: {
+        Row: {
+          created_at: string
+          error: string | null
+          event_type: string
+          hotel_id: string
+          id: string
+          response_code: number | null
+          status: string
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          event_type: string
+          hotel_id: string
+          id?: string
+          response_code?: number | null
+          status?: string
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          event_type?: string
+          hotel_id?: string
+          id?: string
+          response_code?: number | null
+          status?: string
+          webhook_id?: string | null
+        }
+        Relationships: []
+      }
+      webhook_dispatch_config: {
+        Row: {
+          anon_key: string
+          function_url: string
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          anon_key: string
+          function_url: string
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          anon_key?: string
+          function_url?: string
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
