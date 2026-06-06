@@ -450,6 +450,9 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         </div>
       </div>
 
+      {/* Partage des chambres avec une cafetière existante */}
+      <CafetiereShareCard hotelId={currentHotelId} />
+
       {/* Page principale : chambres + petits-déjeuners du jour */}
       <Card>
         <CardHeader>
