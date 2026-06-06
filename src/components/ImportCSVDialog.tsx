@@ -367,12 +367,12 @@ export function ImportCSVDialog({ onImportRooms, existingRooms }: ImportCSVDialo
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Étage</Label>
-                  <Select value={mapping.floor} onValueChange={(v) => setMapping(prev => ({ ...prev, floor: v }))}>
+                  <Select value={mapping.floor || '__none__'} onValueChange={(v) => setMapping(prev => ({ ...prev, floor: v === '__none__' ? '' : v }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Auto (depuis numéro)</SelectItem>
+                      <SelectItem value="__none__">Auto (depuis numéro)</SelectItem>
                       {headers.map(h => (
                         <SelectItem key={h} value={h}>{h}</SelectItem>
                       ))}
