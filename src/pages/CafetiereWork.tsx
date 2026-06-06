@@ -43,10 +43,12 @@ export default function CafetiereWork() {
   const [logs, setLogs] = useState<Record<string, BreakfastLog>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [savingRoom, setSavingRoom] = useState(false);
+  const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const [draftPeople, setDraftPeople] = useState(0);
-  const [draftType, setDraftType] = useState<string>('');
+  // Quantité par prestation (clé = nom du type) + inclus dans le séjour
+  const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
 
   const refreshLogs = useCallback(async () => {
