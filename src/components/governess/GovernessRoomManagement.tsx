@@ -11,12 +11,13 @@ import { toast } from '@/hooks/use-toast';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { 
   Home, Loader2, RefreshCw, Search, User, UserX, Clock, Check, 
-  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package
+  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package, Layers
 } from 'lucide-react';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { Map as MapIcon } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
+import { deduceFloorFromRoomNumber, formatFloorLabel } from '@/utils/floorUtils';
 
 interface GovernessRoomManagementProps {
   hotelId: string;
@@ -75,6 +76,15 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
   const [noteText, setNoteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Attribution groupée (bulk)
+  const [bulkDialog, setBulkDialog] = useState(false);
+  const [bulkHousekeeper, setBulkHousekeeper] = useState<string>('');
+  const [bulkMode, setBulkMode] = useState<'cleaning' | 'floor' | 'manual'>('cleaning');
+  const [bulkCleaningType, setBulkCleaningType] = useState<string>('a_blanc');
+  const [bulkFloor, setBulkFloor] = useState<string>('');
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOnlyUnassigned, setBulkOnlyUnassigned] = useState(true);
 
   // Femmes de chambre disponibles aujourd'hui (présence gérée par la gouvernante).
   const today = new Date().toISOString().split('T')[0];
@@ -237,6 +247,92 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
       setIsSubmitting(false);
     }
   };
+
+  // Chambres concernées par l'attribution groupée selon le mode choisi
+  const getBulkTargetRooms = (): Room[] => {
+    let targets: Room[] = [];
+    if (bulkMode === 'cleaning') {
+      targets = rooms.filter(r => (r.cleaning_type || 'a_blanc') === bulkCleaningType);
+    } else if (bulkMode === 'floor') {
+      targets = rooms.filter(r => String(deduceFloorFromRoomNumber(r.room_number) ?? '') === bulkFloor);
+    } else {
+      targets = rooms.filter(r => bulkSelectedIds.has(r.id));
+    }
+    if (bulkOnlyUnassigned && bulkMode !== 'manual') {
+      targets = targets.filter(r => !assignments.get(r.id));
+    }
+    return targets;
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkHousekeeper) return;
+    const targets = getBulkTargetRooms();
+    if (targets.length === 0) {
+      toast({ variant: 'destructive', title: 'Aucune chambre', description: 'Aucune chambre ne correspond à la sélection.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const chosen = housekeepers.find(h => h.id === bulkHousekeeper);
+      const chosenName = chosen?.name || '';
+      const chosenId = chosen?.id || null;
+
+      const toUpdate = targets.filter(r => assignments.get(r.id));
+      const toInsert = targets.filter(r => !assignments.get(r.id));
+
+      // Mises à jour des assignations existantes (anti-doublon : on ne crée jamais en double)
+      for (const room of toUpdate) {
+        const existing = assignments.get(room.id)!;
+        await supabase
+          .from('assignments')
+          .update({ housekeeper_name: chosenName, housekeeper_id: chosenId })
+          .eq('id', existing.id);
+      }
+
+      // Nouvelles assignations en lot
+      if (toInsert.length > 0) {
+        await supabase.from('assignments').insert(
+          toInsert.map(room => ({
+            hotel_id: hotelId,
+            room_id: room.id,
+            housekeeper_name: chosenName,
+            housekeeper_id: chosenId,
+            status: 'assigned'
+          }))
+        );
+      }
+
+      await supabase.from('daily_action_logs').insert({
+        hotel_id: hotelId,
+        action_type: 'bulk-assignment',
+        description: `${targets.length} chambre(s) assignée(s) à ${chosenName}`,
+        actor_name: governessName,
+        actor_type: 'governess',
+        details: { housekeeper: chosenName, housekeeper_id: chosenId, count: targets.length, mode: bulkMode }
+      });
+
+      toast({ title: 'Attribution groupée réussie', description: `${targets.length} chambre(s) assignée(s) à ${chosenName}` });
+      setBulkDialog(false);
+      setBulkSelectedIds(new Set());
+      loadData();
+    } catch (error) {
+      console.error('Erreur attribution groupée:', error);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer les chambres" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleBulkRoom = (id: string) => {
+    setBulkSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+
 
   const handleUnassign = async (room: Room) => {
     const assignment = assignments.get(room.id);
@@ -437,6 +533,14 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
         >
           <MapIcon className="h-4 w-4" />
           Plan
+        </Button>
+        <Button
+          onClick={() => { setBulkSelectedIds(new Set()); setBulkDialog(true); }}
+          className="gap-2"
+          disabled={availableHousekeepers.length === 0}
+        >
+          <Layers className="h-4 w-4" />
+          Attribution groupée
         </Button>
       </div>
 
@@ -712,6 +816,136 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
             <Button onClick={handleSaveNote} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Attribution groupée */}
+      <Dialog open={bulkDialog} onOpenChange={setBulkDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attribution groupée des chambres</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-4">
+            {/* Femme de chambre */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Femme de chambre</label>
+              {availableHousekeepers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aucune femme de chambre disponible. Sélectionnez d'abord les présentes du jour.
+                </p>
+              ) : (
+                <Select value={bulkHousekeeper} onValueChange={setBulkHousekeeper}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une femme de chambre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableHousekeepers.map(h => (
+                      <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Mode */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Méthode d'attribution</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { v: 'cleaning', label: 'Par type' },
+                  { v: 'floor', label: 'Par étage' },
+                  { v: 'manual', label: 'Manuelle' },
+                ] as const).map(opt => (
+                  <Button
+                    key={opt.v}
+                    type="button"
+                    variant={bulkMode === opt.v ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setBulkMode(opt.v)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Critère selon le mode */}
+            {bulkMode === 'cleaning' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Type de nettoyage</label>
+                <Select value={bulkCleaningType} onValueChange={setBulkCleaningType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a_blanc">🚪 À blanc (départ)</SelectItem>
+                    <SelectItem value="recouche">🛏️ Recouche</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkMode === 'floor' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Étage</label>
+                <Select value={bulkFloor} onValueChange={setBulkFloor}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un étage" /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from(new Set(rooms.map(r => deduceFloorFromRoomNumber(r.room_number))))
+                      .filter((f): f is number => f !== null)
+                      .sort((a, b) => a - b)
+                      .map(f => (
+                        <SelectItem key={f} value={String(f)}>{formatFloorLabel(f)}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkMode === 'manual' && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Chambres ({bulkSelectedIds.size} sélectionnée(s))</label>
+                <div className="max-h-48 overflow-y-auto border rounded-md p-2 grid grid-cols-3 gap-1.5">
+                  {rooms.map(room => {
+                    const on = bulkSelectedIds.has(room.id);
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => toggleBulkRoom(room.id)}
+                        className={`rounded-md border px-2 py-1 text-sm transition ${
+                          on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'
+                        }`}
+                      >
+                        {room.room_number}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {bulkMode !== 'manual' && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={bulkOnlyUnassigned}
+                  onChange={(e) => setBulkOnlyUnassigned(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Seulement les chambres non assignées
+              </label>
+            )}
+
+            <p className="text-sm text-muted-foreground">
+              {getBulkTargetRooms().length} chambre(s) seront attribuée(s).
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialog(false)}>Annuler</Button>
+            <Button onClick={handleBulkAssign} disabled={!bulkHousekeeper || isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Attribuer
             </Button>
           </DialogFooter>
         </DialogContent>
