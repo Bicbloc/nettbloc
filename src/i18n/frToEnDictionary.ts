@@ -12,7 +12,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Cafetière": "Coffee station",
   "Configuration petit-déjeuner": "Breakfast configuration",
   "Facturation, types de prestations et connexion PMS.": "Billing, service types and PMS connection.",
-  "Facturation": "Billing",
   "Activez la facturation et choisissez la source des tarifs.": "Enable billing and choose the rate source.",
   "Activer la facturation petit-déjeuner": "Enable breakfast billing",
   "Source du prix": "Price source",
@@ -32,7 +31,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Tester / voir": "Test / view",
   "Aucun type. Le prix par personne est utilisé par défaut.": "No type. The price per person is used by default.",
   "Ajouter un type": "Add a type",
-  "Connexion PMS": "PMS connection",
   "La facturation utilise la connexion PMS configurée dans": "Billing uses the PMS connection configured in",
   "Service et code de taxe (Mews) détectés automatiquement.": "Service and tax code (Mews) detected automatically.",
   "Test en cours…": "Testing…",
@@ -74,7 +72,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Toutes": "All",
   "Arrivée": "Arrival",
   "Départ": "Departure",
-  "Chambre": "Room",
   // ============= Cleaning types =============
   "À blanc": "Checkout clean",
   "à blanc": "checkout clean",
