@@ -156,16 +156,24 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Chambre</label>
               <Select value={addRoom} onValueChange={setAddRoom}>
-                <SelectTrigger className="w-32"><SelectValue placeholder="Chambre" /></SelectTrigger>
+                <SelectTrigger className="w-56"><SelectValue placeholder="Chambre" /></SelectTrigger>
                 <SelectContent>
                   {availableRooms.length === 0 ? (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      Aucune chambre disponible
+                      Aucune chambre en séjour
                     </div>
                   ) : (
-                    availableRooms.map((rn) => (
-                      <SelectItem key={rn} value={rn}>{rn}</SelectItem>
-                    ))
+                    availableRooms.map((rn) => {
+                      const meta = roomMeta[rn];
+                      const stay = stayText(meta?.status);
+                      return (
+                        <SelectItem key={rn} value={rn}>
+                          <span className="font-medium">{rn}</span>
+                          {meta?.guest_name ? ` — ${meta.guest_name}` : ''}
+                          {stay ? ` (${stay})` : ''}
+                        </SelectItem>
+                      );
+                    })
                   )}
                 </SelectContent>
               </Select>
