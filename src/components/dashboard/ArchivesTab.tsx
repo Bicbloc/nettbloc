@@ -125,7 +125,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       try {
-        const [reportsRes, logsRes, incidentsRes] = await Promise.all([
+        const [reportsRes, logsRes, incidentsRes, breakfastRes] = await Promise.all([
           supabase
             .from('daily_reports')
             .select('*')
@@ -144,12 +144,19 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
             .eq('hotel_id', currentHotelId)
             .gte('created_at', dateStr + 'T00:00:00')
             .lte('created_at', dateStr + 'T23:59:59')
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('breakfast_logs')
+            .select('*')
+            .eq('hotel_id', currentHotelId)
+            .eq('log_date', dateStr)
+            .order('room_number', { ascending: true })
         ]);
 
         setDailyReports(reportsRes.data || []);
         setArchivedLogs(logsRes.data || []);
         setIncidents(incidentsRes.data || []);
+        setBreakfastLogs(breakfastRes.data || []);
 
         // Sélectionner automatiquement le premier rapport
         if (reportsRes.data && reportsRes.data.length > 0) {
