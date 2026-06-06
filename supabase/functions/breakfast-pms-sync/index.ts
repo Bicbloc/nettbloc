@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
           ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
-      const creds = (config.credentials || {}) as PmsCredentials
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
       if (config.pms_type === 'mews') {
         const services = await fetchMewsServices(creds)
         const serviceId = bfCfg?.pms_service_id || pickOrderableService(services)?.id || null
@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
           ok: false, pms: null, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
-      const creds = (config.credentials || {}) as PmsCredentials
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
 
       // Breakfast rooms to match
       const { data: logs } = await admin
@@ -423,7 +423,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const creds = (config.credentials || {}) as PmsCredentials
+    const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
     let sent = 0
     let failed = 0
 
