@@ -10,6 +10,13 @@ interface PmsCredentials {
   baseUrl?: string
 }
 
+interface BreakfastItem {
+  name: string
+  qty: number
+  price: number
+}
+
+// ─── Apaleo ────────────────────────────────────────────────────────
 async function getApaleoToken(creds: PmsCredentials): Promise<string> {
   if (!creds.clientId || !creds.clientSecret) throw new Error('Identifiants Apaleo manquants')
   const res = await fetch('https://identity.apaleo.com/connect/token', {
@@ -27,7 +34,6 @@ async function getApaleoToken(creds: PmsCredentials): Promise<string> {
   return data.access_token
 }
 
-// Map room number -> in-house reservation id (matching the assigned unit name)
 async function buildApaleoReservationMap(token: string, propertyId: string): Promise<Map<string, string>> {
   const res = await fetch(
     `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices`,
@@ -47,14 +53,8 @@ async function buildApaleoReservationMap(token: string, propertyId: string): Pro
 }
 
 async function postApaleoCharge(
-  token: string,
-  reservationId: string,
-  name: string,
-  amount: number,
-  currency: string,
-  quantity: number,
+  token: string, reservationId: string, name: string, amount: number, currency: string, quantity: number,
 ): Promise<void> {
-  // Resolve folio for reservation
   const folioRes = await fetch(
     `https://api.apaleo.com/finance/v1/folios?reservationId=${reservationId}&pageSize=1`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
@@ -77,6 +77,126 @@ async function postApaleoCharge(
   if (!chargeRes.ok) throw new Error(`Charge Apaleo refusée [${chargeRes.status}]: ${await chargeRes.text()}`)
 }
 
+// ─── Mews ──────────────────────────────────────────────────────────
+function mewsAuth(creds: PmsCredentials) {
+  return {
+    ClientToken: creds.clientToken,
+    AccessToken: creds.accessToken,
+    Client: 'NettoBloc 1.0',
+  }
+}
+
+async function mewsFetch(url: string, body: unknown, attempt = 0): Promise<Response> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 429 && attempt < 4) {
+    const retryAfter = Number(res.headers.get('Retry-After'))
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 8000)
+    await res.text().catch(() => {})
+    await new Promise((r) => setTimeout(r, waitMs))
+    return mewsFetch(url, body, attempt + 1)
+  }
+  return res
+}
+
+interface MewsReservationMatch {
+  reservationId: string
+  customerId: string
+}
+
+// Map room name (lowercased) -> reservation/customer for guests in-house today.
+async function buildMewsReservationMap(
+  creds: PmsCredentials,
+): Promise<{ map: Map<string, MewsReservationMatch>; reservations: number; resources: number }> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const auth = mewsAuth(creds)
+
+  // Resources: resource id -> name
+  const resourcesRes = await mewsFetch(`${baseUrl}/resources/getAll`, {
+    ...auth,
+    Extent: { Resources: true },
+  })
+  if (!resourcesRes.ok) {
+    throw new Error(`Mews resources/getAll [${resourcesRes.status}]: ${await resourcesRes.text()}`)
+  }
+  const resourcesData = await resourcesRes.json()
+  const resources = resourcesData.Resources || []
+  const resourceName: Record<string, string> = {}
+  for (const r of resources) resourceName[r.Id] = r.Name || r.Id
+
+  // Reservations colliding today
+  const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const reservationsRes = await mewsFetch(`${baseUrl}/reservations/getAll`, {
+    ...auth,
+    StartUtc: `${today}T00:00:00Z`,
+    EndUtc: `${tomorrow}T23:59:59Z`,
+    TimeFilter: 'Colliding',
+    Extent: { Reservations: true, Customers: true },
+    States: ['Started', 'Confirmed', 'Processed'],
+  })
+  let reservations: any[] = []
+  if (reservationsRes.ok) {
+    const d = await reservationsRes.json()
+    reservations = d.Reservations || []
+  } else {
+    throw new Error(`Mews reservations/getAll [${reservationsRes.status}]: ${await reservationsRes.text()}`)
+  }
+
+  const map = new Map<string, MewsReservationMatch>()
+  for (const r of reservations) {
+    const rid = r.AssignedResourceId || r.AssignedSpaceId
+    const name = rid ? resourceName[rid] : undefined
+    const customerId = r.CustomerId || r.AccountId
+    if (name && customerId) {
+      map.set(String(name).trim().toLowerCase(), { reservationId: r.Id, customerId })
+    }
+  }
+  return { map, reservations: reservations.length, resources: resources.length }
+}
+
+async function fetchMewsServices(creds: PmsCredentials): Promise<{ id: string; name: string }[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const res = await mewsFetch(`${baseUrl}/services/getAll`, { ...mewsAuth(creds) })
+  if (!res.ok) return []
+  const data = await res.json()
+  const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
+    (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
+  return (data.Services || []).map((s: any) => ({ id: s.Id, name: pickName(s.Names, s.Name) }))
+}
+
+async function postMewsOrder(
+  creds: PmsCredentials,
+  serviceId: string,
+  accountId: string,
+  reservationId: string,
+  items: BreakfastItem[],
+  currency: string,
+  taxCode: string | null,
+): Promise<void> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const body: Record<string, unknown> = {
+    ...mewsAuth(creds),
+    ServiceId: serviceId,
+    AccountId: accountId,
+    LinkedReservationId: reservationId,
+    Items: items.map((it) => ({
+      Name: `Petit-déjeuner ${it.name}`.trim(),
+      UnitCount: it.qty,
+      UnitAmount: {
+        Currency: currency,
+        GrossValue: Number(it.price),
+        ...(taxCode ? { TaxCodes: [taxCode] } : {}),
+      },
+    })),
+  }
+  const res = await mewsFetch(`${baseUrl}/orders/add`, body)
+  if (!res.ok) throw new Error(`Mews orders/add [${res.status}]: ${await res.text()}`)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -84,7 +204,6 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
-  // Require an authenticated caller (manager) or service role.
   const authHeader = req.headers.get('Authorization') ?? ''
   let authorized = authHeader.includes(serviceKey)
   if (!authorized && authHeader.startsWith('Bearer ')) {
@@ -103,7 +222,7 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey)
 
   try {
-    const { hotel_id, log_date, room_number } = await req.json()
+    const { hotel_id, log_date, room_number, mode } = await req.json()
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id requis' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,7 +230,73 @@ Deno.serve(async (req) => {
     }
     const date = log_date || new Date().toISOString().split('T')[0]
 
-    // Billable, not-yet-sent breakfast logs
+    // PMS config
+    const { data: config } = await admin
+      .from('hotel_pms_configs')
+      .select('credentials, property_id, base_url, pms_type, is_active')
+      .eq('hotel_id', hotel_id)
+      .eq('is_active', true)
+      .in('pms_type', ['apaleo', 'mews'])
+      .maybeSingle()
+
+    const { data: bfCfg } = await admin
+      .from('hotel_breakfast_configs')
+      .select('currency, pms_service_id, pms_tax_code')
+      .eq('hotel_id', hotel_id)
+      .maybeSingle()
+    const currency = bfCfg?.currency || 'EUR'
+
+    // ─── TEST / DIAGNOSTIC MODE ───────────────────────────────────
+    if (mode === 'test') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, pms: null, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = (config.credentials || {}) as PmsCredentials
+
+      // Breakfast rooms to match
+      const { data: logs } = await admin
+        .from('breakfast_logs').select('room_number, total_amount, included')
+        .eq('hotel_id', hotel_id).eq('log_date', date)
+      const billableRooms = (logs || []).filter((l: any) => !l.included && Number(l.total_amount) > 0)
+        .map((l: any) => String(l.room_number))
+
+      if (config.pms_type === 'mews') {
+        const { map, reservations, resources } = await buildMewsReservationMap(creds)
+        const services = await fetchMewsServices(creds)
+        const matched = billableRooms.filter((r) => map.has(r.trim().toLowerCase()))
+        const unmatched = billableRooms.filter((r) => !map.has(r.trim().toLowerCase()))
+        return new Response(JSON.stringify({
+          ok: true,
+          pms: 'mews',
+          connectivity: 'OK',
+          resources,
+          reservations_in_house: reservations,
+          services: services.length,
+          services_sample: services.slice(0, 10),
+          service_id_configured: bfCfg?.pms_service_id || null,
+          tax_code_configured: bfCfg?.pms_tax_code || null,
+          billable_rooms: billableRooms.length,
+          rooms_matched: matched,
+          rooms_unmatched: unmatched,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const resMap = await buildApaleoReservationMap(token, propertyId!)
+        const matched = billableRooms.filter((r) => resMap.has(r.trim().toLowerCase()))
+        return new Response(JSON.stringify({
+          ok: true, pms: 'apaleo', connectivity: 'OK',
+          reservations_in_house: resMap.size,
+          billable_rooms: billableRooms.length,
+          rooms_matched: matched,
+          rooms_unmatched: billableRooms.filter((r) => !resMap.has(r.trim().toLowerCase())),
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+    // ─── POST MODE ────────────────────────────────────────────────
     let logsQuery = admin
       .from('breakfast_logs')
       .select('*')
@@ -130,15 +315,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // PMS config
-    const { data: config } = await admin
-      .from('hotel_pms_configs')
-      .select('credentials, property_id, base_url, pms_type, is_active')
-      .eq('hotel_id', hotel_id)
-      .eq('is_active', true)
-      .in('pms_type', ['apaleo', 'mews'])
-      .maybeSingle()
-
     if (!config) {
       return new Response(
         JSON.stringify({ error: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel', sent: 0, failed: 0 }),
@@ -147,12 +323,18 @@ Deno.serve(async (req) => {
     }
 
     const creds = (config.credentials || {}) as PmsCredentials
-    const { data: cfg } = await admin
-      .from('hotel_breakfast_configs').select('currency').eq('hotel_id', hotel_id).maybeSingle()
-    const currency = cfg?.currency || 'EUR'
-
     let sent = 0
     let failed = 0
+
+    const itemsOf = (log: any): BreakfastItem[] => {
+      const items = Array.isArray(log.items) ? log.items : []
+      if (items.length > 0) return items.filter((i: any) => i && Number(i.qty) > 0)
+      return [{
+        name: log.breakfast_type || '',
+        qty: Number(log.people_count) || 1,
+        price: Number(log.unit_price) || Number(log.total_amount),
+      }]
+    }
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
@@ -162,32 +344,10 @@ Deno.serve(async (req) => {
 
       for (const log of logs) {
         try {
-          const key = String(log.room_number).trim().toLowerCase()
-          const reservationId = resMap.get(key)
+          const reservationId = resMap.get(String(log.room_number).trim().toLowerCase())
           if (!reservationId) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-
-          const items = Array.isArray(log.items) ? log.items : []
-          if (items.length > 0) {
-            for (const it of items) {
-              if (!it || Number(it.qty) <= 0) continue
-              await postApaleoCharge(
-                token,
-                reservationId,
-                `Petit-déjeuner ${it.name}`,
-                Number(it.price),
-                currency,
-                Number(it.qty),
-              )
-            }
-          } else {
-            await postApaleoCharge(
-              token,
-              reservationId,
-              `Petit-déjeuner${log.breakfast_type ? ' ' + log.breakfast_type : ''} (${log.people_count} pers.)`,
-              Number(log.total_amount),
-              currency,
-              1,
-            )
+          for (const it of itemsOf(log)) {
+            await postApaleoCharge(token, reservationId, `Petit-déjeuner ${it.name}`.trim(), Number(it.price), currency, Number(it.qty))
           }
           await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
           sent++
@@ -198,19 +358,28 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      // Mews: charge posting requires a dedicated service mapping; flag for now.
-      for (const log of logs) {
-        await admin.from('breakfast_logs').update({ pms_status: 'error' }).eq('id', log.id)
-        failed++
+      // Mews
+      const serviceId = bfCfg?.pms_service_id
+      if (!serviceId) {
+        return new Response(JSON.stringify({
+          error: "Identifiant du service Mews manquant. Renseignez-le dans Petit-déjeuner → Facturation PMS.",
+          sent: 0, failed: 0,
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
-      return new Response(
-        JSON.stringify({
-          sent: 0,
-          failed,
-          error: "L'envoi automatique vers Mews n'est pas encore activé pour cet hôtel.",
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      const { map } = await buildMewsReservationMap(creds)
+      for (const log of logs) {
+        try {
+          const match = map.get(String(log.room_number).trim().toLowerCase())
+          if (!match) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
+          await postMewsOrder(creds, serviceId, match.customerId, match.reservationId, itemsOf(log), currency, bfCfg?.pms_tax_code || null)
+          await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
+          sent++
+        } catch (e) {
+          console.error('mews order error', log.room_number, e)
+          await admin.from('breakfast_logs').update({ pms_status: 'error' }).eq('id', log.id)
+          failed++
+        }
+      }
     }
 
     return new Response(JSON.stringify({ sent, failed }), {
