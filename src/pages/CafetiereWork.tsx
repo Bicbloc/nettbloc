@@ -230,6 +230,10 @@ export default function CafetiereWork() {
     () => Object.values(logs).filter((l) => !l.included && Number(l.total_amount) > 0 && l.pms_status !== 'sent').length,
     [logs]
   );
+  const selectedGuestName = useMemo(
+    () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
+    [rooms, selected]
+  );
 
   if (!hotelId) {
     return (
