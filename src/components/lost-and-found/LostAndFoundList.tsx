@@ -127,6 +127,10 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
           admin_notes: adminNotes || item?.admin_notes,
           tracking_number: trackingNumber || item?.tracking_number,
           shipping_address: shippingAddress || item?.shipping_address,
+          guest_first_name: guestFirstName || null,
+          guest_name: guestName || null,
+          guest_check_in: guestCheckIn || null,
+          guest_check_out: guestCheckOut || null,
         })
         .eq("id", itemId);
 
