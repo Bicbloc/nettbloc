@@ -18,11 +18,15 @@ import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
   upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
+  type PmsRoom,
 } from '@/services/breakfastConfigService';
 
 interface SimpleRoom {
   room_number: string;
   breakfast_included: boolean;
+  guest_name: string | null;
+  occupied: boolean;
+  status: string | null;
 }
 
 export default function CafetiereWork() {
@@ -70,20 +74,43 @@ export default function CafetiereWork() {
       loadBreakfastConfig(hotelId),
       hasActivePmsConfig(hotelId),
     ]);
-    // Inclusion du petit-déjeuner récupérée en temps réel depuis le PMS (Mews/Apaleo).
-    let includedMap: Record<string, boolean> = {};
+    // Inclusion + occupation récupérées en temps réel depuis le PMS (Mews/Apaleo).
+    // On ne facture QUE les chambres en cours de séjour : par défaut on affiche
+    // les chambres occupées du PMS, avec le nom du client.
+    let pmsMap: Record<string, PmsRoom> = {};
+    let hasPmsRooms = false;
     if (pmsOk) {
       const pmsRooms = await fetchPmsRooms(hotelId);
-      if (pmsRooms.ok) {
-        includedMap = Object.fromEntries(
-          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r.breakfast_included])
+      if (pmsRooms.ok && pmsRooms.rooms.length > 0) {
+        hasPmsRooms = true;
+        pmsMap = Object.fromEntries(
+          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
         );
       }
     }
-    const list: SimpleRoom[] = (roomData || []).map((r) => ({
-      room_number: r.room_number,
-      breakfast_included: includedMap[String(r.room_number).trim().toLowerCase()] ?? false,
-    }));
+
+    let list: SimpleRoom[];
+    if (hasPmsRooms) {
+      // Source principale : les chambres en séjour remontées par le PMS.
+      list = Object.values(pmsMap)
+        .map((r) => ({
+          room_number: r.room_number,
+          breakfast_included: r.breakfast_included,
+          guest_name: r.guest_name,
+          occupied: true,
+          status: r.status,
+        }))
+        .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
+    } else {
+      // Repli : registre des chambres (aucune occupation PMS disponible).
+      list = (roomData || []).map((r) => ({
+        room_number: r.room_number,
+        breakfast_included: false,
+        guest_name: null,
+        occupied: false,
+        status: null,
+      }));
+    }
     setRooms(list);
     setConfig(cfg);
     setPmsConfigured(pmsOk);
@@ -203,6 +230,10 @@ export default function CafetiereWork() {
     () => Object.values(logs).filter((l) => !l.included && Number(l.total_amount) > 0 && l.pms_status !== 'sent').length,
     [logs]
   );
+  const selectedGuestName = useMemo(
+    () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
+    [rooms, selected]
+  );
 
   if (!hotelId) {
     return (
@@ -233,7 +264,7 @@ export default function CafetiereWork() {
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
       ) : rooms.length === 0 ? (
-        <p className="p-6 text-muted-foreground">Aucune chambre.</p>
+        <p className="p-6 text-muted-foreground">Aucune chambre en cours de séjour.</p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-3">
           {rooms.map((room) => {
@@ -258,6 +289,11 @@ export default function CafetiereWork() {
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
+                {room.guest_name && (
+                  <span className="text-[9px] leading-tight text-center px-0.5 line-clamp-2 opacity-90">
+                    {room.guest_name}
+                  </span>
+                )}
                 {hasCount ? (
                   <span className="text-xs font-medium">{log.people_count} pers.</span>
                 ) : isIncluded ? (
@@ -290,6 +326,9 @@ export default function CafetiereWork() {
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-center">Chambre {selected}</SheetTitle>
+            {selectedGuestName && (
+              <p className="text-center text-sm text-muted-foreground">{selectedGuestName}</p>
+            )}
           </SheetHeader>
 
           <div className="py-6 space-y-5">
