@@ -376,11 +376,15 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      // Mews
-      const serviceId = bfCfg?.pms_service_id
+      // Mews — use the configured service, or auto-pick an active "Orderable" one.
+      let serviceId = bfCfg?.pms_service_id || null
+      if (!serviceId) {
+        const services = await fetchMewsServices(creds)
+        serviceId = pickOrderableService(services)?.id || null
+      }
       if (!serviceId) {
         return new Response(JSON.stringify({
-          error: "Identifiant du service Mews manquant. Renseignez-le dans Petit-déjeuner → Facturation PMS.",
+          error: "Aucun service Mews facturable trouvé. Renseignez l'identifiant du service dans Petit-déjeuner → Facturation PMS.",
           sent: 0, failed: 0,
         }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
