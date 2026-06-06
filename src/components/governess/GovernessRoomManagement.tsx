@@ -248,6 +248,89 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     }
   };
 
+  // Chambres concernées par l'attribution groupée selon le mode choisi
+  const getBulkTargetRooms = (): Room[] => {
+    let targets: Room[] = [];
+    if (bulkMode === 'cleaning') {
+      targets = rooms.filter(r => (r.cleaning_type || 'a_blanc') === bulkCleaningType);
+    } else if (bulkMode === 'floor') {
+      targets = rooms.filter(r => String(deduceFloorFromRoomNumber(r.room_number) ?? '') === bulkFloor);
+    } else {
+      targets = rooms.filter(r => bulkSelectedIds.has(r.id));
+    }
+    if (bulkOnlyUnassigned && bulkMode !== 'manual') {
+      targets = targets.filter(r => !assignments.get(r.id));
+    }
+    return targets;
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkHousekeeper) return;
+    const targets = getBulkTargetRooms();
+    if (targets.length === 0) {
+      toast({ variant: 'destructive', title: 'Aucune chambre', description: 'Aucune chambre ne correspond à la sélection.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const chosen = housekeepers.find(h => h.id === bulkHousekeeper);
+      const chosenName = chosen?.name || '';
+      const chosenId = chosen?.id || null;
+
+      const toUpdate = targets.filter(r => assignments.get(r.id));
+      const toInsert = targets.filter(r => !assignments.get(r.id));
+
+      // Mises à jour des assignations existantes (anti-doublon : on ne crée jamais en double)
+      for (const room of toUpdate) {
+        const existing = assignments.get(room.id)!;
+        await supabase
+          .from('assignments')
+          .update({ housekeeper_name: chosenName, housekeeper_id: chosenId })
+          .eq('id', existing.id);
+      }
+
+      // Nouvelles assignations en lot
+      if (toInsert.length > 0) {
+        await supabase.from('assignments').insert(
+          toInsert.map(room => ({
+            hotel_id: hotelId,
+            room_id: room.id,
+            housekeeper_name: chosenName,
+            housekeeper_id: chosenId,
+            status: 'assigned'
+          }))
+        );
+      }
+
+      await supabase.from('daily_action_logs').insert({
+        hotel_id: hotelId,
+        action_type: 'bulk-assignment',
+        description: `${targets.length} chambre(s) assignée(s) à ${chosenName}`,
+        actor_name: governessName,
+        actor_type: 'governess',
+        details: { housekeeper: chosenName, housekeeper_id: chosenId, count: targets.length, mode: bulkMode }
+      });
+
+      toast({ title: 'Attribution groupée réussie', description: `${targets.length} chambre(s) assignée(s) à ${chosenName}` });
+      setBulkDialog(false);
+      setBulkSelectedIds(new Set());
+      loadData();
+    } catch (error) {
+      console.error('Erreur attribution groupée:', error);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer les chambres" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleBulkRoom = (id: string) => {
+    setBulkSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
   const handleUnassign = async (room: Room) => {
     const assignment = assignments.get(room.id);
     if (!assignment) return;
