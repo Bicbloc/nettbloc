@@ -112,6 +112,9 @@ export default function CafetiereWork() {
           guest_name: r.guest_name,
           occupied: true,
           status: r.status,
+          check_in: r.check_in,
+          check_out: r.check_out,
+          pms_comment: r.comment,
         }))
         .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
     } else {
@@ -122,6 +125,9 @@ export default function CafetiereWork() {
         guest_name: null,
         occupied: false,
         status: null,
+        check_in: null,
+        check_out: null,
+        pms_comment: null,
       }));
     }
     setRooms(list);
