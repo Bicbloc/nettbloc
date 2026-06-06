@@ -453,9 +453,22 @@ export default function CafetiereWork() {
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <MessageSquare className="h-3.5 w-3.5" /> Commentaire
+              </label>
+              <Textarea
+                value={draftComment}
+                onChange={(e) => setDraftComment(e.target.value)}
+                placeholder="Remarque (optionnel)…"
+                rows={2}
+              />
+            </div>
+
             <p className="text-center text-lg font-semibold">
               Total : {draftTotal.toFixed(2)} {currency}
             </p>
+
 
             <Button
               className="w-full bg-amber-700 hover:bg-amber-800"
