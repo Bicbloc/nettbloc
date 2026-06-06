@@ -162,6 +162,22 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     onUpdate: handleRealtimeUpdate
   });
 
+  // Initialiser la liste des disponibilités une fois les femmes de chambre chargées :
+  // on restaure le choix du jour (localStorage) ou, à défaut, toutes les actives.
+  useEffect(() => {
+    if (availableInitialized || housekeepers.length === 0) return;
+    const activeIds = housekeepers.filter(h => h.is_active).map(h => h.id);
+    let initial: string[] | null = null;
+    try {
+      const raw = localStorage.getItem(availableStorageKey);
+      if (raw) initial = (JSON.parse(raw) as string[]).filter(id => activeIds.includes(id));
+    } catch { /* ignore */ }
+    setAvailableIds(new Set(initial ?? activeIds));
+    setAvailableInitialized(true);
+  }, [housekeepers, availableInitialized, availableStorageKey]);
+
+
+
   const handleAssign = async () => {
     if (!selectedRoom || !selectedHousekeeper) return;
     
