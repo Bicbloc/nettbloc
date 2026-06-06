@@ -556,7 +556,9 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   );
                 })}
               </div>
+              )}
             </>
+
           )}
         </CardContent>
       </Card>
