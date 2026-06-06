@@ -24,9 +24,10 @@ interface Props {
   currency: string;
   breakfastTypes: BreakfastType[];
   pricePerPerson: number;
+  availableRooms?: string[];
 }
 
-export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson }: Props) {
+export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pricePerPerson, availableRooms = [] }: Props) {
   const [logs, setLogs] = useState<BreakfastLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
