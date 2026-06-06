@@ -187,13 +187,23 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const occupiedByRoom: Record<string, boolean> = {};
   const guestByRoom: Record<string, string | null> = {};
   const statusByRoom: Record<string, string | null> = {};
+  const checkInByRoom: Record<string, string | null> = {};
+  const checkOutByRoom: Record<string, string | null> = {};
+  const commentByRoom: Record<string, string | null> = {};
   for (const r of pmsRooms || []) {
     const key = String(r.room_number).trim().toLowerCase();
     inclusionByRoom[key] = r.breakfast_included;
     occupiedByRoom[key] = r.occupied;
     guestByRoom[key] = r.guest_name;
     statusByRoom[key] = r.status;
+    checkInByRoom[key] = r.check_in;
+    checkOutByRoom[key] = r.check_out;
+    commentByRoom[key] = r.comment;
   }
+  const fmtDate = (d: string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '';
+  const stayRange = (ci: string | null | undefined, co: string | null | undefined) =>
+    ci || co ? `${fmtDate(ci)}${co ? ` → ${fmtDate(co)}` : ''}` : '';
 
   // Étiquette d'occupation : « En cours » pour les chambres pas encore parties,
   // « Arrivée » pour les check-in du jour, « Check-out » pour les départs.
