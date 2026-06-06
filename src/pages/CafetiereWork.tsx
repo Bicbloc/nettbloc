@@ -362,10 +362,18 @@ export default function CafetiereWork() {
           </SheetHeader>
 
           <div className="py-6 space-y-5">
+            {rooms.find((r) => r.room_number === selected)?.breakfast_included && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                Cette chambre a le petit-déjeuner <strong>inclus</strong> dans le séjour.
+                Vous pouvez tout de même la facturer en désactivant « Inclus dans le séjour » —
+                une confirmation vous sera demandée.
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-lg border p-3">
               <span className="font-medium">Inclus dans le séjour</span>
               <Switch checked={draftIncluded} onCheckedChange={setDraftIncluded} />
             </div>
+
 
             {!draftIncluded && (
               <div className="space-y-3">
