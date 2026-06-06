@@ -85,7 +85,7 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
     pricing_source: config.pricing_source,
     price_per_person: config.price_per_person,
     currency: config.currency,
-    breakfast_types: config.breakfast_types as unknown as object,
+    breakfast_types: config.breakfast_types as unknown as never,
     default_included: config.default_included,
   };
 
