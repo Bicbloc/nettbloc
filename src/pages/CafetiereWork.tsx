@@ -253,10 +253,11 @@ export default function CafetiereWork() {
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
     [logs]
   );
-  const selectedGuestName = useMemo(
-    () => rooms.find((r) => r.room_number === selected)?.guest_name ?? null,
+  const selectedRoom = useMemo(
+    () => rooms.find((r) => r.room_number === selected) ?? null,
     [rooms, selected]
   );
+  const selectedGuestName = selectedRoom?.guest_name ?? null;
 
   // Filtre par statut de séjour + recherche par numéro/nom de client.
   const filteredRooms = useMemo(() => {
