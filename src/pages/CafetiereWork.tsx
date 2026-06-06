@@ -264,56 +264,71 @@ export default function CafetiereWork() {
       </div>
 
       {/* Bottom sheet for entry */}
-      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) closeAndSave(); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o && !savingRoom) setSelected(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-center">Chambre {selected}</SheetTitle>
           </SheetHeader>
 
-          <div className="py-6 space-y-6">
-            <div className={draftIncluded ? 'opacity-40 pointer-events-none' : ''}>
-              <p className="text-center text-sm text-muted-foreground mb-3">Nombre de personnes</p>
-              <div className="flex items-center justify-center gap-6">
-                <Button
-                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
-                  onClick={() => setDraftPeople((p) => Math.max(0, p - 1))}
-                >
-                  <Minus className="h-6 w-6" />
-                </Button>
-                <span className="text-4xl font-bold w-16 text-center">{draftPeople}</span>
-                <Button
-                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
-                  onClick={() => setDraftPeople((p) => p + 1)}
-                >
-                  <Plus className="h-6 w-6" />
-                </Button>
-              </div>
-            </div>
-
-            {config && config.breakfast_types.length > 0 && !draftIncluded && (
-              <Select value={draftType} onValueChange={setDraftType}>
-                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  {config.breakfast_types.map((t) => (
-                    <SelectItem key={t.name} value={t.name}>
-                      {t.name} — {t.price.toFixed(2)} {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
+          <div className="py-6 space-y-5">
             <div className="flex items-center justify-between rounded-lg border p-3">
               <span className="font-medium">Inclus dans le séjour</span>
               <Switch checked={draftIncluded} onCheckedChange={setDraftIncluded} />
             </div>
 
+            {!draftIncluded && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Quantité par prestation</p>
+                {(config?.breakfast_types || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune prestation configurée. Configurez les types de petit-déjeuner dans l'administration.
+                  </p>
+                ) : (
+                  (config?.breakfast_types || []).map((t) => {
+                    const qty = draftItems[t.name] || 0;
+                    return (
+                      <div key={t.name} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">{t.price.toFixed(2)} {currency}</p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <Button
+                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                            onClick={() => setItemQty(t.name, -1)}
+                          >
+                            <Minus className="h-5 w-5" />
+                          </Button>
+                          <span className="text-2xl font-bold w-8 text-center">{qty}</span>
+                          <Button
+                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                            onClick={() => setItemQty(t.name, 1)}
+                          >
+                            <Plus className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
             <p className="text-center text-lg font-semibold">
               Total : {draftTotal.toFixed(2)} {currency}
             </p>
 
-            <Button className="w-full bg-amber-700 hover:bg-amber-800" onClick={closeAndSave}>
-              <Check className="h-4 w-4 mr-2" /> Valider
+            <Button
+              className="w-full bg-amber-700 hover:bg-amber-800"
+              disabled={savingRoom}
+              onClick={validateRoom}
+            >
+              {savingRoom ? 'Enregistrement…' : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  {pmsConfigured ? 'Valider et envoyer au PMS' : 'Valider'}
+                </>
+              )}
             </Button>
           </div>
         </SheetContent>
