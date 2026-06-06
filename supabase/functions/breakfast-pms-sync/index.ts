@@ -165,14 +165,30 @@ Deno.serve(async (req) => {
           const key = String(log.room_number).trim().toLowerCase()
           const reservationId = resMap.get(key)
           if (!reservationId) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          await postApaleoCharge(
-            token,
-            reservationId,
-            `Petit-déjeuner${log.breakfast_type ? ' ' + log.breakfast_type : ''} (${log.people_count} pers.)`,
-            Number(log.total_amount),
-            currency,
-            1,
-          )
+
+          const items = Array.isArray(log.items) ? log.items : []
+          if (items.length > 0) {
+            for (const it of items) {
+              if (!it || Number(it.qty) <= 0) continue
+              await postApaleoCharge(
+                token,
+                reservationId,
+                `Petit-déjeuner ${it.name}`,
+                Number(it.price),
+                currency,
+                Number(it.qty),
+              )
+            }
+          } else {
+            await postApaleoCharge(
+              token,
+              reservationId,
+              `Petit-déjeuner${log.breakfast_type ? ' ' + log.breakfast_type : ''} (${log.people_count} pers.)`,
+              Number(log.total_amount),
+              currency,
+              1,
+            )
+          }
           await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
           sent++
         } catch (e) {
