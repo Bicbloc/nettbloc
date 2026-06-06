@@ -77,6 +77,15 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const [noteText, setNoteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Attribution groupée (bulk)
+  const [bulkDialog, setBulkDialog] = useState(false);
+  const [bulkHousekeeper, setBulkHousekeeper] = useState<string>('');
+  const [bulkMode, setBulkMode] = useState<'cleaning' | 'floor' | 'manual'>('cleaning');
+  const [bulkCleaningType, setBulkCleaningType] = useState<string>('a_blanc');
+  const [bulkFloor, setBulkFloor] = useState<string>('');
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOnlyUnassigned, setBulkOnlyUnassigned] = useState(true);
+
   // Femmes de chambre disponibles aujourd'hui (présence gérée par la gouvernante).
   const today = new Date().toISOString().split('T')[0];
   const availableStorageKey = `gov_available_${hotelId}_${today}`;
