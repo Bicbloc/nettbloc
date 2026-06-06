@@ -584,6 +584,55 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     );
   };
 
+  const renderBreakfast = () => {
+    if (!breakfastLogs || breakfastLogs.length === 0) return null;
+    const billable = breakfastLogs.filter((b) => !b.included);
+    const totalPeople = breakfastLogs.reduce((sum, b) => sum + (b.people_count || 0), 0);
+    const totalAmount = billable.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
+    return (
+      <div className="space-y-3">
+        <h4 className="font-medium flex items-center gap-2">
+          <Package className="h-4 w-4 text-emerald-600" />
+          Petits-déjeuners ({breakfastLogs.length})
+        </h4>
+        <div className="flex gap-2 flex-wrap">
+          <Badge variant="secondary">{totalPeople} couverts</Badge>
+          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700">
+            {totalAmount.toFixed(2)} € facturés
+          </Badge>
+        </div>
+        <div className="space-y-2">
+          {breakfastLogs.map((b) => (
+            <Card key={b.id} className="p-3 bg-muted/30">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {b.room_number && (
+                    <Badge variant="secondary" className="text-xs">Chambre {b.room_number}</Badge>
+                  )}
+                  <span className="text-sm font-medium">{b.people_count || 0} pers.</span>
+                  {b.breakfast_type && (
+                    <Badge variant="outline" className="text-xs">{b.breakfast_type}</Badge>
+                  )}
+                  {b.included ? (
+                    <Badge variant="outline" className="text-xs">Inclus</Badge>
+                  ) : (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700 text-xs">
+                      {Number(b.total_amount || 0).toFixed(2)} €
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {b.source || ''}{b.created_at ? ` • ${format(parseISO(b.created_at), 'HH:mm', { locale: fr })}` : ''}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+
   if (!currentHotelId) {
     return (
       <Card className="p-8 text-center">
