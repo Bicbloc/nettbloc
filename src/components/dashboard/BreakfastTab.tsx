@@ -274,7 +274,20 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       <p>Réservations en cours : {String(testResult.reservations_in_house)}</p>
                     )}
                     {'services' in testResult && (
-                      <p>Services PMS détectés : {String(testResult.services)}</p>
+                      <p>Services PMS détectés : {String(testResult.services)}
+                        {'orderable_services' in testResult && ` (dont ${String(testResult.orderable_services)} facturables)`}
+                      </p>
+                    )}
+                    {testResult.suggested_service_id && (
+                      <p className="flex items-center flex-wrap gap-2">
+                        Service suggéré : <span className="font-medium">{String(testResult.suggested_service_name)}</span>
+                        <Button
+                          size="sm" variant="secondary" className="h-6 px-2 text-xs"
+                          onClick={() => update({ pms_service_id: String(testResult.suggested_service_id) })}
+                        >
+                          Utiliser
+                        </Button>
+                      </p>
                     )}
                     {'billable_rooms' in testResult && (
                       <p>Chambres facturables aujourd'hui : {String(testResult.billable_rooms)}</p>
