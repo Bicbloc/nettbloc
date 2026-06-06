@@ -372,13 +372,21 @@ export default function CafetiereWork() {
                 {sent && (
                   <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
                 )}
-                {log?.comment && (
+                {(log?.comment || room.pms_comment) && (
                   <MessageSquare className="absolute top-1 left-1 h-3 w-3 opacity-70" />
                 )}
                 <span className="font-bold text-base">{room.room_number}</span>
                 {room.guest_name && (
                   <span className="text-[9px] leading-tight text-center px-0.5 line-clamp-2 opacity-90">
                     {room.guest_name}
+                  </span>
+                )}
+                {stayRange(room.check_in, room.check_out) && (
+                  <span className={[
+                    'text-[8px] tabular-nums',
+                    hasCount ? 'text-white/80' : 'text-muted-foreground',
+                  ].join(' ')}>
+                    {stayRange(room.check_in, room.check_out)}
                   </span>
                 )}
                 {stay.label && (
