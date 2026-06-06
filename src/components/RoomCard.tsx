@@ -622,6 +622,11 @@ export function RoomCard({
           )}
         </div>
         <div className="flex gap-1">
+          {room.doNotDisturb && (
+            <Badge variant="outline" className="bg-rose-100 text-rose-700 border-rose-300 gap-1">
+              <Moon className="h-3 w-3" /> {t.rooms.doNotDisturb}
+            </Badge>
+          )}
           {getStatusBadge(room.status)}
           {getCleaningTypeBadge(room.cleaningType)}
         </div>
@@ -700,6 +705,19 @@ export function RoomCard({
       </div>
       
       <div className="flex flex-col gap-2 mt-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`dnd-${room.number}`}
+            checked={room.doNotDisturb || false}
+            onCheckedChange={toggleDnd}
+          />
+          <label
+            htmlFor={`dnd-${room.number}`}
+            className="text-sm font-medium flex items-center gap-1 cursor-pointer text-rose-600"
+          >
+            {t.rooms.doNotDisturb} <Moon className="h-4 w-4" />
+          </label>
+        </div>
         <div className="flex items-center gap-2">
           <Checkbox 
             id={`twin-${room.number}`} 
