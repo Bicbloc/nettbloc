@@ -1,0 +1,283 @@
+/**
+ * Interface dédiée Cafetière : déclaration des petits-déjeuners par chambre.
+ * Grille de toutes les chambres → un clic = nombre de personnes + type.
+ * Les petits-déjeuners facturés alimentent la page « Petit-déjeuner » (admin)
+ * et peuvent être envoyés au PMS pour facturation directe.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Send } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import {
+  BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
+  upsertBreakfastLog, sendBreakfastsToPms, todayDate,
+} from '@/services/breakfastConfigService';
+
+interface SimpleRoom {
+  room_number: string;
+  breakfast_included: boolean;
+}
+
+export default function CafetiereWork() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+
+  const hotelId = useMemo(() => {
+    const fromUrl = params.get('hotel');
+    if (fromUrl && fromUrl.length >= 30) return fromUrl;
+    return storageService.getHotelId() || storageService.getHousekeeperHotelId();
+  }, [params]);
+
+  const [rooms, setRooms] = useState<SimpleRoom[]>([]);
+  const [config, setConfig] = useState<BreakfastConfig | null>(null);
+  const [logs, setLogs] = useState<Record<string, BreakfastLog>>({});
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const [draftPeople, setDraftPeople] = useState(0);
+  const [draftType, setDraftType] = useState<string>('');
+  const [draftIncluded, setDraftIncluded] = useState(false);
+
+  const refreshLogs = useCallback(async () => {
+    if (!hotelId) return;
+    const list = await loadBreakfastLogs(hotelId);
+    const map: Record<string, BreakfastLog> = {};
+    for (const l of list) if (l.log_date === todayDate()) map[l.room_number] = l;
+    setLogs(map);
+  }, [hotelId]);
+
+  const loadAll = useCallback(async () => {
+    if (!hotelId) { setLoading(false); return; }
+    setLoading(true);
+    const [{ data: roomData }, cfg] = await Promise.all([
+      supabase.from('rooms').select('room_number, breakfast_included').eq('hotel_id', hotelId).order('room_number'),
+      loadBreakfastConfig(hotelId),
+    ]);
+    setRooms((roomData || []) as SimpleRoom[]);
+    setConfig(cfg);
+    await refreshLogs();
+    setLoading(false);
+  }, [hotelId, refreshLogs]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Realtime sync of breakfast logs
+  useEffect(() => {
+    if (!hotelId) return;
+    const channel = supabase
+      .channel(`cafetiere-${hotelId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'breakfast_logs', filter: `hotel_id=eq.${hotelId}` },
+        () => refreshLogs())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [hotelId, refreshLogs]);
+
+  const unitPriceFor = (type: string): number => {
+    if (!config) return 0;
+    const found = config.breakfast_types.find((t) => t.name === type);
+    return found ? found.price : config.price_per_person;
+  };
+
+  const openRoom = (room: SimpleRoom) => {
+    const existing = logs[room.room_number];
+    const defaultType = config?.breakfast_types[0]?.name || '';
+    setDraftType(existing?.breakfast_type || defaultType);
+    setDraftPeople(existing?.people_count ?? (existing ? 0 : 1));
+    setDraftIncluded(
+      existing ? existing.included : (room.breakfast_included || config?.default_included || false)
+    );
+    setSelected(room.room_number);
+  };
+
+  const closeAndSave = async () => {
+    if (!selected || !hotelId) { setSelected(null); return; }
+    const unit = unitPriceFor(draftType);
+    await upsertBreakfastLog({
+      hotelId,
+      roomNumber: selected,
+      peopleCount: draftPeople,
+      breakfastType: draftType || null,
+      unitPrice: unit,
+      included: draftIncluded,
+      loggedBy: 'Cafetière',
+    });
+    await refreshLogs();
+    setSelected(null);
+  };
+
+  const handleSendPms = async () => {
+    if (!hotelId) return;
+    setSending(true);
+    const res = await sendBreakfastsToPms(hotelId);
+    setSending(false);
+    if (res.ok) {
+      toast.success(`${res.sent} petit(s)-déjeuner(s) envoyé(s) au PMS${res.failed ? `, ${res.failed} échec(s)` : ''}`);
+      refreshLogs();
+    } else {
+      toast.error(res.error || "Échec de l'envoi au PMS");
+    }
+  };
+
+  const currency = config?.currency || 'EUR';
+  const draftTotal = draftIncluded ? 0 : draftPeople * unitPriceFor(draftType);
+
+  const totalBillable = useMemo(
+    () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
+    [logs]
+  );
+  const pendingPms = useMemo(
+    () => Object.values(logs).filter((l) => !l.included && Number(l.total_amount) > 0 && l.pms_status !== 'sent').length,
+    [logs]
+  );
+
+  if (!hotelId) {
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        Aucun hôtel sélectionné.
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-28">
+      {/* Header — amber/coffee identity for cafetière */}
+      <header className="sticky top-0 z-10 bg-amber-700 text-white px-4 py-3 flex items-center gap-3 shadow">
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <Coffee className="h-5 w-5" />
+        <div className="flex-1">
+          <h1 className="font-semibold leading-tight">Cafetière</h1>
+          <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-white/80">Total du jour</p>
+          <p className="font-bold">{totalBillable.toFixed(2)} {currency}</p>
+        </div>
+      </header>
+
+      {loading ? (
+        <p className="p-6 text-muted-foreground">Chargement…</p>
+      ) : rooms.length === 0 ? (
+        <p className="p-6 text-muted-foreground">Aucune chambre.</p>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-3">
+          {rooms.map((room) => {
+            const log = logs[room.room_number];
+            const isIncluded = log ? log.included : room.breakfast_included;
+            const hasCount = log && !log.included && log.people_count > 0;
+            const sent = log?.pms_status === 'sent';
+            return (
+              <button
+                key={room.room_number}
+                onClick={() => openRoom(room)}
+                className={[
+                  'relative aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition active:scale-95',
+                  hasCount
+                    ? 'bg-amber-700 text-white border-amber-700'
+                    : isIncluded
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-card text-foreground border-border hover:bg-muted/50',
+                ].join(' ')}
+              >
+                {sent && (
+                  <span className="absolute top-1 right-1 text-[9px] bg-white/25 rounded px-1">PMS</span>
+                )}
+                <span className="font-bold text-base">{room.room_number}</span>
+                {hasCount ? (
+                  <span className="text-xs font-medium">{log.people_count} pers.</span>
+                ) : isIncluded ? (
+                  <span className="text-[10px] font-medium flex items-center gap-0.5">
+                    <Check className="h-3 w-3" /> Inclus
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">—</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Send to PMS bar */}
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-card px-4 py-3">
+        <Button
+          className="w-full bg-amber-700 hover:bg-amber-800"
+          disabled={sending || pendingPms === 0}
+          onClick={handleSendPms}
+        >
+          <Send className="h-4 w-4 mr-2" />
+          {sending ? 'Envoi…' : `Envoyer au PMS (${pendingPms})`}
+        </Button>
+      </div>
+
+      {/* Bottom sheet for entry */}
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) closeAndSave(); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle className="text-center">Chambre {selected}</SheetTitle>
+          </SheetHeader>
+
+          <div className="py-6 space-y-6">
+            <div className={draftIncluded ? 'opacity-40 pointer-events-none' : ''}>
+              <p className="text-center text-sm text-muted-foreground mb-3">Nombre de personnes</p>
+              <div className="flex items-center justify-center gap-6">
+                <Button
+                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
+                  onClick={() => setDraftPeople((p) => Math.max(0, p - 1))}
+                >
+                  <Minus className="h-6 w-6" />
+                </Button>
+                <span className="text-4xl font-bold w-16 text-center">{draftPeople}</span>
+                <Button
+                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
+                  onClick={() => setDraftPeople((p) => p + 1)}
+                >
+                  <Plus className="h-6 w-6" />
+                </Button>
+              </div>
+            </div>
+
+            {config && config.breakfast_types.length > 0 && !draftIncluded && (
+              <Select value={draftType} onValueChange={setDraftType}>
+                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent>
+                  {config.breakfast_types.map((t) => (
+                    <SelectItem key={t.name} value={t.name}>
+                      {t.name} — {t.price.toFixed(2)} {currency}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <span className="font-medium">Inclus dans le séjour</span>
+              <Switch checked={draftIncluded} onCheckedChange={setDraftIncluded} />
+            </div>
+
+            <p className="text-center text-lg font-semibold">
+              Total : {draftTotal.toFixed(2)} {currency}
+            </p>
+
+            <Button className="w-full bg-amber-700 hover:bg-amber-800" onClick={closeAndSave}>
+              <Check className="h-4 w-4 mr-2" /> Valider
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
