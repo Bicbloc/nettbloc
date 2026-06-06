@@ -112,6 +112,53 @@ export function IncidentReportDialogSimple({
     },
   });
 
+  // Chambres remontées par le PMS (avec nom du client et statut de séjour),
+  // y compris les clients en départ (check-out).
+  const { data: pmsRooms } = useQuery({
+    queryKey: ["incident-pms-rooms", hotelId],
+    queryFn: async () => {
+      const res = await fetchPmsRooms(hotelId);
+      return res.ok ? res.rooms : [];
+    },
+    enabled: isOpen,
+  });
+
+  const roomMeta = useMemo(() => {
+    const map: Record<string, { guest: string | null; status: string | null; occupied: boolean }> = {};
+    for (const r of pmsRooms || []) {
+      map[String(r.room_number).trim().toLowerCase()] = {
+        guest: r.guest_name,
+        status: r.status,
+        occupied: r.occupied,
+      };
+    }
+    return map;
+  }, [pmsRooms]);
+
+  // Liste fusionnée : on privilégie les chambres du PMS (séjour en cours / départ),
+  // complétées par le registre pour ne rien manquer.
+  const roomOptions = useMemo(() => {
+    const byNumber = new Map<string, { room_number: string; guest: string | null; status: string | null; occupied: boolean }>();
+    for (const r of pmsRooms || []) {
+      byNumber.set(String(r.room_number).trim(), {
+        room_number: String(r.room_number).trim(),
+        guest: r.guest_name,
+        status: r.status,
+        occupied: r.occupied,
+      });
+    }
+    for (const r of registeredRooms || []) {
+      const key = String(r.room_number).trim();
+      if (!byNumber.has(key)) {
+        byNumber.set(key, { room_number: key, guest: null, status: null, occupied: false });
+      }
+    }
+    return Array.from(byNumber.values()).sort((a, b) =>
+      a.room_number.localeCompare(b.room_number, undefined, { numeric: true })
+    );
+  }, [pmsRooms, registeredRooms]);
+
+
   const { data: categoriesWithItems } = useQuery({
     queryKey: ["categories-with-items", hotelId],
     queryFn: async () => {
