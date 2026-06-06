@@ -237,6 +237,7 @@ export function ReportLostItemDialog({
     setGuestCheckOut("");
     setImageUrl("");
     setSelectedGuest("");
+    setManualRoom(false);
   };
 
   const formatDate = (dateStr?: string) => {
