@@ -4,7 +4,7 @@
  * et permet d'envoyer les facturables au PMS. Mise à jour en temps réel.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Send, RefreshCw, Plus } from 'lucide-react';
+import { RefreshCw, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
