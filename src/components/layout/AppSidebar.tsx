@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { 
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText, 
   Brain, Archive, ClipboardCheck, Package, 
-  ChevronRight, Settings, Repeat, ShoppingCart, TicketCheck
+  ChevronRight, Settings, Repeat, ShoppingCart, TicketCheck, Coffee
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates' | 'tickets' | 'breakfast';
 
 interface NavItem {
   value: TabValue;
@@ -60,6 +60,7 @@ export function AppSidebar({
   const operationsItems: NavItem[] = [
     { value: 'access-codes', label: t.dashboard.accessCodes, icon: <Key className="h-5 w-5" />, premium: true },
     { value: 'tickets', label: 'Tickets', icon: <TicketCheck className="h-5 w-5" /> },
+    { value: 'breakfast', label: t.dashboard.breakfast, icon: <Coffee className="h-5 w-5" /> },
     { value: 'incidents', label: t.dashboard.incidents, icon: <AlertTriangle className="h-5 w-5" />, premium: true },
     { value: 'inspections', label: t.dashboard.inspections, icon: <ClipboardCheck className="h-5 w-5" />, premium: true },
   ];
