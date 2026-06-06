@@ -244,6 +244,10 @@ export default function CafetiereWork() {
 
 
   const currency = config?.currency || 'EUR';
+  const fmtDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '';
+  const stayRange = (ci: string | null, co: string | null) =>
+    ci || co ? `${fmtDate(ci)}${co ? ` → ${fmtDate(co)}` : ''}` : '';
   const draftTotal = draftIncluded
     ? 0
     : (config?.breakfast_types || []).reduce((s, t) => s + (draftItems[t.name] || 0) * t.price, 0);
