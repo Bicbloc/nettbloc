@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
-  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, todayDate,
+  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
 } from '@/services/breakfastConfigService';
 
 interface SimpleRoom {
