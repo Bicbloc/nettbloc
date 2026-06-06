@@ -167,27 +167,50 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     setPreviewProducts(res.products);
   };
 
-  // Liste des chambres disponibles pour la sélection (registre, sinon Mews).
-  const availableRooms = (registryRooms.length > 0
-    ? registryRooms
-    : (pmsRooms || []).map((r) => r.room_number)
+  // Pour la facturation, on ne propose QUE les chambres en cours de séjour
+  // (occupées dans le PMS). À défaut de PMS, on retombe sur le registre.
+  const inStayRooms = (pmsRooms || []).filter((r) => r.occupied).map((r) => r.room_number);
+  const availableRooms = (inStayRooms.length > 0
+    ? inStayRooms
+    : registryRooms
   )
     .filter((v, i, a) => a.indexOf(v) === i)
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
+
   const inclusionByRoom: Record<string, boolean> = {};
   const occupiedByRoom: Record<string, boolean> = {};
+  const guestByRoom: Record<string, string | null> = {};
+  const statusByRoom: Record<string, string | null> = {};
   for (const r of pmsRooms || []) {
     const key = String(r.room_number).trim().toLowerCase();
     inclusionByRoom[key] = r.breakfast_included;
     occupiedByRoom[key] = r.occupied;
+    guestByRoom[key] = r.guest_name;
+    statusByRoom[key] = r.status;
   }
 
+  // Étiquette d'occupation : « En cours » pour les chambres pas encore parties,
+  // « Arrivée » pour les check-in du jour, « Check-out » pour les départs.
+  const stayLabel = (status: string | null | undefined): { label: string; tone: string } | null => {
+    if (status === 'departure') return { label: 'Check-out', tone: 'text-rose-600' };
+    if (status === 'arrival') return { label: 'Arrivée', tone: 'text-blue-600' };
+    if (status) return { label: 'En cours', tone: 'text-emerald-600' };
+    return null;
+  };
+
+  // On affiche d'abord les chambres en séjour (occupées), puis le reste.
   const gridRooms = (availableRooms.length > 0
     ? availableRooms
     : (pmsRooms || []).map((r) => r.room_number)
-  );
+  ).slice().sort((a, b) => {
+    const oa = occupiedByRoom[a.trim().toLowerCase()] ? 0 : 1;
+    const ob = occupiedByRoom[b.trim().toLowerCase()] ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
   const includedCount = gridRooms.filter((rn) => inclusionByRoom[rn.trim().toLowerCase()]).length;
+  const occupiedCount = gridRooms.filter((rn) => occupiedByRoom[rn.trim().toLowerCase()]).length;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -443,12 +466,15 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   <span className="h-3 w-3 rounded-full bg-muted inline-block border" />
                   Libre
                 </span>
+                <span className="ml-auto text-muted-foreground">En séjour : {occupiedCount}</span>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {gridRooms.map((rn) => {
                   const key = rn.trim().toLowerCase();
                   const included = inclusionByRoom[key];
                   const occupied = occupiedByRoom[key];
+                  const guest = guestByRoom[key];
+                  const stay = stayLabel(statusByRoom[key]);
                   const cls = included
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : occupied
@@ -456,7 +482,13 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       : 'bg-card border-border text-muted-foreground';
                   return (
                     <div key={rn} className={`rounded-lg border p-2 text-center ${cls}`}>
-                      <p className="font-bold text-sm">{rn}</p>
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="font-bold text-sm">{rn}</p>
+                        {stay && <span className={`text-[9px] font-semibold ${stay.tone}`}>{stay.label}</span>}
+                      </div>
+                      {guest && (
+                        <p className="text-[10px] truncate text-foreground/80" title={guest}>{guest}</p>
+                      )}
                       <p className="text-[10px] font-medium flex items-center justify-center gap-0.5">
                         {included ? (<><Check className="h-3 w-3" /> Inclus</>) : occupied ? 'Non inclus' : '—'}
                       </p>
@@ -475,7 +507,14 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         breakfastTypes={config.breakfast_types}
         pricePerPerson={config.price_per_person}
         availableRooms={availableRooms}
+        roomMeta={Object.fromEntries(
+          availableRooms.map((rn) => {
+            const key = rn.trim().toLowerCase();
+            return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
+          })
+        )}
       />
+
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-lg">
