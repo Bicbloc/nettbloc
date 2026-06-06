@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown, Wrench } from 'lucide-react';
+import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown, Wrench, Coffee } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
