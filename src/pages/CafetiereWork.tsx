@@ -158,6 +158,7 @@ export default function CafetiereWork() {
     setDraftIncluded(
       existing ? existing.included : (room.breakfast_included || config?.default_included || false)
     );
+    setDraftComment(existing?.comment || '');
     setSelected(room.room_number);
   };
 
