@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey)
 
   try {
-    const { hotel_id, log_date } = await req.json()
+    const { hotel_id, log_date, room_number } = await req.json()
     if (!hotel_id) {
       return new Response(JSON.stringify({ error: 'hotel_id requis' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const date = log_date || new Date().toISOString().split('T')[0]
 
     // Billable, not-yet-sent breakfast logs
-    const { data: logs, error: logsErr } = await admin
+    let logsQuery = admin
       .from('breakfast_logs')
       .select('*')
       .eq('hotel_id', hotel_id)
@@ -120,6 +120,8 @@ Deno.serve(async (req) => {
       .eq('included', false)
       .gt('total_amount', 0)
       .neq('pms_status', 'sent')
+    if (room_number) logsQuery = logsQuery.eq('room_number', room_number)
+    const { data: logs, error: logsErr } = await logsQuery
     if (logsErr) throw logsErr
 
     if (!logs || logs.length === 0) {
@@ -163,14 +165,30 @@ Deno.serve(async (req) => {
           const key = String(log.room_number).trim().toLowerCase()
           const reservationId = resMap.get(key)
           if (!reservationId) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          await postApaleoCharge(
-            token,
-            reservationId,
-            `Petit-déjeuner${log.breakfast_type ? ' ' + log.breakfast_type : ''} (${log.people_count} pers.)`,
-            Number(log.total_amount),
-            currency,
-            1,
-          )
+
+          const items = Array.isArray(log.items) ? log.items : []
+          if (items.length > 0) {
+            for (const it of items) {
+              if (!it || Number(it.qty) <= 0) continue
+              await postApaleoCharge(
+                token,
+                reservationId,
+                `Petit-déjeuner ${it.name}`,
+                Number(it.price),
+                currency,
+                Number(it.qty),
+              )
+            }
+          } else {
+            await postApaleoCharge(
+              token,
+              reservationId,
+              `Petit-déjeuner${log.breakfast_type ? ' ' + log.breakfast_type : ''} (${log.people_count} pers.)`,
+              Number(log.total_amount),
+              currency,
+              1,
+            )
+          }
           await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
           sent++
         } catch (e) {

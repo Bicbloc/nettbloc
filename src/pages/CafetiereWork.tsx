@@ -13,14 +13,11 @@ import { Button } from '@/components/ui/button';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
-  upsertBreakfastLog, sendBreakfastsToPms, todayDate,
+  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, todayDate,
 } from '@/services/breakfastConfigService';
 
 interface SimpleRoom {
@@ -43,10 +40,12 @@ export default function CafetiereWork() {
   const [logs, setLogs] = useState<Record<string, BreakfastLog>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [savingRoom, setSavingRoom] = useState(false);
+  const [pmsConfigured, setPmsConfigured] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const [draftPeople, setDraftPeople] = useState(0);
-  const [draftType, setDraftType] = useState<string>('');
+  // Quantité par prestation (clé = nom du type) + inclus dans le séjour
+  const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
 
   const refreshLogs = useCallback(async () => {
@@ -60,12 +59,14 @@ export default function CafetiereWork() {
   const loadAll = useCallback(async () => {
     if (!hotelId) { setLoading(false); return; }
     setLoading(true);
-    const [{ data: roomData }, cfg] = await Promise.all([
+    const [{ data: roomData }, cfg, pmsOk] = await Promise.all([
       supabase.from('rooms').select('room_number, breakfast_included').eq('hotel_id', hotelId).order('room_number'),
       loadBreakfastConfig(hotelId),
+      hasActivePmsConfig(hotelId),
     ]);
     setRooms((roomData || []) as SimpleRoom[]);
     setConfig(cfg);
+    setPmsConfigured(pmsOk);
     await refreshLogs();
     setLoading(false);
   }, [hotelId, refreshLogs]);
@@ -84,36 +85,64 @@ export default function CafetiereWork() {
     return () => { supabase.removeChannel(channel); };
   }, [hotelId, refreshLogs]);
 
-  const unitPriceFor = (type: string): number => {
-    if (!config) return 0;
-    const found = config.breakfast_types.find((t) => t.name === type);
-    return found ? found.price : config.price_per_person;
-  };
 
   const openRoom = (room: SimpleRoom) => {
     const existing = logs[room.room_number];
-    const defaultType = config?.breakfast_types[0]?.name || '';
-    setDraftType(existing?.breakfast_type || defaultType);
-    setDraftPeople(existing?.people_count ?? (existing ? 0 : 1));
+    const items: Record<string, number> = {};
+    if (existing && Array.isArray(existing.items)) {
+      for (const it of existing.items) items[it.name] = it.qty;
+    }
+    setDraftItems(items);
     setDraftIncluded(
       existing ? existing.included : (room.breakfast_included || config?.default_included || false)
     );
     setSelected(room.room_number);
   };
 
-  const closeAndSave = async () => {
+  const setItemQty = (name: string, delta: number) => {
+    setDraftItems((prev) => {
+      const next = Math.max(0, (prev[name] || 0) + delta);
+      return { ...prev, [name]: next };
+    });
+  };
+
+  // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
+  const validateRoom = async () => {
     if (!selected || !hotelId) { setSelected(null); return; }
-    const unit = unitPriceFor(draftType);
+    setSavingRoom(true);
+    const items = (config?.breakfast_types || [])
+      .map((t) => ({ name: t.name, qty: draftItems[t.name] || 0, price: t.price }))
+      .filter((i) => i.qty > 0);
+    const peopleCount = items.reduce((s, i) => s + i.qty, 0);
+    const firstType = items[0]?.name || null;
+    const firstUnit = items[0]?.price || 0;
+
     await upsertBreakfastLog({
       hotelId,
       roomNumber: selected,
-      peopleCount: draftPeople,
-      breakfastType: draftType || null,
-      unitPrice: unit,
+      peopleCount,
+      breakfastType: firstType,
+      unitPrice: firstUnit,
       included: draftIncluded,
+      items,
       loggedBy: 'Cafetière',
     });
     await refreshLogs();
+
+    // Envoi direct au PMS si configuré et facturable
+    if (pmsConfigured && !draftIncluded && peopleCount > 0) {
+      const res = await sendBreakfastsToPms(hotelId, todayDate(), selected);
+      if (res.ok && res.sent > 0) {
+        toast.success(`Chambre ${selected} enregistrée et envoyée au PMS`);
+      } else if (res.ok) {
+        toast.success(`Chambre ${selected} enregistrée`);
+      } else {
+        toast.warning(`Chambre ${selected} enregistrée — envoi PMS échoué`);
+      }
+    } else {
+      toast.success(`Chambre ${selected} enregistrée`);
+    }
+    setSavingRoom(false);
     setSelected(null);
   };
 
@@ -131,7 +160,10 @@ export default function CafetiereWork() {
   };
 
   const currency = config?.currency || 'EUR';
-  const draftTotal = draftIncluded ? 0 : draftPeople * unitPriceFor(draftType);
+  const draftTotal = draftIncluded
+    ? 0
+    : (config?.breakfast_types || []).reduce((s, t) => s + (draftItems[t.name] || 0) * t.price, 0);
+
 
   const totalBillable = useMemo(
     () => Object.values(logs).reduce((s, l) => s + Number(l.total_amount || 0), 0),
@@ -224,56 +256,71 @@ export default function CafetiereWork() {
       </div>
 
       {/* Bottom sheet for entry */}
-      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) closeAndSave(); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o && !savingRoom) setSelected(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-center">Chambre {selected}</SheetTitle>
           </SheetHeader>
 
-          <div className="py-6 space-y-6">
-            <div className={draftIncluded ? 'opacity-40 pointer-events-none' : ''}>
-              <p className="text-center text-sm text-muted-foreground mb-3">Nombre de personnes</p>
-              <div className="flex items-center justify-center gap-6">
-                <Button
-                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
-                  onClick={() => setDraftPeople((p) => Math.max(0, p - 1))}
-                >
-                  <Minus className="h-6 w-6" />
-                </Button>
-                <span className="text-4xl font-bold w-16 text-center">{draftPeople}</span>
-                <Button
-                  variant="outline" size="icon" className="h-14 w-14 rounded-full"
-                  onClick={() => setDraftPeople((p) => p + 1)}
-                >
-                  <Plus className="h-6 w-6" />
-                </Button>
-              </div>
-            </div>
-
-            {config && config.breakfast_types.length > 0 && !draftIncluded && (
-              <Select value={draftType} onValueChange={setDraftType}>
-                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  {config.breakfast_types.map((t) => (
-                    <SelectItem key={t.name} value={t.name}>
-                      {t.name} — {t.price.toFixed(2)} {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
+          <div className="py-6 space-y-5">
             <div className="flex items-center justify-between rounded-lg border p-3">
               <span className="font-medium">Inclus dans le séjour</span>
               <Switch checked={draftIncluded} onCheckedChange={setDraftIncluded} />
             </div>
 
+            {!draftIncluded && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Quantité par prestation</p>
+                {(config?.breakfast_types || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune prestation configurée. Configurez les types de petit-déjeuner dans l'administration.
+                  </p>
+                ) : (
+                  (config?.breakfast_types || []).map((t) => {
+                    const qty = draftItems[t.name] || 0;
+                    return (
+                      <div key={t.name} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">{t.price.toFixed(2)} {currency}</p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <Button
+                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                            onClick={() => setItemQty(t.name, -1)}
+                          >
+                            <Minus className="h-5 w-5" />
+                          </Button>
+                          <span className="text-2xl font-bold w-8 text-center">{qty}</span>
+                          <Button
+                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                            onClick={() => setItemQty(t.name, 1)}
+                          >
+                            <Plus className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
             <p className="text-center text-lg font-semibold">
               Total : {draftTotal.toFixed(2)} {currency}
             </p>
 
-            <Button className="w-full bg-amber-700 hover:bg-amber-800" onClick={closeAndSave}>
-              <Check className="h-4 w-4 mr-2" /> Valider
+            <Button
+              className="w-full bg-amber-700 hover:bg-amber-800"
+              disabled={savingRoom}
+              onClick={validateRoom}
+            >
+              {savingRoom ? 'Enregistrement…' : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  {pmsConfigured ? 'Valider et envoyer au PMS' : 'Valider'}
+                </>
+              )}
             </Button>
           </div>
         </SheetContent>

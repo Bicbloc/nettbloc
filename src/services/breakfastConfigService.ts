@@ -20,6 +20,12 @@ export interface BreakfastConfig {
   default_included: boolean;
 }
 
+export interface BreakfastLogItem {
+  name: string;
+  qty: number;
+  price: number;
+}
+
 export interface BreakfastLog {
   id: string;
   hotel_id: string;
@@ -33,6 +39,7 @@ export interface BreakfastLog {
   source: string;
   logged_by: string | null;
   pms_status: string;
+  items: BreakfastLogItem[];
 }
 
 const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
@@ -139,6 +146,7 @@ interface UpsertLogParams {
   breakfastType: string | null;
   unitPrice: number;
   included: boolean;
+  items?: BreakfastLogItem[];
   loggedBy?: string | null;
   logDate?: string;
 }
@@ -152,11 +160,15 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     breakfastType,
     unitPrice,
     included,
+    items = [],
     loggedBy = null,
     logDate = todayDate(),
   } = params;
 
-  const total = included ? 0 : Number((peopleCount * unitPrice).toFixed(2));
+  const cleanItems = items.filter((i) => i.qty > 0);
+  const total = included
+    ? 0
+    : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
 
   const payload = {
     hotel_id: hotelId,
@@ -167,6 +179,7 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     unit_price: unitPrice,
     total_amount: total,
     included,
+    items: cleanItems as unknown as never,
     source: 'manual',
     logged_by: loggedBy,
     pms_status: 'pending',
@@ -206,18 +219,32 @@ export async function deleteBreakfastLog(
 /**
  * Envoie les petits-déjeuners facturés du jour au PMS pour facturation directe.
  * Cible la fonction edge `breakfast-pms-sync` (Apaleo / Mews).
+ * Si `roomNumber` est fourni, n'envoie que cette chambre.
  */
 export async function sendBreakfastsToPms(
   hotelId: string,
   logDate: string = todayDate(),
+  roomNumber?: string,
 ): Promise<{ ok: boolean; sent: number; failed: number; error?: string }> {
   const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
-    body: { hotel_id: hotelId, log_date: logDate },
+    body: { hotel_id: hotelId, log_date: logDate, room_number: roomNumber },
   });
   if (error) {
     console.error('[breakfast] pms sync error:', error);
     return { ok: false, sent: 0, failed: 0, error: error.message };
   }
   return { ok: true, sent: data?.sent ?? 0, failed: data?.failed ?? 0 };
+}
+
+/** Indique si un hôtel a une configuration PMS active (Apaleo/Mews). */
+export async function hasActivePmsConfig(hotelId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('hotel_pms_configs')
+    .select('id')
+    .eq('hotel_id', hotelId)
+    .eq('is_active', true)
+    .in('pms_type', ['apaleo', 'mews'])
+    .maybeSingle();
+  return !!data;
 }
 
