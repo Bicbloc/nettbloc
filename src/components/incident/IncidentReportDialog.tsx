@@ -189,13 +189,19 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Non authentifié');
 
+      // Client confirmé (depuis les chambres remontées par le PMS)
+      const selectedRoom = registeredRooms.find(r => r.room_number === validated.location_reference);
+      const descriptionWithGuest = selectedRoom?.guest
+        ? `${validated.description ? validated.description + '\n\n' : ''}Client : ${selectedRoom.guest}`
+        : (validated.description || null);
+
       // Créer l'incident
       const { data: incident, error: incidentError } = await supabase
         .from('incidents')
         .insert([{
           hotel_id: hotelId,
           title: validated.title,
-          description: validated.description || null,
+          description: descriptionWithGuest,
           category_id: validated.category_id,
           item_id: validated.item_id || null,
           type_id: validated.type_id,
