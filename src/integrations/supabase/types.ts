@@ -430,6 +430,7 @@ export type Database = {
           hotel_id: string
           id: string
           included: boolean
+          items: Json
           log_date: string
           logged_by: string | null
           people_count: number
@@ -446,6 +447,7 @@ export type Database = {
           hotel_id: string
           id?: string
           included?: boolean
+          items?: Json
           log_date?: string
           logged_by?: string | null
           people_count?: number
@@ -462,6 +464,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           included?: boolean
+          items?: Json
           log_date?: string
           logged_by?: string | null
           people_count?: number

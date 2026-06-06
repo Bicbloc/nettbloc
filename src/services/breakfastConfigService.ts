@@ -20,6 +20,12 @@ export interface BreakfastConfig {
   default_included: boolean;
 }
 
+export interface BreakfastLogItem {
+  name: string;
+  qty: number;
+  price: number;
+}
+
 export interface BreakfastLog {
   id: string;
   hotel_id: string;
@@ -33,6 +39,7 @@ export interface BreakfastLog {
   source: string;
   logged_by: string | null;
   pms_status: string;
+  items: BreakfastLogItem[];
 }
 
 const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
