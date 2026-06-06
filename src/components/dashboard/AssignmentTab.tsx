@@ -98,7 +98,8 @@ export function AssignmentTab({
   const roomCounts = useMemo(() => {
     return calculateRoomCounts(rooms.map(r => ({
       status: r.status,
-      cleaningType: r.cleaningType
+      cleaningType: r.cleaningType,
+      doNotDisturb: r.doNotDisturb
     })));
   }, [rooms]);
   
