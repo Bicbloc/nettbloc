@@ -99,13 +99,34 @@ export function ReportLostItemDialog({
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("rooms")
-        .select("room_number")
-        .eq("hotel_id", hotelId)
-        .order("room_number");
-      if (!cancelled && data) {
-        setAvailableRooms(data.map((r) => r.room_number));
+      const [roomsRes, registryRes] = await Promise.all([
+        supabase
+          .from("rooms")
+          .select("room_number")
+          .eq("hotel_id", hotelId)
+          .order("room_number"),
+        supabase
+          .from("hotel_rooms_registry")
+          .select("room_number")
+          .eq("hotel_id", hotelId)
+          .eq("is_active", true)
+          .order("room_number"),
+      ]);
+
+      if (!cancelled) {
+        const mergedRooms = [
+          ...(roomsRes.data || []).map((room) => room.room_number),
+          ...(registryRes.data || []).map((room) => room.room_number),
+        ]
+          .filter((value): value is string => !!value)
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        setAvailableRooms(
+          Array.from(new Set(mergedRooms)).sort((a, b) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+          )
+        );
       }
     })();
     return () => { cancelled = true; };
