@@ -202,3 +202,22 @@ export async function deleteBreakfastLog(
   }
   return true;
 }
+
+/**
+ * Envoie les petits-déjeuners facturés du jour au PMS pour facturation directe.
+ * Cible la fonction edge `breakfast-pms-sync` (Apaleo / Mews).
+ */
+export async function sendBreakfastsToPms(
+  hotelId: string,
+  logDate: string = todayDate(),
+): Promise<{ ok: boolean; sent: number; failed: number; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, log_date: logDate },
+  });
+  if (error) {
+    console.error('[breakfast] pms sync error:', error);
+    return { ok: false, sent: 0, failed: 0, error: error.message };
+  }
+  return { ok: true, sent: data?.sent ?? 0, failed: data?.failed ?? 0 };
+}
+

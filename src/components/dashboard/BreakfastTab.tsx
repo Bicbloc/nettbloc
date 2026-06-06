@@ -2,7 +2,7 @@
  * Onglet admin : configuration de la facturation des petits-déjeuners.
  */
 import { useEffect, useState } from 'react';
-import { Coffee, Plus, Trash2, Save } from 'lucide-react';
+import { Coffee, Plus, Trash2, Save, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig,
 } from '@/services/breakfastConfigService';
+import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
+
+
 
 interface BreakfastTabProps {
   currentHotelId: string | null;
@@ -67,10 +70,26 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center gap-2">
-        <Coffee className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-bold">Petit-déjeuner</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Coffee className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-bold">Petit-déjeuner</h2>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => window.open(`/cafetiere?hotel=${currentHotelId}`, '_blank')}
+        >
+          <ExternalLink className="h-4 w-4" /> Ouvrir l'interface Cafetière
+        </Button>
       </div>
+
+      {config.is_active && (
+        <BreakfastBilledSection hotelId={currentHotelId} currency={config.currency || 'EUR'} />
+      )}
+
+
 
       <Card>
         <CardHeader>
