@@ -75,6 +75,7 @@ export function AppSidebar({
   const toolsItems: NavItem[] = [
     { value: 'templates', label: 'Templates', icon: <Repeat className="h-5 w-5" /> },
     { value: 'reports', label: t.dashboard.reports, icon: <FileText className="h-5 w-5" /> },
+    { value: 'integrations', label: 'Intégrations', icon: <Webhook className="h-5 w-5" />, premium: true },
     { value: 'archives', label: t.dashboard.archives, icon: <Archive className="h-5 w-5" /> },
     // Training IA retiré de la nav — accessible via Gestion des chambres > Config avancée
   ];
