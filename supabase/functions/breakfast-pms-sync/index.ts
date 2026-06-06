@@ -312,7 +312,37 @@ Deno.serve(async (req) => {
       .maybeSingle()
     const currency = bfCfg?.currency || 'EUR'
 
+    // ─── FETCH PRODUCTS / PRESTATIONS MODE ────────────────────────
+    // Returns the breakfast prestations directly from the PMS (single config),
+    // so the establishment doesn't re-type them manually.
+    if (mode === 'fetch_products') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = (config.credentials || {}) as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const services = await fetchMewsServices(creds)
+        const serviceId = bfCfg?.pms_service_id || pickOrderableService(services)?.id || null
+        if (!serviceId) {
+          return new Response(JSON.stringify({ ok: false, message: 'Aucun service Mews facturable trouvé.' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        const products = await fetchMewsProducts(creds, serviceId)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', service_id: serviceId, products }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds)
+        const products = await fetchApaleoProducts(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', service_id: null, products }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
     // ─── TEST / DIAGNOSTIC MODE ───────────────────────────────────
+
     if (mode === 'test') {
       if (!config) {
         return new Response(JSON.stringify({
