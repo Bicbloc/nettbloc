@@ -298,12 +298,17 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     const services = r.services || []
     const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
     const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
+    const checkIn = r.arrival?.split('T')[0] || null
+    const checkOut = r.departure?.split('T')[0] || null
     rooms.push({
       room_number: String(unitName).trim(),
       occupied: true,
       breakfast_included: breakfast,
       guest_name: guest || null,
       status: 'inhouse',
+      check_in: checkIn,
+      check_out: checkOut,
+      comment: r.comment || null,
     })
   }
   return rooms
