@@ -35,6 +35,7 @@ interface Room {
   cleaning_priority: number;
   cleaning_type?: string;
   is_twin?: boolean;
+  do_not_disturb?: boolean;
 }
 
 interface ActivityLogEntry {
