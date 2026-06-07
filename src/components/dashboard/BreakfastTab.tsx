@@ -728,20 +728,25 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
-      <BreakfastBilledSection
-        hotelId={currentHotelId}
-        currency={config.currency || 'EUR'}
-        breakfastTypes={config.breakfast_types}
-        pricePerPerson={config.price_per_person}
-        availableRooms={availableRooms}
-        roomMeta={Object.fromEntries(
-          availableRooms.map((rn) => {
-            const key = rn.trim().toLowerCase();
-            return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
-          })
-        )}
-      />
+        <TabsContent value="billing" className="mt-4">
+          <BreakfastBilledSection
+            hotelId={currentHotelId}
+            currency={config.currency || 'EUR'}
+            breakfastTypes={config.breakfast_types}
+            pricePerPerson={config.price_per_person}
+            availableRooms={availableRooms}
+            roomMeta={Object.fromEntries(
+              availableRooms.map((rn) => {
+                const key = rn.trim().toLowerCase();
+                return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
+              })
+            )}
+          />
+        </TabsContent>
+      </Tabs>
+
 
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
