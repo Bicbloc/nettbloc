@@ -47,6 +47,10 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Plans tarifaires PMS : récupération + sélection « inclus ».
+  const [ratePlans, setRatePlans] = useState<PmsRatePlan[] | null>(null);
+  const [ratePlansLoading, setRatePlansLoading] = useState(false);
+
   // Chambres : registre (canonique) + inclusion PDJ depuis le PMS.
   const [registryRooms, setRegistryRooms] = useState<string[]>([]);
   const [pmsRooms, setPmsRooms] = useState<PmsRoom[] | null>(null);
