@@ -724,13 +724,17 @@ Deno.serve(async (req) => {
       const resMap = await buildApaleoReservationMap(token, propertyId)
 
       for (const log of logs) {
+        const delta = deltaItemsOf(log)
+        if (delta.length === 0) continue // Rien de nouveau à facturer.
         try {
           const reservationId = resMap.get(String(log.room_number).trim().toLowerCase())
           if (!reservationId) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          for (const it of itemsOf(log)) {
+          for (const it of delta) {
             await postApaleoCharge(token, reservationId, `Petit-déjeuner ${it.name}`.trim(), Number(it.price), currency, Number(it.qty))
           }
-          await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
+          await admin.from('breakfast_logs')
+            .update({ pms_status: 'sent', sent_items: itemsOf(log) as unknown as never })
+            .eq('id', log.id)
           sent++
         } catch (e) {
           console.error('apaleo charge error', log.room_number, e)
