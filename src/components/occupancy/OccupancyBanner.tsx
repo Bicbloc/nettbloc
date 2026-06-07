@@ -1,8 +1,10 @@
-import { TrendingUp, BedDouble, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { TrendingUp, BedDouble, LogIn, LogOut, RefreshCw, Sparkles, BrushCleaning } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useOccupancyForecast } from '@/hooks/use-occupancy-forecast';
+import { useRoomCleanliness } from '@/hooks/use-room-cleanliness';
 
 interface OccupancyBannerProps {
   hotelId: string | null | undefined;
