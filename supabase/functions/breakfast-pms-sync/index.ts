@@ -40,25 +40,41 @@ interface PmsProduct {
 // partagent le même client, ou quand on appelle plusieurs fois par requête).
 const apaleoTokenCache = new Map<string, { token: string; expiresAt: number }>()
 
-async function getApaleoToken(creds: PmsCredentials): Promise<string> {
+async function getApaleoToken(creds: PmsCredentials, persist?: ApaleoPersistCtx): Promise<string> {
   const clientId = (creds.clientId || '').trim()
   const clientSecret = (creds.clientSecret || '').trim()
+  const refreshToken = (creds.refreshToken || '').trim()
   if (!clientId || !clientSecret) throw new Error('Identifiants Apaleo manquants')
 
-  const cached = apaleoTokenCache.get(clientId)
+  const cacheKey = refreshToken ? `${clientId}:rt` : clientId
+  const cached = apaleoTokenCache.get(cacheKey)
   if (cached && cached.expiresAt - 60_000 > Date.now()) {
     return cached.token
   }
+
+  // Deux modes d'authentification Apaleo :
+  // - Authorization Code (app interactive) : on dispose d'un refresh token,
+  //   on l'échange contre un access token (grant_type=refresh_token).
+  // - Client Credentials (app serveur-à-serveur) : on utilise client_id/secret.
+  const buildBody = () =>
+    refreshToken
+      ? new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+        })
+      : new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+        })
 
   const requestToken = async () => {
     return await fetch('https://identity.apaleo.com/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
+      body: buildBody(),
     })
   }
 
@@ -70,14 +86,39 @@ async function getApaleoToken(creds: PmsCredentials): Promise<string> {
   }
   if (!res.ok) {
     const errBody = await res.text()
-    throw new Error(`Auth Apaleo échouée [${res.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`)
+    const hint = refreshToken
+      ? "le refresh token a peut-être expiré : reconnectez Apaleo (bouton « Connecter Apaleo »)"
+      : "cette application Apaleo est de type « Authorization Code » : utilisez le bouton « Connecter Apaleo » au lieu du Client Secret seul"
+    throw new Error(`Auth Apaleo échouée [${res.status}]: ${errBody || hint}`)
   }
   const data = await res.json()
   if (!data.access_token) throw new Error('Token Apaleo non reçu')
   const ttlMs = (Number(data.expires_in) || 3600) * 1000
-  apaleoTokenCache.set(clientId, { token: data.access_token, expiresAt: Date.now() + ttlMs })
+  apaleoTokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + ttlMs })
+
+  // Les refresh tokens Apaleo (offline_access) sont rotatifs : on persiste le
+  // nouveau pour éviter qu'il devienne invalide au prochain appel.
+  if (refreshToken && data.refresh_token && data.refresh_token !== refreshToken && persist) {
+    try {
+      const { data: cfg } = await persist.admin
+        .from('hotel_pms_configs')
+        .select('id, credentials')
+        .eq('hotel_id', persist.hotelId)
+        .eq('pms_type', 'apaleo')
+        .maybeSingle()
+      if (cfg?.id) {
+        await persist.admin
+          .from('hotel_pms_configs')
+          .update({ credentials: { ...(cfg.credentials || {}), refreshToken: data.refresh_token } })
+          .eq('id', cfg.id)
+      }
+    } catch (e) {
+      console.error('[apaleo] persist refresh token failed:', e)
+    }
+  }
   return data.access_token
 }
+
 
 async function buildApaleoReservationMap(token: string, propertyId: string): Promise<Map<string, string>> {
   const res = await fetch(
