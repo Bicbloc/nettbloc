@@ -182,6 +182,22 @@ export default function CafetiereWork() {
     });
   };
 
+  // Ajoute une prestation à la chambre. Si elle est déjà présente (doublon),
+  // on demande confirmation avant de l'ajouter une nouvelle fois.
+  const addPrestation = (name: string) => {
+    if ((draftItems[name] || 0) > 0) {
+      setDupConfirm(name);
+      return;
+    }
+    setItemQty(name, 1);
+  };
+
+  // Liste des prestations effectivement ajoutées (qty > 0).
+  const draftPrestations = useMemo(
+    () => (config?.breakfast_types || []).filter((t) => (draftItems[t.name] || 0) > 0),
+    [config, draftItems]
+  );
+
   // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
   const doSaveRoom = async () => {
     if (!selected || !hotelId) { setSelected(null); return; }
