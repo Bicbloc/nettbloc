@@ -241,15 +241,15 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <CardContent className="p-4 space-y-3">
                 <h4 className="font-semibold">Récapitulatif</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Établissement</span>
-                    <span className="font-medium">{info.companyName}</span>
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-2">
+                    <span className="text-muted-foreground shrink-0">Établissement</span>
+                    <span className="font-medium break-words sm:text-right">{info.companyName}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Contact</span>
-                    <span className="font-medium">{info.contactName}</span>
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-2">
+                    <span className="text-muted-foreground shrink-0">Contact</span>
+                    <span className="font-medium break-words sm:text-right">{info.contactName}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Essai gratuit</span>
                     <span className="font-medium text-green-600">3 mois</span>
                   </div>
