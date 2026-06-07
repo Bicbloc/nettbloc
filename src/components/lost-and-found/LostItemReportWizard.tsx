@@ -168,10 +168,11 @@ export function LostItemReportWizard({
   }, []);
 
   const fallbackGuestOptions = useMemo(() => [
+    guestCheckedOut ? { key: 'checked_out', label: 'Parti (check-out)', info: guestCheckedOut } : null,
     guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
     guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
     guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
-  ].filter(Boolean) as RoomGuestOption[], [guestArrival, guestDeparture, guestStaying]);
+  ].filter(Boolean) as RoomGuestOption[], [guestArrival, guestDeparture, guestStaying, guestCheckedOut]);
 
   const shouldUseFallbackGuestOptions =
     !!defaultRoomNumber && roomNumber.trim().toLowerCase() === defaultRoomNumber.trim().toLowerCase();
