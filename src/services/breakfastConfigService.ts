@@ -195,12 +195,10 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     loggedBy = null,
     logDate = todayDate(),
     comment = null,
+    accumulate = false,
   } = params;
 
-  const cleanItems = items.filter((i) => i.qty > 0);
-  const total = included
-    ? 0
-    : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
+  const newItems = items.filter((i) => i.qty > 0);
 
   // La cafetière peut ajouter des prestations à tout moment. On compare les
   // prestations déclarées aux prestations déjà envoyées au PMS (`sent_items`)
@@ -208,18 +206,38 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
   // on repasse en « pending » pour déclencher un nouvel envoi (du delta seul).
   const { data: existing } = await supabase
     .from('breakfast_logs')
-    .select('pms_status, sent_items')
+    .select('pms_status, sent_items, items, people_count')
     .eq('hotel_id', hotelId)
     .eq('room_number', roomNumber)
     .eq('log_date', logDate)
     .maybeSingle();
 
+  // En mode accumulation, on conserve les prestations déjà déclarées et on
+  // ajoute les nouvelles : chaque facturation du jour reste tracée.
+  const rawExistingItems = (existing as unknown as { items?: unknown } | null)?.items;
+  const existingItems =
+    accumulate && Array.isArray(rawExistingItems)
+      ? (rawExistingItems as BreakfastLogItem[]).filter((i) => Number(i.qty) > 0)
+      : [];
+  const cleanItems = [...existingItems, ...newItems];
+
+  const total = included
+    ? 0
+    : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
+
+  const totalPeople = accumulate
+    ? Number((existing as unknown as { people_count?: number } | null)?.people_count || 0) + peopleCount
+    : peopleCount;
+
   const rawSent = (existing as unknown as { sent_items?: unknown } | null)?.sent_items;
   const sentList = Array.isArray(rawSent) ? (rawSent as BreakfastLogItem[]) : [];
   const sentMap: Record<string, number> = {};
   for (const s of sentList) sentMap[s.name] = (sentMap[s.name] || 0) + Number(s.qty || 0);
+  // Agrège les prestations courantes par nom pour comparer au déjà-envoyé.
+  const currentMap: Record<string, number> = {};
+  for (const i of cleanItems) currentMap[i.name] = (currentMap[i.name] || 0) + Number(i.qty || 0);
   const hasNewToBill =
-    !included && cleanItems.some((i) => i.qty - (sentMap[i.name] || 0) > 0);
+    !included && Object.entries(currentMap).some(([name, qty]) => qty - (sentMap[name] || 0) > 0);
   // Si rien de nouveau à facturer, on conserve le statut existant (ex. « sent »).
   const nextStatus = hasNewToBill ? 'pending' : (existing?.pms_status || 'pending');
 
@@ -227,7 +245,7 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     hotel_id: hotelId,
     room_number: roomNumber,
     log_date: logDate,
-    people_count: peopleCount,
+    people_count: totalPeople,
     breakfast_type: breakfastType,
     unit_price: unitPrice,
     total_amount: total,
