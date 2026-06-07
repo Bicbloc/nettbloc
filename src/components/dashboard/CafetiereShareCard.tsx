@@ -135,11 +135,11 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Coffee className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">Cafetière du jour</CardTitle>
+          <CardTitle className="text-lg">Personnel point de vente du jour</CardTitle>
         </div>
         <CardDescription>
-          Choisissez une cafetière existante pour lui partager toutes les chambres du
-          registre et les chambres en séjour en cours.
+          Choisissez un membre du personnel point de vente pour lui partager toutes les
+          chambres du registre et les chambres en séjour en cours.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
