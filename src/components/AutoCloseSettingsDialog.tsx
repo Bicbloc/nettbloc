@@ -72,6 +72,11 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
       toast.error('Sélectionnez au moins un jour de clôture.');
       return;
     }
+    const trimmedEmail = recapEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error('Adresse e-mail de récapitulatif invalide.');
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from('hotels')
@@ -79,7 +84,8 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
         auto_close_enabled: enabled,
         auto_close_time: time.length === 5 ? `${time}:00` : time,
         auto_close_days: days,
-      })
+        auto_close_recap_email: trimmedEmail || null,
+      } as any)
       .eq('id', hotelId);
     setSaving(false);
     if (error) {
@@ -89,6 +95,7 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
     toast.success('Clôture automatique enregistrée.');
     setOpen(false);
   };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
