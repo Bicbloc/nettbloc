@@ -165,38 +165,66 @@ export function IntegrationsTab({ currentHotelId }: IntegrationsTabProps) {
         </p>
       </div>
 
-      {/* Add new */}
+      {/* Add new — guided */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Ajouter une intégration</CardTitle>
-          <CardDescription>
-            Collez une URL Slack (Incoming Webhook) ou une URL Zapier/Make qui pousse vers Trello, Drive, etc.
-          </CardDescription>
+          <CardDescription>En 3 étapes simples : choisissez l’outil, collez l’URL, sélectionnez les événements.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Nom</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Slack #incidents" />
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={provider} onValueChange={(v) => setProvider(v as WebhookProvider)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(PROVIDER_LABELS) as WebhookProvider[]).map((p) => (
-                    <SelectItem key={p} value={p}>{PROVIDER_LABELS[p]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <CardContent className="space-y-6">
+          {/* Step 1 — choose tool */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">1. Choisissez votre outil</Label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {PROVIDER_PRESETS.map((p) => {
+                const Icon = p.icon;
+                const selected = provider === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setProvider(p.value)}
+                    className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors ${
+                      selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    {selected && <Check className="absolute right-2 top-2 h-4 w-4 text-primary" />}
+                    <Icon className="h-5 w-5 text-primary" />
+                    <span className="font-medium">{p.label}</span>
+                    <span className="text-xs text-muted-foreground">{p.description}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Step 2 — URL */}
           <div className="space-y-2">
-            <Label>URL du webhook</Label>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://hooks.slack.com/services/…" />
+            <Label className="text-sm font-semibold">2. Collez l’URL du webhook</Label>
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={activePreset.placeholder} />
+            <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+              {activePreset.helpText}
+              {activePreset.helpUrl && (
+                <a
+                  href={activePreset.helpUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                >
+                  Guide <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </p>
           </div>
+
+          {/* Step 3 — events */}
           <div className="space-y-2">
-            <Label>Événements à envoyer</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">3. Quels événements envoyer ?</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={toggleAllEvents}>
+                {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {WEBHOOK_EVENTS.map((ev) => (
                 <button
@@ -214,11 +242,19 @@ export function IntegrationsTab({ currentHotelId }: IntegrationsTabProps) {
               ))}
             </div>
           </div>
-          <Button onClick={handleCreate} disabled={creating}>
-            <Plus className="h-4 w-4 mr-2" /> Ajouter
+
+          {/* Optional name */}
+          <div className="space-y-2">
+            <Label>Nom (optionnel)</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Ex: ${activePreset.label} #incidents`} />
+          </div>
+
+          <Button onClick={handleCreate} disabled={creating} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" /> {creating ? 'Ajout…' : 'Ajouter l’intégration'}
           </Button>
         </CardContent>
       </Card>
+
 
       {/* Existing */}
       <Card>
