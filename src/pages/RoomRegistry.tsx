@@ -138,21 +138,32 @@ const RoomRegistry = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('hotel_rooms_registry')
         .delete()
-        .in('id', ids);
+        .in('id', ids)
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Aucun espace supprimé. Vous n'avez peut-être pas les droits sur cet hôtel.");
+      }
+      return data.length;
     },
-    onSuccess: () => {
+    onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
       setSelectedIds(new Set());
-      toast({ title: "Suppression effectuée", description: `${selectedIds.size} espace(s) supprimé(s)` });
+      toast({ title: "Suppression effectuée", description: `${count} espace(s) supprimé(s)` });
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
+    onError: (error: any) => {
+      console.error('Bulk delete registry error:', error);
+      toast({
+        title: "Erreur",
+        description: error?.message || "Impossible de supprimer",
+        variant: "destructive",
+      });
     },
   });
+
 
   const autoOrganizeMutation = useMutation({
     mutationFn: async () => {
