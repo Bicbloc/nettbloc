@@ -55,6 +55,7 @@ export interface LostItemReportWizardProps {
   guestArrival?: GuestInfo;
   guestDeparture?: GuestInfo;
   guestStaying?: GuestInfo;
+  guestCheckedOut?: GuestInfo;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
