@@ -183,6 +183,8 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
   await supabase.from('notifications').delete().eq('hotel_id', hotelId)
     .gte('created_at', reportDate + 'T00:00:00').lte('created_at', reportDate + 'T23:59:59');
   await supabase.from('daily_action_logs').delete().eq('hotel_id', hotelId).eq('log_date', reportDate);
+  // Petits-déjeuners du jour archivés dans le rapport : on purge la table opérationnelle.
+  await supabase.from('breakfast_logs').delete().eq('hotel_id', hotelId).eq('log_date', reportDate);
 
   // 6. Deactivate active hotel sessions
   await supabase.from('hotel_sessions').update({ is_active: false }).eq('hotel_id', hotelId).eq('is_active', true);
