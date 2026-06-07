@@ -72,7 +72,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
 
   const handleShare = async () => {
     if (!selected) {
-      toast.error('Choisissez une cafetière à qui partager les chambres.');
+      toast.error('Choisissez un membre du personnel à qui partager les chambres.');
       return;
     }
     setSharing(true);
@@ -111,7 +111,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       toast.error("Échec du partage des chambres");
       return;
     }
-    const name = profiles.find((p) => p.id === selected)?.name || 'Cafetière';
+    const name = profiles.find((p) => p.id === selected)?.name || 'Personnel';
     toast.success(`Chambres partagées avec ${name}`);
     setSelected('');
     load();
@@ -126,7 +126,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       toast.error('Échec de la révocation');
       return;
     }
-    toast.success(`Accès retiré à ${name || 'la cafetière'}`);
+    toast.success(`Accès retiré à ${name || 'le personnel'}`);
     load();
   };
 
@@ -135,11 +135,11 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Coffee className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">Cafetière du jour</CardTitle>
+          <CardTitle className="text-lg">Personnel point de vente du jour</CardTitle>
         </div>
         <CardDescription>
-          Choisissez une cafetière existante pour lui partager toutes les chambres du
-          registre et les chambres en séjour en cours.
+          Choisissez un membre du personnel point de vente pour lui partager toutes les
+          chambres du registre et les chambres en séjour en cours.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -148,8 +148,8 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
             <SelectTrigger className="flex-1">
               <SelectValue placeholder={
                 loading ? 'Chargement…'
-                  : selectableProfiles.length === 0 ? 'Aucune cafetière disponible'
-                  : 'Sélectionner une cafetière'
+                  : selectableProfiles.length === 0 ? 'Aucun personnel disponible'
+                  : 'Sélectionner un membre du personnel'
               } />
             </SelectTrigger>
             <SelectContent>
@@ -168,7 +168,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
 
         {shared.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Cafetières ayant accès</p>
+            <p className="text-xs font-medium text-muted-foreground">Personnel ayant accès</p>
             {shared.map((s) => (
               <div key={s.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
                 <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
                     <Check className="h-3 w-3" /> Partagé
                   </Badge>
                   <span className="font-medium">
-                    {s.cafetiere_profiles?.name || s.cafetiere_profiles?.email || 'Cafetière'}
+                    {s.cafetiere_profiles?.name || s.cafetiere_profiles?.email || 'Personnel'}
                   </span>
                 </div>
                 <Button

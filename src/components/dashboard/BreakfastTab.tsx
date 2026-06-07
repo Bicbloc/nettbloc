@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Coffee, Plus, Trash2, Save, ExternalLink, Plug, Download, Eye, BedDouble,
+  Coffee, Plus, Trash2, Save, Plug, Download, Eye, BedDouble,
   RefreshCw, Check, Settings, Search, MessageSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger,
 } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -58,7 +59,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [pmsRooms, setPmsRooms] = useState<PmsRoom[] | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomSearch, setRoomSearch] = useState('');
-  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('current');
 
 
 
@@ -319,12 +320,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           <h2 className="text-2xl font-bold">Petit-déjeuner</h2>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline" size="sm" className="gap-2"
-            onClick={() => window.open(`/cafetiere?hotel=${currentHotelId}`, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4" /> Interface Cafetière
-          </Button>
+
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
               <Button variant="secondary" size="sm" className="gap-2">
@@ -591,10 +587,21 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         </div>
       </div>
 
-      {/* Partage des chambres avec une cafetière existante */}
+      {/* Personnel point de vente du jour */}
       <CafetiereShareCard hotelId={currentHotelId} />
 
-      {/* Page principale : chambres + petits-déjeuners du jour */}
+      <Tabs defaultValue="rooms" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="rooms" className="gap-2">
+            <BedDouble className="h-4 w-4" /> Chambres
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="gap-2">
+            <Coffee className="h-4 w-4" /> Facturation du jour
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rooms" className="mt-4 space-y-6">
+      {/* Page principale : chambres */}
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -644,10 +651,23 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   <Input
                     value={roomSearch}
                     onChange={(e) => setRoomSearch(e.target.value)}
-                    placeholder="Rechercher une chambre ou un client…"
+                    placeholder="Saisir un n° de chambre ou un client…"
                     className="pl-9 h-9"
+                    list="bf-room-options"
+                    autoComplete="off"
                   />
+                  <datalist id="bf-room-options">
+                    {gridRooms.map((rn) => {
+                      const guest = guestByRoom[rn.trim().toLowerCase()];
+                      return (
+                        <option key={rn} value={rn}>
+                          {guest ? `${rn} — ${guest}` : rn}
+                        </option>
+                      );
+                    })}
+                  </datalist>
                 </div>
+
                 <div className="flex gap-1.5 overflow-x-auto">
                   {([
                     { key: 'all', label: 'Toutes' },
@@ -721,20 +741,25 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
-      <BreakfastBilledSection
-        hotelId={currentHotelId}
-        currency={config.currency || 'EUR'}
-        breakfastTypes={config.breakfast_types}
-        pricePerPerson={config.price_per_person}
-        availableRooms={availableRooms}
-        roomMeta={Object.fromEntries(
-          availableRooms.map((rn) => {
-            const key = rn.trim().toLowerCase();
-            return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
-          })
-        )}
-      />
+        <TabsContent value="billing" className="mt-4">
+          <BreakfastBilledSection
+            hotelId={currentHotelId}
+            currency={config.currency || 'EUR'}
+            breakfastTypes={config.breakfast_types}
+            pricePerPerson={config.price_per_person}
+            availableRooms={availableRooms}
+            roomMeta={Object.fromEntries(
+              availableRooms.map((rn) => {
+                const key = rn.trim().toLowerCase();
+                return [rn, { guest_name: guestByRoom[key] ?? null, status: statusByRoom[key] ?? null }];
+              })
+            )}
+          />
+        </TabsContent>
+      </Tabs>
+
 
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

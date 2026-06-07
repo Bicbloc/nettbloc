@@ -223,7 +223,7 @@ export default function CafetiereWork() {
       unitPrice: firstUnit,
       included: draftIncluded,
       items,
-      loggedBy: 'Cafetière',
+      loggedBy: 'Personnel point de vente',
       comment: draftComment.trim() || null,
     });
     await refreshLogs();
@@ -322,7 +322,7 @@ export default function CafetiereWork() {
         </Button>
         <Coffee className="h-5 w-5" />
         <div className="flex-1">
-          <h1 className="font-semibold leading-tight">Cafetière</h1>
+          <h1 className="font-semibold leading-tight">Personnel point de vente</h1>
           <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
         </div>
         <div className="text-right">
