@@ -17,7 +17,7 @@ import { useHotel } from '@/contexts/HotelContext';
 import { FeatureGuard } from '@/components/FeatureGuard';
 import { 
   Plug, TestTube, RefreshCw, CheckCircle2, XCircle, Clock, 
-  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks, ChevronDown
+  Eye, EyeOff, Trash2, Loader2, Wifi, DoorOpen, Download, Users, ListChecks, ChevronDown, Link2
 } from 'lucide-react';
 import { PendingRoomsSection } from './PendingRoomsSection';
 
