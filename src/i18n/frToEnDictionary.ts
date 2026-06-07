@@ -16,7 +16,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Propres": "Clean",
   "Aucune donnée prévisionnelle. Synchronisez votre PMS pour l'afficher.": "No forecast data. Sync your PMS to display it.",
   "Prévisionnel du besoin en personnel sur 7 jours :": "7-day housekeeping needs forecast:",
-  "Femmes de chambre": "Housekeepers",
   // ============= Breakfast / Cafetière =============
 
   "Petit-déjeuner": "Breakfast",
