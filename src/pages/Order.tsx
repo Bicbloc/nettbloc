@@ -269,6 +269,22 @@ export default function Order() {
     return `Bonjour,\n\nC'est l'hôtel ${displayHotelName}${hotelAddress ? `, situé au ${hotelAddress}` : ""}.\n\nNous souhaiterions vous commander ${housekeeperCount} femme${housekeeperCount > 1 ? 's' : ''} de chambre pour le ${formattedDate}.${roomDetails}${weekTable}\n\nMerci de nous confirmer la disponibilité.\n\nCordialement,\n\n${displayHotelName}\n${hotelAddress ? `📍 ${hotelAddress}` : ""}\n${hotelPhone ? `📞 ${hotelPhone}` : ""}\n\n---\nGéré via NettoBloc\n🔗 https://nettobloc.bicbloc.eu`;
   }, [hotelName, selectedDate, housekeeperCount, hotelAddress, hotelPhone, pdfAnalysisResult, forecastDays]);
 
+  // Lignes structurées du prévisionnel 7 jours (pour le tableau HTML de l'email)
+  const weekForecastRows = useMemo(() => {
+    const startStr = format(selectedDate, "yyyy-MM-dd");
+    return forecastDays
+      .filter((d) => d.forecast_date >= startStr)
+      .slice(0, 7)
+      .map((d) => ({
+        label: format(new Date(d.forecast_date + "T00:00:00"), "EEEE d MMMM", { locale: fr }),
+        departures: d.departures,
+        stayovers: d.stayovers,
+        needed: housekeepersNeeded(d.departures, d.stayovers),
+      }));
+  }, [forecastDays, selectedDate]);
+
+
+
   // Copy email to clipboard
   const handleCopyEmail = async () => {
     try {
