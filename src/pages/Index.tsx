@@ -898,18 +898,21 @@ const IndexDashboard = () => {
         <div className="space-y-6 mt-6">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <OverviewTab
-              rooms={rooms}
-              housekeeperNames={housekeeperNames}
-              cleaningConfig={cleaningConfig}
-              isPremium={isPremium}
-              currentHotelId={currentHotelId}
-              roomStats={roomStats}
-              onPdfProcessed={handlePdfProcessed}
-              onConfigChange={handleConfigChange}
-              onHousekeeperNamesChange={handleHousekeeperNamesChange}
-              onDistribute={handleDistributeWithValidation}
-            />
+            <>
+              {currentHotelId && <OccupancyForecast hotelId={currentHotelId} />}
+              <OverviewTab
+                rooms={rooms}
+                housekeeperNames={housekeeperNames}
+                cleaningConfig={cleaningConfig}
+                isPremium={isPremium}
+                currentHotelId={currentHotelId}
+                roomStats={roomStats}
+                onPdfProcessed={handlePdfProcessed}
+                onConfigChange={handleConfigChange}
+                onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                onDistribute={handleDistributeWithValidation}
+              />
+            </>
           )}
 
           {/* Rooms Tab */}
