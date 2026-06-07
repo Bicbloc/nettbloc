@@ -174,6 +174,12 @@ interface UpsertLogParams {
   loggedBy?: string | null;
   logDate?: string;
   comment?: string | null;
+  /**
+   * Si vrai, les prestations fournies sont AJOUTÉES aux prestations déjà
+   * déclarées du jour pour la chambre (chaque facturation est tracée), au lieu
+   * de remplacer la déclaration existante. Utilisé pour la saisie admin.
+   */
+  accumulate?: boolean;
 }
 
 /** Crée ou met à jour la déclaration petit-déjeuner d'une chambre (1 par jour). */
