@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -41,11 +41,38 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasExistingName, setHasExistingName] = useState(false);
   const [info, setInfo] = useState<OnboardingInfo>({
     companyName: '',
     contactName: '',
     phone: '',
   });
+
+  // Préremplir avec les infos déjà connues (profil + métadonnées du compte)
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    const loadExisting = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_name, billing_contact_name, billing_phone')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const metaName =
+        (user.user_metadata?.full_name as string) ||
+        (user.user_metadata?.name as string) ||
+        '';
+      const existingName = profile?.billing_contact_name || metaName || '';
+
+      setHasExistingName(existingName.trim().length > 2);
+      setInfo(prev => ({
+        companyName: profile?.company_name || prev.companyName,
+        contactName: existingName || prev.contactName,
+        phone: profile?.billing_phone || prev.phone,
+      }));
+    };
+    loadExisting();
+  }, [isOpen, user]);
 
   const updateField = (field: keyof OnboardingInfo, value: string) => {
     setInfo(prev => ({ ...prev, [field]: value }));
@@ -103,14 +130,14 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     switch (currentStep) {
       case 0:
         return (
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-2 sm:py-4">
             <div className="text-center space-y-4">
-              <div className="w-24 h-24 mx-auto bg-gradient-to-br from-primary/20 to-primary/40 rounded-full flex items-center justify-center">
-                <Sparkles className="h-12 w-12 text-primary" />
+              <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto bg-gradient-to-br from-primary/20 to-primary/40 rounded-full flex items-center justify-center">
+                <Sparkles className="h-12 w-12 sm:h-14 sm:w-14 text-primary" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold">Bienvenue sur NettoBloc !</h3>
-                <p className="text-muted-foreground mt-2">
+                <h3 className="text-2xl sm:text-3xl font-bold">Bienvenue sur NettoBloc !</h3>
+                <p className="text-muted-foreground mt-3 text-sm sm:text-base leading-relaxed">
                   Quelques informations de base suffisent pour démarrer. La configuration complète
                   (chambres, équipe, consignes…) se fait ensuite tranquillement depuis votre tableau de bord.
                 </p>
@@ -118,11 +145,11 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </div>
 
             <Card className="border-primary/20 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Gift className="h-8 w-8 text-green-600 shrink-0" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <Gift className="h-9 w-9 sm:h-10 sm:w-10 text-green-600 shrink-0" />
                   <div>
-                    <p className="font-semibold text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
+                    <p className="font-semibold text-base text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       Accès complet à toutes les fonctionnalités, sans carte bancaire.
                     </p>
@@ -132,14 +159,14 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </Card>
 
             <Card className="bg-muted/50">
-              <CardContent className="p-4 space-y-2 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Vous pourrez faire plus tard :</p>
-                <ul className="space-y-1 list-disc pl-4">
+              <CardContent className="p-5 space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground text-base">Vous pourrez faire plus tard :</p>
+                <ul className="space-y-1.5 list-disc pl-5">
                   <li>Importer ou créer vos chambres</li>
                   <li>Inviter vos gouvernantes et femmes de chambre</li>
                   <li>Définir vos consignes et temps de nettoyage</li>
                 </ul>
-                <p className="pt-1">Rien d'urgent : tout reste modifiable à tout moment.</p>
+                <p className="pt-2">Rien d'urgent : tout reste modifiable à tout moment.</p>
               </CardContent>
             </Card>
           </div>
@@ -163,15 +190,17 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="contactName">Votre nom *</Label>
-              <Input
-                id="contactName"
-                value={info.contactName}
-                onChange={(e) => updateField('contactName', e.target.value)}
-                placeholder="Marie Dupont"
-              />
-            </div>
+            {!hasExistingName && (
+              <div className="space-y-2">
+                <Label htmlFor="contactName">Votre nom *</Label>
+                <Input
+                  id="contactName"
+                  value={info.contactName}
+                  onChange={(e) => updateField('contactName', e.target.value)}
+                  placeholder="Marie Dupont"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="phone">Téléphone *</Label>
@@ -212,15 +241,15 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <CardContent className="p-4 space-y-3">
                 <h4 className="font-semibold">Récapitulatif</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Établissement</span>
-                    <span className="font-medium">{info.companyName}</span>
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-2">
+                    <span className="text-muted-foreground shrink-0">Établissement</span>
+                    <span className="font-medium break-words sm:text-right">{info.companyName}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Contact</span>
-                    <span className="font-medium">{info.contactName}</span>
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-2">
+                    <span className="text-muted-foreground shrink-0">Contact</span>
+                    <span className="font-medium break-words sm:text-right">{info.contactName}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Essai gratuit</span>
                     <span className="font-medium text-green-600">3 mois</span>
                   </div>
@@ -253,7 +282,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-[450px]" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[480px] max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             {STEPS.map((step, idx) => (
@@ -281,8 +310,8 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
         {renderStep()}
 
-        <DialogFooter className="flex justify-between">
-          <div className="flex gap-2">
+        <DialogFooter className="flex flex-row items-center justify-between gap-2 sm:justify-between">
+          <div className="flex gap-1 sm:gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -290,18 +319,20 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                 await signOut();
                 navigate('/auth', { replace: true });
               }}
-              className="text-destructive hover:text-destructive"
+              className="text-destructive hover:text-destructive px-2 sm:px-3"
             >
-              <LogOut className="h-4 w-4 mr-1" />
-              Déconnexion
+              <LogOut className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Déconnexion</span>
             </Button>
             {currentStep > 0 && (
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={() => setCurrentStep(prev => prev - 1)}
+                className="px-2 sm:px-3"
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Retour
+                <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Retour</span>
               </Button>
             )}
           </div>
