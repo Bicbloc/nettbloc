@@ -700,6 +700,22 @@ Deno.serve(async (req) => {
       }]
     }
 
+    // Calcule le delta : prestations déclarées non encore envoyées au PMS.
+    // `sent_items` mémorise les quantités déjà facturées par prestation.
+    const deltaItemsOf = (log: any): BreakfastItem[] => {
+      const current = itemsOf(log)
+      const sent = Array.isArray(log.sent_items) ? log.sent_items : []
+      const sentMap: Record<string, number> = {}
+      for (const s of sent) {
+        const key = String(s?.name ?? '')
+        sentMap[key] = (sentMap[key] || 0) + Number(s?.qty || 0)
+      }
+      return current
+        .map((it) => ({ ...it, qty: it.qty - (sentMap[it.name] || 0) }))
+        .filter((it) => it.qty > 0)
+    }
+
+
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
