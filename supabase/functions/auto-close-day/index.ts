@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
   try {
     const { data: hotels, error } = await supabase
       .from('hotels')
-      .select('id, name, auto_close_enabled, auto_close_time, auto_close_days, auto_close_timezone, last_auto_close_date')
+      .select('id, name, auto_close_enabled, auto_close_time, auto_close_days, auto_close_timezone, last_auto_close_date, auto_close_recap_email')
       .eq('auto_close_enabled', true);
 
     if (error) throw error;
