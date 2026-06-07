@@ -27,20 +27,48 @@ interface PmsProduct {
 }
 
 // ─── Apaleo ────────────────────────────────────────────────────────
+// Cache de token Apaleo (par clientId). Les tokens durent ~1h. On les
+// réutilise pour éviter de marteler le endpoint `connect/token` (sinon
+// Apaleo renvoie 400 invalid_client par throttling quand plusieurs hôtels
+// partagent le même client, ou quand on appelle plusieurs fois par requête).
+const apaleoTokenCache = new Map<string, { token: string; expiresAt: number }>()
+
 async function getApaleoToken(creds: PmsCredentials): Promise<string> {
-  if (!creds.clientId || !creds.clientSecret) throw new Error('Identifiants Apaleo manquants')
-  const res = await fetch('https://identity.apaleo.com/connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-    }),
-  })
-  if (!res.ok) throw new Error(`Auth Apaleo échouée [${res.status}]`)
+  const clientId = (creds.clientId || '').trim()
+  const clientSecret = (creds.clientSecret || '').trim()
+  if (!clientId || !clientSecret) throw new Error('Identifiants Apaleo manquants')
+
+  const cached = apaleoTokenCache.get(clientId)
+  if (cached && cached.expiresAt - 60_000 > Date.now()) {
+    return cached.token
+  }
+
+  const requestToken = async () => {
+    return await fetch('https://identity.apaleo.com/connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    })
+  }
+
+  let res = await requestToken()
+  // Tolérance au throttling : une seconde tentative après un court délai.
+  if (res.status === 400 || res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1200))
+    res = await requestToken()
+  }
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Auth Apaleo échouée [${res.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`)
+  }
   const data = await res.json()
   if (!data.access_token) throw new Error('Token Apaleo non reçu')
+  const ttlMs = (Number(data.expires_in) || 3600) * 1000
+  apaleoTokenCache.set(clientId, { token: data.access_token, expiresAt: Date.now() + ttlMs })
   return data.access_token
 }
 
