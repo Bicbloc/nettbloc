@@ -468,6 +468,72 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   </CardContent>
                 </Card>
 
+                {/* Plans tarifaires « petit-déjeuner inclus » */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Plans tarifaires « inclus »</CardTitle>
+                    <CardDescription>
+                      Récupérez les plans tarifaires de votre PMS et cochez ceux qui comprennent
+                      le petit-déjeuner. Les chambres réservées sur ces plans seront marquées
+                      « inclus » automatiquement (non facturées).
+                    </CardDescription>
+                    <Button
+                      variant="secondary" size="sm" className="gap-2 w-fit mt-2"
+                      onClick={handleLoadRatePlans} disabled={ratePlansLoading}
+                    >
+                      <Download className="h-4 w-4" />
+                      {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(config.included_rate_plan_ids?.length ?? 0) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {config.included_rate_plan_ids.length} plan(s) marqué(s) « inclus ».
+                      </p>
+                    )}
+                    {ratePlans === null ? (
+                      <p className="text-sm text-muted-foreground">
+                        Cliquez sur « Récupérer les plans tarifaires » pour les afficher.
+                      </p>
+                    ) : ratePlans.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Aucun plan tarifaire trouvé dans le PMS.
+                      </p>
+                    ) : (
+                      <ScrollArea className="max-h-72 pr-2">
+                        <div className="space-y-2">
+                          {ratePlans.map((rp) => {
+                            const checked =
+                              config.included_rate_plan_ids?.includes(rp.id) ||
+                              (rp.code ? config.included_rate_plan_ids?.includes(rp.code) : false) ||
+                              false;
+                            return (
+                              <label
+                                key={rp.id}
+                                className="flex items-start gap-3 rounded-lg border p-2 cursor-pointer hover:bg-muted/40"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => toggleRatePlan(rp.id, v === true)}
+                                  className="mt-0.5"
+                                />
+                                <div className="text-sm">
+                                  <p className="font-medium">{rp.name}</p>
+                                  {rp.code && (
+                                    <p className="text-xs text-muted-foreground">{rp.code}</p>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+
+
+
                 {/* Facturation PMS */}
                 <Card>
                   <CardHeader>
