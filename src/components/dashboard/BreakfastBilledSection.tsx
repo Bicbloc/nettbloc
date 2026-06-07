@@ -215,7 +215,6 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
           <p className="text-muted-foreground">Aucun petit-déjeuner facturable aujourd'hui.</p>
         ) : (
           <>
-            <div class="space-y-2">
             <div className="space-y-2">
               {billed.map((l) => (
                 <div key={l.id} className="rounded-lg border p-2 text-sm">
