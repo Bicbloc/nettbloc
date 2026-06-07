@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -26,7 +28,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
   BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
-  fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
+  fetchPmsProducts, fetchPmsRooms, fetchPmsRatePlans, PmsProduct, PmsRoom, PmsRatePlan,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 import { CafetiereShareCard } from '@/components/dashboard/CafetiereShareCard';
@@ -46,6 +48,10 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Plans tarifaires PMS : récupération + sélection « inclus ».
+  const [ratePlans, setRatePlans] = useState<PmsRatePlan[] | null>(null);
+  const [ratePlansLoading, setRatePlansLoading] = useState(false);
 
   // Chambres : registre (canonique) + inclusion PDJ depuis le PMS.
   const [registryRooms, setRegistryRooms] = useState<string[]>([]);
@@ -201,6 +207,34 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
       return;
     }
     setPreviewProducts(res.products);
+  };
+
+  // Récupère tous les plans tarifaires du PMS afin que l'admin coche
+  // ceux qui signifient « petit-déjeuner inclus ».
+  const handleLoadRatePlans = async () => {
+    if (!currentHotelId) return;
+    setRatePlansLoading(true);
+    const res = await fetchPmsRatePlans(currentHotelId);
+    setRatePlansLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération des plans tarifaires impossible');
+      setRatePlans([]);
+      return;
+    }
+    setRatePlans(res.ratePlans);
+    if (res.ratePlans.length === 0) {
+      toast.warning('Aucun plan tarifaire trouvé dans le PMS.');
+    }
+  };
+
+  const toggleRatePlan = (id: string, checked: boolean) => {
+    if (!config) return;
+    const current = config.included_rate_plan_ids || [];
+    update({
+      included_rate_plan_ids: checked
+        ? Array.from(new Set([...current, id]))
+        : current.filter((v) => v !== id),
+    });
   };
 
   // Les chambres proposées au petit-déjeuner incluent le registre permanent,
@@ -435,6 +469,72 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                     </Button>
                   </CardContent>
                 </Card>
+
+                {/* Plans tarifaires « petit-déjeuner inclus » */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Plans tarifaires « inclus »</CardTitle>
+                    <CardDescription>
+                      Récupérez les plans tarifaires de votre PMS et cochez ceux qui comprennent
+                      le petit-déjeuner. Les chambres réservées sur ces plans seront marquées
+                      « inclus » automatiquement (non facturées).
+                    </CardDescription>
+                    <Button
+                      variant="secondary" size="sm" className="gap-2 w-fit mt-2"
+                      onClick={handleLoadRatePlans} disabled={ratePlansLoading}
+                    >
+                      <Download className="h-4 w-4" />
+                      {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(config.included_rate_plan_ids?.length ?? 0) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {config.included_rate_plan_ids.length} plan(s) marqué(s) « inclus ».
+                      </p>
+                    )}
+                    {ratePlans === null ? (
+                      <p className="text-sm text-muted-foreground">
+                        Cliquez sur « Récupérer les plans tarifaires » pour les afficher.
+                      </p>
+                    ) : ratePlans.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Aucun plan tarifaire trouvé dans le PMS.
+                      </p>
+                    ) : (
+                      <ScrollArea className="max-h-72 pr-2">
+                        <div className="space-y-2">
+                          {ratePlans.map((rp) => {
+                            const checked =
+                              config.included_rate_plan_ids?.includes(rp.id) ||
+                              (rp.code ? config.included_rate_plan_ids?.includes(rp.code) : false) ||
+                              false;
+                            return (
+                              <label
+                                key={rp.id}
+                                className="flex items-start gap-3 rounded-lg border p-2 cursor-pointer hover:bg-muted/40"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => toggleRatePlan(rp.id, v === true)}
+                                  className="mt-0.5"
+                                />
+                                <div className="text-sm">
+                                  <p className="font-medium">{rp.name}</p>
+                                  {rp.code && (
+                                    <p className="text-xs text-muted-foreground">{rp.code}</p>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+
+
 
                 {/* Facturation PMS */}
                 <Card>

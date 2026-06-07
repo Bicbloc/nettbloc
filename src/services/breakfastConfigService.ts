@@ -26,6 +26,8 @@ export interface BreakfastConfig {
   pms_service_id: string | null;
   /** Code de taxe PMS appliqué aux charges (requis pour Mews). */
   pms_tax_code: string | null;
+  /** Plans tarifaires (rate plans) du PMS qui signifient « petit-déjeuner inclus ». */
+  included_rate_plan_ids: string[];
 }
 
 export interface BreakfastLogItem {
@@ -63,6 +65,7 @@ const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
   default_included: false,
   pms_service_id: null,
   pms_tax_code: null,
+  included_rate_plan_ids: [],
 });
 
 export function todayDate(): string {
@@ -96,6 +99,9 @@ export async function loadBreakfastConfig(hotelId: string): Promise<BreakfastCon
     default_included: !!data.default_included,
     pms_service_id: (data as { pms_service_id?: string | null }).pms_service_id ?? null,
     pms_tax_code: (data as { pms_tax_code?: string | null }).pms_tax_code ?? null,
+    included_rate_plan_ids: Array.isArray((data as { included_rate_plan_ids?: string[] }).included_rate_plan_ids)
+      ? ((data as { included_rate_plan_ids?: string[] }).included_rate_plan_ids as string[])
+      : [],
   };
 }
 
@@ -111,6 +117,7 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
     default_included: config.default_included,
     pms_service_id: config.pms_service_id,
     pms_tax_code: config.pms_tax_code,
+    included_rate_plan_ids: config.included_rate_plan_ids ?? [],
   };
 
   const { data: existing } = await supabase
@@ -328,6 +335,31 @@ export async function fetchPmsProducts(
     return { ok: false, error: data?.message || 'Aucune prestation trouvée', products: [] };
   }
   return { ok: true, service_id: data.service_id ?? null, products: (data.products || []) as PmsProduct[] };
+}
+
+export interface PmsRatePlan {
+  id: string;
+  code: string | null;
+  name: string;
+}
+
+/**
+ * Récupère tous les plans tarifaires (rate plans) du PMS (Mews/Apaleo)
+ * pour que l'admin choisisse ceux qui incluent le petit-déjeuner.
+ */
+export async function fetchPmsRatePlans(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; ratePlans: PmsRatePlan[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_rate_plans' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, ratePlans: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucun plan tarifaire trouvé', ratePlans: [] };
+  }
+  return { ok: true, ratePlans: (data.rate_plans || []) as PmsRatePlan[] };
 }
 
 export interface PmsRoom {

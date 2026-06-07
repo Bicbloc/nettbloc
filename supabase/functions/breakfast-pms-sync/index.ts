@@ -355,7 +355,10 @@ interface PmsRoom {
 const BREAKFAST_RE = /breakfast|petit.?d[eé]j|petit.?dej|p\.?d\.?j|déjeuner|dejeuner|\bb&b\b|\bbb\b|bed.*breakfast/i
 
 // Build the room occupancy + breakfast-inclusion list for in-house guests today (Mews).
-async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
+async function fetchMewsRooms(
+  creds: PmsCredentials,
+  includedRatePlanIds: Set<string> = new Set(),
+): Promise<PmsRoom[]> {
   const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
   const auth = mewsAuth(creds)
   const today = new Date().toISOString().split('T')[0]
@@ -399,10 +402,13 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
     else if (checkIn === today) status = 'arrival'
     const comment = [r.Notes, r.ChannelManagerNumber ? null : null]
       .filter(Boolean).join(' ').trim() || null
+    const rateId = String(r.RateId || '').trim().toLowerCase()
+    const byRatePlan = rateId ? includedRatePlanIds.has(rateId) : false
+    const byCharge = account ? breakfastAccounts.has(account) : false
     rooms.push({
       room_number: String(name).trim(),
       occupied: true,
-      breakfast_included: account ? breakfastAccounts.has(account) : false,
+      breakfast_included: byCharge || byRatePlan,
       guest_name: account ? (customerName[account] || null) : null,
       status,
       check_in: checkIn,
@@ -413,10 +419,32 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
   return rooms
 }
 
-// Apaleo rooms with breakfast inclusion detected from reservation services.
-async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsRoom[]> {
+// Tous les plans tarifaires (rates) Mews de l'établissement.
+async function fetchMewsRatePlans(creds: PmsCredentials): Promise<PmsRatePlan[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const res = await mewsFetch(`${baseUrl}/rates/getAll`, { ...mewsAuth(creds) })
+  if (!res.ok) throw new Error(`Mews rates/getAll [${res.status}]: ${await res.text()}`)
+  const data = await res.json()
+  const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
+    (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
+  return (data.Rates || [])
+    .filter((r: any) => r.IsActive !== false)
+    .map((r: any) => ({
+      id: String(r.Id),
+      code: null,
+      name: pickName(r.Names, r.Name) || String(r.Id),
+    }))
+}
+
+// Apaleo rooms with breakfast inclusion detected from reservation services
+// and/or the rate plans flagged "breakfast included" by the admin.
+async function fetchApaleoRooms(
+  token: string,
+  propertyId: string,
+  includedRatePlanIds: Set<string> = new Set(),
+): Promise<PmsRoom[]> {
   const res = await fetch(
-    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices,services,booker`,
+    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices,services,booker,ratePlan`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
   )
   if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
@@ -429,14 +457,18 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     const unitName = apaleoUnitName(r)
     if (!unitName) continue
     const services = r.services || []
-    const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
+    const byService = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
+    // Inclusion par plan tarifaire choisi par l'admin (id ou code).
+    const rpId = String(r.ratePlan?.id || r.ratePlanId || '').trim().toLowerCase()
+    const rpCode = String(r.ratePlan?.code || '').trim().toLowerCase()
+    const byRatePlan = (rpId && includedRatePlanIds.has(rpId)) || (rpCode && includedRatePlanIds.has(rpCode))
     const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
     const checkIn = r.arrival?.split('T')[0] || null
     const checkOut = r.departure?.split('T')[0] || null
     rooms.push({
       room_number: String(unitName).trim(),
       occupied: true,
-      breakfast_included: breakfast,
+      breakfast_included: byService || byRatePlan,
       guest_name: guest || null,
       status: 'inhouse',
       check_in: checkIn,
@@ -445,6 +477,23 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     })
   }
   return rooms
+}
+
+interface PmsRatePlan { id: string; code: string | null; name: string }
+
+// Tous les plans tarifaires Apaleo de l'établissement.
+async function fetchApaleoRatePlans(token: string, propertyId: string): Promise<PmsRatePlan[]> {
+  const res = await fetch(
+    `https://api.apaleo.com/rateplan/v1/rate-plans?propertyId=${propertyId}&pageSize=200`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) throw new Error(`Récupération plans tarifaires Apaleo échouée [${res.status}]`)
+  const data = await res.json()
+  return (data.ratePlans || []).map((rp: any) => ({
+    id: String(rp.id),
+    code: rp.code ? String(rp.code) : null,
+    name: String(rp.name || rp.code || rp.id),
+  }))
 }
 
 // Guests (room + name + stay dates) for the Lost & Found feature: includes
@@ -648,10 +697,16 @@ Deno.serve(async (req) => {
 
     const { data: bfCfg } = await admin
       .from('hotel_breakfast_configs')
-      .select('currency, pms_service_id, pms_tax_code')
+      .select('currency, pms_service_id, pms_tax_code, included_rate_plan_ids')
       .eq('hotel_id', hotel_id)
       .maybeSingle()
     const currency = bfCfg?.currency || 'EUR'
+    // Plans tarifaires (rate plans) du PMS marqués « petit-déjeuner inclus » par l'admin.
+    const includedRatePlanIds = new Set<string>(
+      ((bfCfg?.included_rate_plan_ids as string[] | null) || [])
+        .map((v) => String(v).trim().toLowerCase())
+        .filter(Boolean),
+    )
 
     // ─── FETCH PRODUCTS / PRESTATIONS MODE ────────────────────────
     // Returns the breakfast prestations directly from the PMS (single config),
@@ -693,14 +748,37 @@ Deno.serve(async (req) => {
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
       if (config.pms_type === 'mews') {
-        const rooms = await fetchMewsRooms(creds)
+        const rooms = await fetchMewsRooms(creds, includedRatePlanIds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', rooms }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
         const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
-        const rooms = await fetchApaleoRooms(token, propertyId!)
+        const rooms = await fetchApaleoRooms(token, propertyId!, includedRatePlanIds)
         return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rooms }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+    // ─── FETCH RATE PLANS MODE ────────────────────────────────────
+    // Renvoie tous les plans tarifaires du PMS pour que l'admin coche ceux
+    // qui incluent le petit-déjeuner.
+    if (mode === 'fetch_rate_plans') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: noConfigMessage, rate_plans: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const ratePlans = await fetchMewsRatePlans(creds)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', rate_plans: ratePlans }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
+        const ratePlans = await fetchApaleoRatePlans(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rate_plans: ratePlans }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
