@@ -107,6 +107,12 @@ export function IntegrationsTab({ currentHotelId }: IntegrationsTabProps) {
   const toggleEvent = (value: string) =>
     setEvents((prev) => (prev.includes(value) ? prev.filter((e) => e !== value) : [...prev, value]));
 
+  const allSelected = events.length === WEBHOOK_EVENTS.length;
+  const toggleAllEvents = () =>
+    setEvents(allSelected ? [] : WEBHOOK_EVENTS.map((e) => e.value));
+
+  const activePreset = PROVIDER_PRESETS.find((p) => p.value === provider) ?? PROVIDER_PRESETS[0];
+
   const handleCreate = async () => {
     if (!url.trim()) { toast.error("L'URL du webhook est requise"); return; }
     if (events.length === 0) { toast.error("Sélectionnez au moins un événement"); return; }
