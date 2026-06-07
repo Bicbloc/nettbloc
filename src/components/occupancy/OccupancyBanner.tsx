@@ -19,13 +19,15 @@ interface OccupancyBannerProps {
  */
 export function OccupancyBanner({ hotelId, canRefresh = false, className }: OccupancyBannerProps) {
   const { today, loading, refreshing, refresh } = useOccupancyForecast(hotelId, { autoRefresh: canRefresh });
+  const { clean, dirty, total: roomsTotal } = useRoomCleanliness(hotelId);
 
   if (!hotelId) return null;
-  if (!today && !loading && !canRefresh) return null;
+  if (!today && !loading && !canRefresh && roomsTotal === 0) return null;
 
   const rate = today?.occupancy_rate ?? 0;
   const occupied = today?.occupied_rooms ?? 0;
   const total = today?.total_rooms ?? 0;
+  const cleanPct = roomsTotal > 0 ? Math.round((clean / roomsTotal) * 100) : 0;
 
   return (
     <Card className={cn('overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10', className)}>
