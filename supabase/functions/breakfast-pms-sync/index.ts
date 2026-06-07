@@ -699,14 +699,37 @@ Deno.serve(async (req) => {
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
       if (config.pms_type === 'mews') {
-        const rooms = await fetchMewsRooms(creds)
+        const rooms = await fetchMewsRooms(creds, includedRatePlanIds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', rooms }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
         const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
-        const rooms = await fetchApaleoRooms(token, propertyId!)
+        const rooms = await fetchApaleoRooms(token, propertyId!, includedRatePlanIds)
         return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rooms }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+    // ─── FETCH RATE PLANS MODE ────────────────────────────────────
+    // Renvoie tous les plans tarifaires du PMS pour que l'admin coche ceux
+    // qui incluent le petit-déjeuner.
+    if (mode === 'fetch_rate_plans') {
+      if (!config) {
+        return new Response(JSON.stringify({
+          ok: false, message: noConfigMessage, rate_plans: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      if (config.pms_type === 'mews') {
+        const ratePlans = await fetchMewsRatePlans(creds)
+        return new Response(JSON.stringify({ ok: true, pms: 'mews', rate_plans: ratePlans }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else {
+        const propertyId = creds.propertyId || config.property_id
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
+        const ratePlans = await fetchApaleoRatePlans(token, propertyId!)
+        return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rate_plans: ratePlans }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
