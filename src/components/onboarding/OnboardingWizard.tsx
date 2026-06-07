@@ -41,11 +41,38 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasExistingName, setHasExistingName] = useState(false);
   const [info, setInfo] = useState<OnboardingInfo>({
     companyName: '',
     contactName: '',
     phone: '',
   });
+
+  // Préremplir avec les infos déjà connues (profil + métadonnées du compte)
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    const loadExisting = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_name, billing_contact_name, billing_phone')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const metaName =
+        (user.user_metadata?.full_name as string) ||
+        (user.user_metadata?.name as string) ||
+        '';
+      const existingName = profile?.billing_contact_name || metaName || '';
+
+      setHasExistingName(existingName.trim().length > 2);
+      setInfo(prev => ({
+        companyName: profile?.company_name || prev.companyName,
+        contactName: existingName || prev.contactName,
+        phone: profile?.billing_phone || prev.phone,
+      }));
+    };
+    loadExisting();
+  }, [isOpen, user]);
 
   const updateField = (field: keyof OnboardingInfo, value: string) => {
     setInfo(prev => ({ ...prev, [field]: value }));
