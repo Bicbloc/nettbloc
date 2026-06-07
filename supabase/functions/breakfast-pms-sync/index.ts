@@ -707,7 +707,7 @@ Deno.serve(async (req) => {
 
     if (!config) {
       return new Response(
-        JSON.stringify({ error: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel', sent: 0, failed: 0 }),
+        JSON.stringify({ error: noConfigMessage, sent: 0, failed: 0 }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
