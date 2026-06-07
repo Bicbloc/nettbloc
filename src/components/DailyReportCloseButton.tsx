@@ -285,7 +285,27 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+
+        {/* Récapitulatif d'archivage par e-mail (optionnel) */}
+        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+          <Label htmlFor="recap-email" className="flex items-center gap-2 text-sm font-medium">
+            <Mail className="h-4 w-4 text-primary" />
+            Recevoir le récapitulatif par e-mail (optionnel)
+          </Label>
+          <Input
+            id="recap-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="ex : direction@hotel.com"
+            value={recapEmail}
+            onChange={(e) => setRecapEmail(e.target.value)}
+            disabled={isClosing}
+          />
+          <p className="text-xs text-muted-foreground">
+            Un récapitulatif de l'archivage (avec le lien du rapport PDF) sera envoyé à cette adresse au moment de la clôture.
+          </p>
+        </div>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
           <AlertDialogAction onClick={handleCloseDay} className="bg-destructive hover:bg-destructive/90">
             Confirmer la clôture
