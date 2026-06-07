@@ -76,13 +76,16 @@ export default function CafetiereWork() {
   const loadAll = useCallback(async () => {
     if (!hotelId) { setLoading(false); return; }
     setLoading(true);
-    // Les chambres proviennent OBLIGATOIREMENT du registre des chambres
-    // (alimenté en temps réel par la connexion API PMS configurée dans « Chambres »).
-    const [{ data: roomData }, cfg, pmsOk] = await Promise.all([
+    const [{ data: roomData }, { data: pendingRooms }, cfg, pmsOk] = await Promise.all([
       supabase.from('hotel_rooms_registry')
         .select('room_number')
         .eq('hotel_id', hotelId)
         .eq('is_active', true)
+        .order('room_number'),
+      supabase.from('pms_pending_rooms')
+        .select('room_number')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'pending')
         .order('room_number'),
       loadBreakfastConfig(hotelId),
       hasActivePmsConfig(hotelId),
@@ -102,34 +105,31 @@ export default function CafetiereWork() {
       }
     }
 
-    let list: SimpleRoom[];
-    if (hasPmsRooms) {
-      // Source principale : les chambres en séjour remontées par le PMS.
-      list = Object.values(pmsMap)
-        .map((r) => ({
-          room_number: r.room_number,
-          breakfast_included: r.breakfast_included,
-          guest_name: r.guest_name,
-          occupied: true,
-          status: r.status,
-          check_in: r.check_in,
-          check_out: r.check_out,
-          pms_comment: r.comment,
-        }))
-        .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
-    } else {
-      // Repli : registre des chambres (aucune occupation PMS disponible).
-      list = (roomData || []).map((r) => ({
-        room_number: r.room_number,
-        breakfast_included: false,
-        guest_name: null,
-        occupied: false,
-        status: null,
-        check_in: null,
-        check_out: null,
-        pms_comment: null,
-      }));
-    }
+    const roomNumbers = Array.from(new Set([
+      ...(roomData || []).map((r) => r.room_number),
+      ...(pendingRooms || []).map((r) => r.room_number),
+      ...Object.values(pmsMap).map((r) => r.room_number),
+    ]));
+
+    const list: SimpleRoom[] = roomNumbers
+      .map((roomNumber) => {
+        const pmsRoom = pmsMap[String(roomNumber).trim().toLowerCase()];
+        return {
+          room_number: roomNumber,
+          breakfast_included: pmsRoom?.breakfast_included ?? false,
+          guest_name: pmsRoom?.guest_name ?? null,
+          occupied: pmsRoom?.occupied ?? false,
+          status: pmsRoom?.status ?? null,
+          check_in: pmsRoom?.check_in ?? null,
+          check_out: pmsRoom?.check_out ?? null,
+          pms_comment: pmsRoom?.comment ?? null,
+        };
+      })
+      .sort((a, b) => {
+        if (a.occupied !== b.occupied) return a.occupied ? -1 : 1;
+        return a.room_number.localeCompare(b.room_number, undefined, { numeric: true });
+      });
+
     setRooms(list);
     setConfig(cfg);
     setPmsConfigured(pmsOk);

@@ -4,7 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Check, X, DoorClosed, Loader2 } from 'lucide-react';
+import { Check, X, DoorClosed, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PendingRoom {
   id: string;
@@ -24,6 +24,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     if (!hotelId) return;
@@ -136,18 +137,18 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           {rooms.length > 0 && (
             <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
               {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-              Tout valider
+              Tout ajouter
             </Button>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Ces chambres ont été synchronisées pour les opérations du jour mais ne sont pas encore dans le registre permanent. Validez leur ajout ou ignorez-les.
+          Ces chambres ont été synchronisées pour les opérations du jour mais ne sont pas encore dans le registre permanent. Ajoutez-les au registre ou ignorez-les.
         </p>
         {loading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
-        ) : (
+        ) : expanded ? (
           <div className="space-y-2">
             {rooms.map(room => (
               <div key={room.id} className="flex items-center justify-between gap-2 rounded-md border bg-background p-2">
@@ -168,6 +169,17 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
               </div>
             ))}
           </div>
+        ) : null}
+
+        {!loading && rooms.length > 0 && (
+          <Button
+            variant="ghost"
+            className="w-full gap-2"
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? 'Voir moins' : 'Voir plus'}
+          </Button>
         )}
       </div>
     </>
