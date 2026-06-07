@@ -7,7 +7,14 @@ interface PmsCredentials {
   propertyId?: string
   clientToken?: string
   accessToken?: string
+  refreshToken?: string
   baseUrl?: string
+}
+
+// Contexte de persistance pour stocker un refresh token Apaleo renouvelé.
+interface ApaleoPersistCtx {
+  admin: ReturnType<typeof createClient>
+  hotelId: string
 }
 
 interface BreakfastItem {
