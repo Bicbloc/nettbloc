@@ -115,6 +115,7 @@ export function LostItemReportWizard({
   guestArrival,
   guestDeparture,
   guestStaying,
+  guestCheckedOut,
   trigger,
   onSuccess,
 }: LostItemReportWizardProps) {
