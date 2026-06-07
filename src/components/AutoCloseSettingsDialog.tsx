@@ -39,13 +39,14 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
   const [enabled, setEnabled] = useState(false);
   const [time, setTime] = useState('23:00');
   const [days, setDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [recapEmail, setRecapEmail] = useState('');
 
   useEffect(() => {
     if (!open || !hotelId) return;
     setLoading(true);
     supabase
       .from('hotels')
-      .select('auto_close_enabled, auto_close_time, auto_close_days')
+      .select('auto_close_enabled, auto_close_time, auto_close_days, auto_close_recap_email')
       .eq('id', hotelId)
       .single()
       .then(({ data }) => {
@@ -53,10 +54,12 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
           setEnabled(!!data.auto_close_enabled);
           setTime((data.auto_close_time || '23:00').slice(0, 5));
           setDays(data.auto_close_days || [0, 1, 2, 3, 4, 5, 6]);
+          setRecapEmail((data as any).auto_close_recap_email || '');
         }
         setLoading(false);
       });
   }, [open, hotelId]);
+
 
   const toggleDay = (value: number) => {
     setDays((prev) =>
