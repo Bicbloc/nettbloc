@@ -72,7 +72,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
 
   const handleShare = async () => {
     if (!selected) {
-      toast.error('Choisissez une cafetière à qui partager les chambres.');
+      toast.error('Choisissez un membre du personnel à qui partager les chambres.');
       return;
     }
     setSharing(true);
@@ -111,7 +111,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       toast.error("Échec du partage des chambres");
       return;
     }
-    const name = profiles.find((p) => p.id === selected)?.name || 'Cafetière';
+    const name = profiles.find((p) => p.id === selected)?.name || 'Personnel';
     toast.success(`Chambres partagées avec ${name}`);
     setSelected('');
     load();
@@ -126,7 +126,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
       toast.error('Échec de la révocation');
       return;
     }
-    toast.success(`Accès retiré à ${name || 'la cafetière'}`);
+    toast.success(`Accès retiré à ${name || 'le personnel'}`);
     load();
   };
 
