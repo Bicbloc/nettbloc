@@ -1557,6 +1557,7 @@ export type Database = {
           default_included: boolean
           hotel_id: string
           id: string
+          included_rate_plan_ids: string[]
           is_active: boolean
           pms_service_id: string | null
           pms_tax_code: string | null
@@ -1571,6 +1572,7 @@ export type Database = {
           default_included?: boolean
           hotel_id: string
           id?: string
+          included_rate_plan_ids?: string[]
           is_active?: boolean
           pms_service_id?: string | null
           pms_tax_code?: string | null
@@ -1585,6 +1587,7 @@ export type Database = {
           default_included?: boolean
           hotel_id?: string
           id?: string
+          included_rate_plan_ids?: string[]
           is_active?: boolean
           pms_service_id?: string | null
           pms_tax_code?: string | null
