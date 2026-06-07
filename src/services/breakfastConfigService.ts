@@ -117,6 +117,7 @@ export async function saveBreakfastConfig(config: BreakfastConfig): Promise<bool
     default_included: config.default_included,
     pms_service_id: config.pms_service_id,
     pms_tax_code: config.pms_tax_code,
+    included_rate_plan_ids: config.included_rate_plan_ids ?? [],
   };
 
   const { data: existing } = await supabase
