@@ -355,7 +355,10 @@ interface PmsRoom {
 const BREAKFAST_RE = /breakfast|petit.?d[eé]j|petit.?dej|p\.?d\.?j|déjeuner|dejeuner|\bb&b\b|\bbb\b|bed.*breakfast/i
 
 // Build the room occupancy + breakfast-inclusion list for in-house guests today (Mews).
-async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
+async function fetchMewsRooms(
+  creds: PmsCredentials,
+  includedRatePlanIds: Set<string> = new Set(),
+): Promise<PmsRoom[]> {
   const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
   const auth = mewsAuth(creds)
   const today = new Date().toISOString().split('T')[0]
@@ -399,10 +402,13 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
     else if (checkIn === today) status = 'arrival'
     const comment = [r.Notes, r.ChannelManagerNumber ? null : null]
       .filter(Boolean).join(' ').trim() || null
+    const rateId = String(r.RateId || '').trim().toLowerCase()
+    const byRatePlan = rateId ? includedRatePlanIds.has(rateId) : false
+    const byCharge = account ? breakfastAccounts.has(account) : false
     rooms.push({
       room_number: String(name).trim(),
       occupied: true,
-      breakfast_included: account ? breakfastAccounts.has(account) : false,
+      breakfast_included: byCharge || byRatePlan,
       guest_name: account ? (customerName[account] || null) : null,
       status,
       check_in: checkIn,
@@ -411,6 +417,23 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
     })
   }
   return rooms
+}
+
+// Tous les plans tarifaires (rates) Mews de l'établissement.
+async function fetchMewsRatePlans(creds: PmsCredentials): Promise<PmsRatePlan[]> {
+  const baseUrl = creds.baseUrl || 'https://api.mews.com/api/connector/v1'
+  const res = await mewsFetch(`${baseUrl}/rates/getAll`, { ...mewsAuth(creds) })
+  if (!res.ok) throw new Error(`Mews rates/getAll [${res.status}]: ${await res.text()}`)
+  const data = await res.json()
+  const pickName = (names: Record<string, string> | undefined, fallback?: string) =>
+    (names && (names['fr-FR'] || names['en-US'] || Object.values(names)[0])) || fallback || ''
+  return (data.Rates || [])
+    .filter((r: any) => r.IsActive !== false)
+    .map((r: any) => ({
+      id: String(r.Id),
+      code: null,
+      name: pickName(r.Names, r.Name) || String(r.Id),
+    }))
 }
 
 // Apaleo rooms with breakfast inclusion detected from reservation services
