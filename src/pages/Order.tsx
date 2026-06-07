@@ -27,6 +27,12 @@ import { useHotel } from "@/contexts/HotelContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
+import { useOccupancyForecast } from "@/hooks/use-occupancy-forecast";
+
+/** Besoin recommandé de femmes de chambre selon la formule métier : (départs × 1.5 + recouches) / 11 */
+function housekeepersNeeded(departures: number, stayovers: number): number {
+  return Math.max(1, Math.ceil((departures * 1.5 + stayovers) / 11));
+}
 
 export default function Order() {
   const navigate = useNavigate();
