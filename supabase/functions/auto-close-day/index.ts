@@ -13,7 +13,9 @@ interface HotelRow {
   auto_close_days: number[]; // 0=Sunday ... 6=Saturday
   auto_close_timezone: string;
   last_auto_close_date: string | null;
+  auto_close_recap_email: string | null;
 }
+
 
 // Returns { date: "YYYY-MM-DD", dow: 0-6, minutes: minutesSinceMidnight } in the given timezone
 function nowInTimezone(timeZone: string) {
