@@ -880,6 +880,12 @@ const IndexDashboard = () => {
 
         {!isGuestMode && currentHotelId && (
           <div className="mt-6">
+            <OccupancyBanner hotelId={currentHotelId} canRefresh />
+          </div>
+        )}
+
+        {!isGuestMode && currentHotelId && (
+          <div className="mt-6">
             <NewDayBanner
               hotelId={currentHotelId}
               roomsEmpty={rooms.length === 0}
