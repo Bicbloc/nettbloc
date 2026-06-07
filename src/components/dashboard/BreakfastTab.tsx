@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
   BreakfastConfig, BreakfastType, loadBreakfastConfig, saveBreakfastConfig, testPmsConnectivity,
-  fetchPmsProducts, fetchPmsRooms, PmsProduct, PmsRoom,
+  fetchPmsProducts, fetchPmsRooms, fetchPmsRatePlans, PmsProduct, PmsRoom, PmsRatePlan,
 } from '@/services/breakfastConfigService';
 import { BreakfastBilledSection } from '@/components/dashboard/BreakfastBilledSection';
 import { CafetiereShareCard } from '@/components/dashboard/CafetiereShareCard';
