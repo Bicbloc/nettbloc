@@ -176,7 +176,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
                     <Check className="h-3 w-3" /> Partagé
                   </Badge>
                   <span className="font-medium">
-                    {s.cafetiere_profiles?.name || s.cafetiere_profiles?.email || 'Cafetière'}
+                    {s.cafetiere_profiles?.name || s.cafetiere_profiles?.email || 'Personnel'}
                   </span>
                 </div>
                 <Button
