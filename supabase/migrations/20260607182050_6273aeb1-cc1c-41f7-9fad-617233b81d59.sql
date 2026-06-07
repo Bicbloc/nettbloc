@@ -1,0 +1,1 @@
+UPDATE public.breakfast_logs SET pms_status = 'pending', sent_items = '[]'::jsonb WHERE id = 'a5083867-dfb3-4732-9ea8-edd8ba5523fb';
