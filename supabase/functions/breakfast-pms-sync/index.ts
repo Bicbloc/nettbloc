@@ -413,10 +413,15 @@ async function fetchMewsRooms(creds: PmsCredentials): Promise<PmsRoom[]> {
   return rooms
 }
 
-// Apaleo rooms with breakfast inclusion detected from reservation services.
-async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsRoom[]> {
+// Apaleo rooms with breakfast inclusion detected from reservation services
+// and/or the rate plans flagged "breakfast included" by the admin.
+async function fetchApaleoRooms(
+  token: string,
+  propertyId: string,
+  includedRatePlanIds: Set<string> = new Set(),
+): Promise<PmsRoom[]> {
   const res = await fetch(
-    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices,services,booker`,
+    `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices,services,booker,ratePlan`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
   )
   if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
@@ -429,14 +434,18 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     const unitName = apaleoUnitName(r)
     if (!unitName) continue
     const services = r.services || []
-    const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
+    const byService = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
+    // Inclusion par plan tarifaire choisi par l'admin (id ou code).
+    const rpId = String(r.ratePlan?.id || r.ratePlanId || '').trim().toLowerCase()
+    const rpCode = String(r.ratePlan?.code || '').trim().toLowerCase()
+    const byRatePlan = (rpId && includedRatePlanIds.has(rpId)) || (rpCode && includedRatePlanIds.has(rpCode))
     const guest = `${r.primaryGuest?.lastName || ''} ${r.primaryGuest?.firstName || ''}`.trim()
     const checkIn = r.arrival?.split('T')[0] || null
     const checkOut = r.departure?.split('T')[0] || null
     rooms.push({
       room_number: String(unitName).trim(),
       occupied: true,
-      breakfast_included: breakfast,
+      breakfast_included: byService || byRatePlan,
       guest_name: guest || null,
       status: 'inhouse',
       check_in: checkIn,
@@ -445,6 +454,23 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
     })
   }
   return rooms
+}
+
+interface PmsRatePlan { id: string; code: string | null; name: string }
+
+// Tous les plans tarifaires Apaleo de l'établissement.
+async function fetchApaleoRatePlans(token: string, propertyId: string): Promise<PmsRatePlan[]> {
+  const res = await fetch(
+    `https://api.apaleo.com/rateplan/v1/rate-plans?propertyId=${propertyId}&pageSize=200`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+  )
+  if (!res.ok) throw new Error(`Récupération plans tarifaires Apaleo échouée [${res.status}]`)
+  const data = await res.json()
+  return (data.ratePlans || []).map((rp: any) => ({
+    id: String(rp.id),
+    code: rp.code ? String(rp.code) : null,
+    name: String(rp.name || rp.code || rp.id),
+  }))
 }
 
 // Guests (room + name + stay dates) for the Lost & Found feature: includes
