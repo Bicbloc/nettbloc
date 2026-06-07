@@ -149,8 +149,13 @@ const RoomRegistry = () => {
       setSelectedIds(new Set());
       toast({ title: "Suppression effectuée", description: `${selectedIds.size} espace(s) supprimé(s)` });
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
+    onError: (error: any) => {
+      console.error('Bulk delete registry error:', error);
+      toast({
+        title: "Erreur",
+        description: error?.message || "Impossible de supprimer",
+        variant: "destructive",
+      });
     },
   });
 
