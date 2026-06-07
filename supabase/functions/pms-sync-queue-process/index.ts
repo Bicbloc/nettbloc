@@ -60,24 +60,43 @@ function mapStatusToMewsState(status: string): 'Clean' | 'Inspected' | 'Dirty' |
 // Apaleo helpers
 // ─────────────────────────────────────────────────────────────────
 
+// Cache de token Apaleo (par clientId) pour éviter le throttling du
+// endpoint connect/token (sinon 400 invalid_client).
+const apaleoTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
 async function getApaleoToken(creds: PmsCredentials): Promise<string> {
-  if (!creds.clientId || !creds.clientSecret) {
+  const clientId = (creds.clientId || '').trim();
+  const clientSecret = (creds.clientSecret || '').trim();
+  if (!clientId || !clientSecret) {
     throw new Error('Client ID / Client Secret Apaleo manquants');
   }
-  const res = await fetch('https://identity.apaleo.com/connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-    }),
-  });
+  const cached = apaleoTokenCache.get(clientId);
+  if (cached && cached.expiresAt - 60_000 > Date.now()) {
+    return cached.token;
+  }
+  const requestToken = async () => {
+    return await fetch('https://identity.apaleo.com/connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+  };
+  let res = await requestToken();
+  if (res.status === 400 || res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1200));
+    res = await requestToken();
+  }
   if (!res.ok) {
     throw new Error(`Auth Apaleo échouée [${res.status}]: ${await res.text()}`);
   }
   const data = await res.json();
   if (!data.access_token) throw new Error('Token Apaleo non reçu');
+  const ttlMs = (Number(data.expires_in) || 3600) * 1000;
+  apaleoTokenCache.set(clientId, { token: data.access_token, expiresAt: Date.now() + ttlMs });
   return data.access_token;
 }
 
