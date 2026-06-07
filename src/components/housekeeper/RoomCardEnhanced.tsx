@@ -24,6 +24,7 @@ interface Room {
   guest_arrival?: GuestInfo;
   guest_departure?: GuestInfo;
   guest_staying?: GuestInfo;
+  guest_checked_out?: GuestInfo;
 }
 
 interface RoomCardEnhancedProps {
