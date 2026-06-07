@@ -185,10 +185,11 @@ export class RoomArchiveService {
                   count_method: e.count_method
                 }))
               }))
-            }
+            },
+            breakfast_billing: breakfastSummary
           },
           total_rooms_cleaned: currentRooms.filter(r => r.status === 'clean').length,
-          notes: `${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s), ${linenTasksData.length} inventaire(s) linge`
+          notes: `${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s), ${linenTasksData.length} inventaire(s) linge, ${breakfastData.length} petit(s)-déjeuner(s)`
         };
         
         const { error: archiveError } = await supabase
