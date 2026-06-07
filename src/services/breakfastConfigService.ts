@@ -65,6 +65,7 @@ const DEFAULT_CONFIG = (hotelId: string): BreakfastConfig => ({
   default_included: false,
   pms_service_id: null,
   pms_tax_code: null,
+  included_rate_plan_ids: [],
 });
 
 export function todayDate(): string {
