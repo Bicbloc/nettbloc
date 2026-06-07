@@ -40,6 +40,7 @@ export default function Order() {
   const { hotelId, hotelName, hotelCode } = useHotel();
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { days: forecastDays } = useOccupancyForecast(hotelId);
 
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date>(addDays(new Date(), 1));
