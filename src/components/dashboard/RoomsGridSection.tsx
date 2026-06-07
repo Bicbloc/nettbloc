@@ -87,7 +87,7 @@ export function RoomsGridSection({
       case 'dirty': return 'Chambres à nettoyer';
       case 'stayover': return 'Chambres recouche';
       case 'checkout': return 'Chambres client sorti';
-      case 'dnd': return 'Chambres "Ne pas déranger"';
+      case 'dnd': return 'DND rooms';
       default: return 'Toutes les chambres';
     }
   };
