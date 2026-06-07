@@ -328,7 +328,8 @@ export default function Order() {
           subject,
           body: emailContent,
           hotelName: hotelName || 'Hôtel',
-          hotelEmail: hotel?.email
+          hotelEmail: hotel?.email,
+          weekForecast: weekForecastRows,
         }
       });
 
