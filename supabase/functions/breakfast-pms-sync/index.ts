@@ -114,13 +114,17 @@ async function postApaleoCharge(
   // incompatibilité de devise, ex. folio en GBP vs config en EUR).
   const folioCurrency = folio?.balance?.currency || currency
 
-  const chargeRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${folioId}/charges`, {
+  // Endpoint correct = `finance/v1/folio-actions/{folioId}/charges` (l'ancien
+  // `folios/{id}/charges` renvoie 404). `vatType` est requis AU NIVEAU RACINE
+  // de la charge (pas dans `amount`), sinon Apaleo renvoie 422.
+  const chargeRes = await fetch(`https://api.apaleo.com/finance/v1/folio-actions/${folioId}/charges`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       serviceType: 'FoodAndBeverages',
       name,
       quantity,
+      vatType: 'Normal',
       amount: { amount, currency: folioCurrency },
     }),
   })
