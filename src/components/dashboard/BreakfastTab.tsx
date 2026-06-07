@@ -24,6 +24,7 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger,
 } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
