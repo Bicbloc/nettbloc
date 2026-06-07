@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Calendar, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Loader2, CheckCircle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { storageService } from '@/services/storageService';
@@ -19,6 +21,8 @@ interface DailyReportCloseButtonProps {
   hideTrigger?: boolean;
 }
 
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
 export function DailyReportCloseButton({ hotelId, onReportClosed, open: controlledOpen, onOpenChange, hideTrigger }: DailyReportCloseButtonProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -28,6 +32,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
   };
   const [isClosing, setIsClosing] = useState(false);
   const [closingStep, setClosingStep] = useState('');
+  const recapEmailKey = `closing_recap_email_${hotelId}`;
+  const [recapEmail, setRecapEmail] = useState('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(recapEmailKey);
+      if (saved) setRecapEmail(saved);
+    } catch { /* ignore */ }
+  }, [recapEmailKey]);
+
 
   const handleCloseDay = async () => {
     setIsClosing(true);
