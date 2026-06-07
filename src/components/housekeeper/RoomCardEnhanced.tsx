@@ -387,6 +387,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                   guestArrival={room.guest_arrival}
                   guestDeparture={room.guest_departure}
                   guestStaying={room.guest_staying}
+                  guestCheckedOut={room.guest_checked_out}
                   trigger={
                     <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un objet trouvé">
                       <Package className="h-5 w-5" />
