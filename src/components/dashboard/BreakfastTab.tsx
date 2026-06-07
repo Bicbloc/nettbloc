@@ -207,6 +207,34 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     setPreviewProducts(res.products);
   };
 
+  // Récupère tous les plans tarifaires du PMS afin que l'admin coche
+  // ceux qui signifient « petit-déjeuner inclus ».
+  const handleLoadRatePlans = async () => {
+    if (!currentHotelId) return;
+    setRatePlansLoading(true);
+    const res = await fetchPmsRatePlans(currentHotelId);
+    setRatePlansLoading(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Récupération des plans tarifaires impossible');
+      setRatePlans([]);
+      return;
+    }
+    setRatePlans(res.ratePlans);
+    if (res.ratePlans.length === 0) {
+      toast.warning('Aucun plan tarifaire trouvé dans le PMS.');
+    }
+  };
+
+  const toggleRatePlan = (id: string, checked: boolean) => {
+    if (!config) return;
+    const current = config.included_rate_plan_ids || [];
+    update({
+      included_rate_plan_ids: checked
+        ? Array.from(new Set([...current, id]))
+        : current.filter((v) => v !== id),
+    });
+  };
+
   // Les chambres proposées au petit-déjeuner incluent le registre permanent,
   // les nouvelles chambres PMS en attente de validation, et les chambres PMS en séjour.
   const availableRooms = [
