@@ -480,6 +480,7 @@ function GovernessDashboardContent() {
       <StaffNotificationBanner hotelId={selectedHotel?.id} />
 
       <main className="px-4 py-4 space-y-4">
+        {selectedHotel?.id && <OccupancyBanner hotelId={selectedHotel.id} />}
 
         {/* Demandes en attente */}
         {pendingRequests.length > 0 && (
