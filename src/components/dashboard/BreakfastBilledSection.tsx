@@ -73,6 +73,7 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
       included: false,
       items,
       loggedBy: 'Admin',
+      accumulate: true,
     });
     if (!ok) {
       setAdding(false);
