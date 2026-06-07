@@ -757,11 +757,15 @@ Deno.serve(async (req) => {
       }
       const { map } = await buildMewsReservationMap(creds)
       for (const log of logs) {
+        const delta = deltaItemsOf(log)
+        if (delta.length === 0) continue // Rien de nouveau à facturer.
         try {
           const match = map.get(String(log.room_number).trim().toLowerCase())
           if (!match) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          await postMewsOrder(creds, serviceId, match.customerId, match.reservationId, itemsOf(log), currency, bfCfg?.pms_tax_code || null)
-          await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
+          await postMewsOrder(creds, serviceId, match.customerId, match.reservationId, delta, currency, bfCfg?.pms_tax_code || null)
+          await admin.from('breakfast_logs')
+            .update({ pms_status: 'sent', sent_items: itemsOf(log) as unknown as never })
+            .eq('id', log.id)
           sent++
         } catch (e) {
           console.error('mews order error', log.room_number, e)
