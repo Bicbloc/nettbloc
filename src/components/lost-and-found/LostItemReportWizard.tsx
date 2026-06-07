@@ -55,6 +55,7 @@ export interface LostItemReportWizardProps {
   guestArrival?: GuestInfo;
   guestDeparture?: GuestInfo;
   guestStaying?: GuestInfo;
+  guestCheckedOut?: GuestInfo;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
@@ -114,6 +115,7 @@ export function LostItemReportWizard({
   guestArrival,
   guestDeparture,
   guestStaying,
+  guestCheckedOut,
   trigger,
   onSuccess,
 }: LostItemReportWizardProps) {
@@ -166,10 +168,11 @@ export function LostItemReportWizard({
   }, []);
 
   const fallbackGuestOptions = useMemo(() => [
+    guestCheckedOut ? { key: 'checked_out', label: 'Parti (check-out)', info: guestCheckedOut } : null,
     guestDeparture ? { key: 'departure', label: 'Départ (check-out)', info: guestDeparture } : null,
     guestStaying ? { key: 'staying', label: 'En cours (séjour)', info: guestStaying } : null,
     guestArrival ? { key: 'arrival', label: 'Arrivée', info: guestArrival } : null,
-  ].filter(Boolean) as RoomGuestOption[], [guestArrival, guestDeparture, guestStaying]);
+  ].filter(Boolean) as RoomGuestOption[], [guestArrival, guestDeparture, guestStaying, guestCheckedOut]);
 
   const shouldUseFallbackGuestOptions =
     !!defaultRoomNumber && roomNumber.trim().toLowerCase() === defaultRoomNumber.trim().toLowerCase();
@@ -962,7 +965,7 @@ export function LostItemReportWizard({
                           <RadioGroupItem value={guest.key} id={`wizard-guest-${guest.key}`} />
                           <label htmlFor={`wizard-guest-${guest.key}`} className="flex-1 cursor-pointer text-sm">
                             <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 {guest.key === 'departure' ? (
                                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                                 ) : guest.key === 'arrival' ? (
@@ -971,6 +974,9 @@ export function LostItemReportWizard({
                                   <User className="h-4 w-4 text-muted-foreground" />
                                 )}
                                 <span className="font-medium">{guest.label}</span>
+                                {guest.key === 'checked_out' && (
+                                  <Badge variant="secondary" className="text-[10px]">Déjà parti</Badge>
+                                )}
                                 <span className="text-muted-foreground">
                                   {guest.info.firstName} {guest.info.lastName}
                                 </span>
