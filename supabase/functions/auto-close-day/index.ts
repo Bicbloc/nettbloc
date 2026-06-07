@@ -13,7 +13,9 @@ interface HotelRow {
   auto_close_days: number[]; // 0=Sunday ... 6=Saturday
   auto_close_timezone: string;
   last_auto_close_date: string | null;
+  auto_close_recap_email: string | null;
 }
+
 
 // Returns { date: "YYYY-MM-DD", dow: 0-6, minutes: minutesSinceMidnight } in the given timezone
 function nowInTimezone(timeZone: string) {
@@ -210,7 +212,7 @@ Deno.serve(async (req) => {
   try {
     const { data: hotels, error } = await supabase
       .from('hotels')
-      .select('id, name, auto_close_enabled, auto_close_time, auto_close_days, auto_close_timezone, last_auto_close_date')
+      .select('id, name, auto_close_enabled, auto_close_time, auto_close_days, auto_close_timezone, last_auto_close_date, auto_close_recap_email')
       .eq('auto_close_enabled', true);
 
     if (error) throw error;
@@ -230,11 +232,33 @@ Deno.serve(async (req) => {
       try {
         const summary = await closeHotelDay(supabase, hotel.id, date);
         await supabase.from('hotels').update({ last_auto_close_date: date }).eq('id', hotel.id);
+
+        // Envoi du récapitulatif d'archivage par e-mail si configuré
+        if (hotel.auto_close_recap_email) {
+          try {
+            await supabase.functions.invoke('send-archive-recap', {
+              body: {
+                to: hotel.auto_close_recap_email,
+                hotelName: hotel.name,
+                reportDate: date,
+                summary: {
+                  roomsArchived: summary.rooms,
+                  assignmentsCleared: summary.assignments,
+                  linenTasksArchived: summary.linenTasks,
+                },
+              },
+            });
+          } catch (mailErr) {
+            console.error(`Erreur envoi récap hôtel ${hotel.id}:`, mailErr);
+          }
+        }
+
         results.push({ hotel_id: hotel.id, name: hotel.name, closed: true, ...summary });
       } catch (e) {
         console.error(`Erreur clôture hôtel ${hotel.id}:`, e);
         results.push({ hotel_id: hotel.id, name: hotel.name, closed: false, error: String(e) });
       }
+
     }
 
     return new Response(JSON.stringify({ processed: results.length, results }), {

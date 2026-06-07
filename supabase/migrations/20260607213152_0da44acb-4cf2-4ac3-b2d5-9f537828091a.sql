@@ -1,0 +1,1 @@
+ALTER TABLE public.hotels ADD COLUMN IF NOT EXISTS auto_close_recap_email text;

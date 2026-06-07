@@ -2202,6 +2202,7 @@ export type Database = {
           address: string | null
           auto_close_days: number[]
           auto_close_enabled: boolean
+          auto_close_recap_email: string | null
           auto_close_time: string
           auto_close_timezone: string
           created_at: string
@@ -2222,6 +2223,7 @@ export type Database = {
           address?: string | null
           auto_close_days?: number[]
           auto_close_enabled?: boolean
+          auto_close_recap_email?: string | null
           auto_close_time?: string
           auto_close_timezone?: string
           created_at?: string
@@ -2242,6 +2244,7 @@ export type Database = {
           address?: string | null
           auto_close_days?: number[]
           auto_close_enabled?: boolean
+          auto_close_recap_email?: string | null
           auto_close_time?: string
           auto_close_timezone?: string
           created_at?: string

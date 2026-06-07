@@ -39,13 +39,14 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
   const [enabled, setEnabled] = useState(false);
   const [time, setTime] = useState('23:00');
   const [days, setDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [recapEmail, setRecapEmail] = useState('');
 
   useEffect(() => {
     if (!open || !hotelId) return;
     setLoading(true);
     supabase
       .from('hotels')
-      .select('auto_close_enabled, auto_close_time, auto_close_days')
+      .select('auto_close_enabled, auto_close_time, auto_close_days, auto_close_recap_email')
       .eq('id', hotelId)
       .single()
       .then(({ data }) => {
@@ -53,10 +54,12 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
           setEnabled(!!data.auto_close_enabled);
           setTime((data.auto_close_time || '23:00').slice(0, 5));
           setDays(data.auto_close_days || [0, 1, 2, 3, 4, 5, 6]);
+          setRecapEmail((data as any).auto_close_recap_email || '');
         }
         setLoading(false);
       });
   }, [open, hotelId]);
+
 
   const toggleDay = (value: number) => {
     setDays((prev) =>
@@ -69,6 +72,11 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
       toast.error('Sélectionnez au moins un jour de clôture.');
       return;
     }
+    const trimmedEmail = recapEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error('Adresse e-mail de récapitulatif invalide.');
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from('hotels')
@@ -76,7 +84,8 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
         auto_close_enabled: enabled,
         auto_close_time: time.length === 5 ? `${time}:00` : time,
         auto_close_days: days,
-      })
+        auto_close_recap_email: trimmedEmail || null,
+      } as any)
       .eq('id', hotelId);
     setSaving(false);
     if (error) {
@@ -86,6 +95,7 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
     toast.success('Clôture automatique enregistrée.');
     setOpen(false);
   };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -148,6 +158,22 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
                 ))}
               </div>
             </div>
+
+            <div className={cn('space-y-2', !enabled && 'opacity-50 pointer-events-none')}>
+              <Label htmlFor="auto-close-recap-email">E-mail de récapitulatif (optionnel)</Label>
+              <Input
+                id="auto-close-recap-email"
+                type="email"
+                placeholder="exemple@hotel.com"
+                value={recapEmail}
+                onChange={(e) => setRecapEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Le récapitulatif d'archivage sera envoyé à cette adresse à chaque clôture automatique.
+              </p>
+            </div>
+
+
 
             <p className="text-xs text-muted-foreground">
               La clôture s'effectue selon le fuseau horaire de l'établissement, dans les 15 minutes
