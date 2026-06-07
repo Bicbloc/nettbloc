@@ -16,6 +16,56 @@ interface PmsCredentials {
   baseUrl?: string;
 }
 
+// ─── Cache de token Apaleo (par clientId) ─────────────────────────
+// Les tokens Apaleo durent ~1h. On les réutilise pour éviter de marteler
+// le endpoint `connect/token` (sinon Apaleo renvoie 400 invalid_client par
+// throttling lorsque plusieurs hôtels partagent le même client).
+const apaleoTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+async function getCachedApaleoToken(creds: PmsCredentials): Promise<string> {
+  const clientId = (creds.clientId || '').trim();
+  const clientSecret = (creds.clientSecret || '').trim();
+  if (!clientId || !clientSecret) {
+    throw new Error('Client ID et Client Secret Apaleo requis.');
+  }
+  const cacheKey = clientId;
+  const cached = apaleoTokenCache.get(cacheKey);
+  // Marge de sécurité de 60s avant expiration.
+  if (cached && cached.expiresAt - 60_000 > Date.now()) {
+    return cached.token;
+  }
+
+  const requestToken = async () => {
+    return await fetch('https://identity.apaleo.com/connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+  };
+
+  let res = await requestToken();
+  // Tolérance au throttling : une seconde tentative après un court délai.
+  if (res.status === 400 || res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1200));
+    res = await requestToken();
+  }
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Authentification Apaleo échouée [${res.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`);
+  }
+  const data = await res.json();
+  if (!data.access_token) {
+    throw new Error('Token Apaleo non reçu — vérifiez Client ID / Client Secret et les scopes du compte.');
+  }
+  const ttlMs = (Number(data.expires_in) || 3600) * 1000;
+  apaleoTokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + ttlMs });
+  return data.access_token;
+}
+
 interface ExtractedRoom {
   roomNumber: string;
   status: string;
@@ -279,27 +329,8 @@ async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedR
     throw new Error('Property ID Apaleo manquant.');
   }
 
-  // 1. Get OAuth token (scope requis pour accéder aux unités et réservations)
-  const tokenRes = await fetch('https://identity.apaleo.com/connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    const errBody = await tokenRes.text();
-    throw new Error(`Authentification Apaleo échouée [${tokenRes.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`);
-  }
-
-  const tokenData = await safeJson(tokenRes, 'Authentification Apaleo');
-  const access_token = tokenData.access_token;
-  if (!access_token) {
-    throw new Error('Token Apaleo non reçu — vérifiez Client ID / Client Secret et les scopes du compte.');
-  }
+  // 1. Get OAuth token (mis en cache pour éviter le throttling Apaleo)
+  const access_token = await getCachedApaleoToken(credentials);
 
   // 2. Fetch units (rooms)
   const unitsData = await getJson(

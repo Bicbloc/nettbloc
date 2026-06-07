@@ -27,20 +27,48 @@ interface PmsProduct {
 }
 
 // ─── Apaleo ────────────────────────────────────────────────────────
+// Cache de token Apaleo (par clientId). Les tokens durent ~1h. On les
+// réutilise pour éviter de marteler le endpoint `connect/token` (sinon
+// Apaleo renvoie 400 invalid_client par throttling quand plusieurs hôtels
+// partagent le même client, ou quand on appelle plusieurs fois par requête).
+const apaleoTokenCache = new Map<string, { token: string; expiresAt: number }>()
+
 async function getApaleoToken(creds: PmsCredentials): Promise<string> {
-  if (!creds.clientId || !creds.clientSecret) throw new Error('Identifiants Apaleo manquants')
-  const res = await fetch('https://identity.apaleo.com/connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-    }),
-  })
-  if (!res.ok) throw new Error(`Auth Apaleo échouée [${res.status}]`)
+  const clientId = (creds.clientId || '').trim()
+  const clientSecret = (creds.clientSecret || '').trim()
+  if (!clientId || !clientSecret) throw new Error('Identifiants Apaleo manquants')
+
+  const cached = apaleoTokenCache.get(clientId)
+  if (cached && cached.expiresAt - 60_000 > Date.now()) {
+    return cached.token
+  }
+
+  const requestToken = async () => {
+    return await fetch('https://identity.apaleo.com/connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    })
+  }
+
+  let res = await requestToken()
+  // Tolérance au throttling : une seconde tentative après un court délai.
+  if (res.status === 400 || res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1200))
+    res = await requestToken()
+  }
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Auth Apaleo échouée [${res.status}]: ${errBody || 'vérifiez Client ID / Client Secret'}`)
+  }
   const data = await res.json()
   if (!data.access_token) throw new Error('Token Apaleo non reçu')
+  const ttlMs = (Number(data.expires_in) || 3600) * 1000
+  apaleoTokenCache.set(clientId, { token: data.access_token, expiresAt: Date.now() + ttlMs })
   return data.access_token
 }
 
@@ -496,14 +524,22 @@ Deno.serve(async (req) => {
     }
     const date = log_date || new Date().toISOString().split('T')[0]
 
-    // PMS config
-    const { data: config } = await admin
+    // PMS config — on récupère toute config Apaleo/Mews (active ou non) pour
+    // pouvoir distinguer « aucune config » de « config désactivée ».
+    const { data: anyConfig } = await admin
       .from('hotel_pms_configs')
       .select('credentials, property_id, base_url, pms_type, is_active')
       .eq('hotel_id', hotel_id)
-      .eq('is_active', true)
       .in('pms_type', ['apaleo', 'mews'])
+      .order('is_active', { ascending: false })
+      .limit(1)
       .maybeSingle()
+
+    const config = anyConfig && anyConfig.is_active ? anyConfig : null
+    // Message précis selon la cause de l'absence de config exploitable.
+    const noConfigMessage = !anyConfig
+      ? 'Aucune configuration PMS (Apaleo/Mews) pour cet hôtel. Configurez-la dans Configuration PMS.'
+      : 'La configuration PMS de cet hôtel est désactivée. Activez-la dans Configuration PMS.'
 
     const { data: bfCfg } = await admin
       .from('hotel_breakfast_configs')
@@ -518,7 +554,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_products') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+          ok: false, message: noConfigMessage,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -547,7 +583,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_rooms') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', rooms: [],
+          ok: false, message: noConfigMessage, rooms: [],
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -570,7 +606,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_room_guests') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', guests: [],
+          ok: false, message: noConfigMessage, guests: [],
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -596,7 +632,7 @@ Deno.serve(async (req) => {
     if (mode === 'test') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, pms: null, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+          ok: false, pms: null, message: noConfigMessage,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -671,7 +707,7 @@ Deno.serve(async (req) => {
 
     if (!config) {
       return new Response(
-        JSON.stringify({ error: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel', sent: 0, failed: 0 }),
+        JSON.stringify({ error: noConfigMessage, sent: 0, failed: 0 }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }

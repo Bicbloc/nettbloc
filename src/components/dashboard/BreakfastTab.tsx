@@ -125,7 +125,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     if (res.ok) {
       toast.success(`Connexion ${String(res.pms || 'PMS').toUpperCase()} OK`);
     } else {
-      toast.error(res.error || 'Connexion PMS impossible');
+      toast.error((res.message as string) || res.error || 'Connexion PMS impossible');
     }
   };
 
