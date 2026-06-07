@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck } from 'lucide-react';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 interface GovernessInspectionInterfaceProps {
@@ -21,7 +21,16 @@ interface Room {
   status: string;
   cleaning_type: string;
   notes: string | null;
+  floor?: number | null;
   housekeeper_name?: string;
+}
+
+interface DailyGovAssignment {
+  id: string;
+  governess_name: string;
+  assignment_type: string;
+  assigned_floors: number[] | null;
+  assigned_housekeepers: string[] | null;
 }
 
 interface Inspection {
@@ -46,6 +55,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   governessId
 }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [govAssignments, setGovAssignments] = useState<DailyGovAssignment[]>([]);
   const [inspections, setInspections] = useState<Map<string, Inspection>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -59,6 +69,8 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   const loadData = useCallback(async () => {
     try {
+      const today = new Date().toISOString().split('T')[0];
+
       // Charger les chambres propres (à inspecter)
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
@@ -67,7 +79,8 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           room_number,
           status,
           cleaning_type,
-          notes
+          notes,
+          floor
         `)
         .eq('hotel_id', hotelId)
         .eq('status', 'clean')
@@ -91,8 +104,15 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       setRooms(roomsWithHousekeeper);
 
+      // Charger les attributions de gouvernantes du jour (par étage / femme de chambre)
+      const { data: govData } = await supabase
+        .from('daily_governess_assignments')
+        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers')
+        .eq('hotel_id', hotelId)
+        .eq('assignment_date', today);
+      setGovAssignments((govData as DailyGovAssignment[]) || []);
+
       // Charger les inspections du jour
-      const today = new Date().toISOString().split('T')[0];
       const { data: inspectionsData, error: inspectionsError } = await supabase
         .from('room_inspections')
         .select('*')
@@ -103,6 +123,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       const inspectionMap = new Map(inspectionsData?.map(i => [i.room_id, i]) || []);
       setInspections(inspectionMap);
+
 
     } catch (error) {
       console.error('Erreur chargement données:', error);
@@ -118,14 +139,14 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Realtime sync
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    if (table === 'rooms' || table === 'room_inspections') {
+    if (table === 'rooms' || table === 'room_inspections' || table === 'daily_governess_assignments') {
       loadData();
     }
   }, [loadData]);
 
   useRealtimeSync({
     hotelId,
-    tables: ['rooms', 'room_inspections'],
+    tables: ['rooms', 'room_inspections', 'daily_governess_assignments'],
     onUpdate: handleRealtimeUpdate
   });
 
@@ -259,6 +280,95 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     failed: Array.from(inspections.values()).filter(i => i.status === 'failed' || i.status === 'needs_rework').length
   };
 
+  // Détermine si une chambre relève d'une attribution de gouvernante donnée.
+  const roomMatchesAssignment = (room: Room, a: DailyGovAssignment): boolean => {
+    if (a.assignment_type === 'floor') {
+      const floors = (a.assigned_floors || []).map(Number);
+      return room.floor != null && floors.includes(Number(room.floor));
+    }
+    if (a.assignment_type === 'housekeeper') {
+      const hks = (a.assigned_housekeepers || []).map((h) => (h || '').trim().toLowerCase());
+      return !!room.housekeeper_name && hks.includes(room.housekeeper_name.trim().toLowerCase());
+    }
+    return false;
+  };
+
+  // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
+  const sections = useMemo(() => {
+    const result: { key: string; name: string; scope: string; rooms: Room[] }[] = [];
+    const claimed = new Set<string>();
+
+    for (const a of govAssignments) {
+      const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
+      sectionRooms.forEach((r) => claimed.add(r.id));
+      const scope =
+        a.assignment_type === 'floor'
+          ? `Étages : ${(a.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ') || '—'}`
+          : `Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ') || '—'}`;
+      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
+    }
+
+    const unassigned = rooms.filter((r) => !claimed.has(r.id));
+    if (unassigned.length > 0) {
+      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'Aucune gouvernante', rooms: unassigned });
+    }
+    return result;
+  }, [rooms, govAssignments]);
+
+  const renderRoomCard = (room: Room) => {
+    const inspection = getInspectionStatus(room.id);
+    const StatusIcon = inspection ? statusConfig[inspection.status].icon : Eye;
+    return (
+      <Card
+        key={room.id}
+        className={`cursor-pointer transition-all hover:shadow-lg ${
+          inspection?.status === 'passed' ? 'border-green-200 bg-green-50/50' :
+          inspection?.status === 'failed' ? 'border-red-200 bg-red-50/50' :
+          inspection?.status === 'needs_rework' ? 'border-orange-200 bg-orange-50/50' :
+          ''
+        }`}
+        onClick={() => openInspectionDialog(room)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Home className="h-5 w-5 text-muted-foreground" />
+              <span className="font-bold text-lg">{room.room_number}</span>
+            </div>
+            {inspection ? (
+              <Badge className={statusConfig[inspection.status].color}>
+                <StatusIcon className="h-3 w-3 mr-1" />
+                {statusConfig[inspection.status].label}
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                <Eye className="h-3 w-3 mr-1" />
+                À inspecter
+              </Badge>
+            )}
+          </div>
+
+          {room.housekeeper_name && (
+            <p className="text-sm text-muted-foreground mb-2">
+              Nettoyée par: {room.housekeeper_name}
+            </p>
+          )}
+
+          {inspection?.cleanliness_score && (
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map(star => (
+                <Star
+                  key={star}
+                  className={`h-4 w-4 ${star <= inspection.cleanliness_score! ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -297,7 +407,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Button>
       </div>
 
-      {/* Room list */}
+      {/* Room list grouped by governess */}
       {rooms.length === 0 ? (
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -307,63 +417,32 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {rooms.map(room => {
-            const inspection = getInspectionStatus(room.id);
-            const StatusIcon = inspection ? statusConfig[inspection.status].icon : Eye;
-
+        <div className="space-y-6">
+          {sections.map(section => {
+            const doneCount = section.rooms.filter(
+              r => getInspectionStatus(r.id)?.status === 'passed'
+            ).length;
             return (
-              <Card 
-                key={room.id}
-                className={`cursor-pointer transition-all hover:shadow-lg ${
-                  inspection?.status === 'passed' ? 'border-green-200 bg-green-50/50' :
-                  inspection?.status === 'failed' ? 'border-red-200 bg-red-50/50' :
-                  inspection?.status === 'needs_rework' ? 'border-orange-200 bg-orange-50/50' :
-                  ''
-                }`}
-                onClick={() => openInspectionDialog(room)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Home className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-bold text-lg">{room.room_number}</span>
-                    </div>
-                    {inspection ? (
-                      <Badge className={statusConfig[inspection.status].color}>
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        {statusConfig[inspection.status].label}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <Eye className="h-3 w-3 mr-1" />
-                        À inspecter
-                      </Badge>
-                    )}
+              <div key={section.key} className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-base">{section.name}</h3>
+                    <span className="text-xs text-muted-foreground">{section.scope}</span>
                   </div>
-
-                  {room.housekeeper_name && (
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Nettoyée par: {room.housekeeper_name}
-                    </p>
-                  )}
-
-                  {inspection?.cleanliness_score && (
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <Star 
-                          key={star}
-                          className={`h-4 w-4 ${star <= inspection.cleanliness_score! ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  <Badge variant="secondary">
+                    {doneCount}/{section.rooms.length} validée(s)
+                  </Badge>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {section.rooms.map(renderRoomCard)}
+                </div>
+              </div>
             );
           })}
         </div>
       )}
+
 
       {/* Inspection Dialog */}
       <Dialog open={inspectionDialog} onOpenChange={setInspectionDialog}>
