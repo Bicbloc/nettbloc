@@ -159,6 +159,22 @@ export function AutoCloseSettingsDialog({ hotelId, open: controlledOpen, onOpenC
               </div>
             </div>
 
+            <div className={cn('space-y-2', !enabled && 'opacity-50 pointer-events-none')}>
+              <Label htmlFor="auto-close-recap-email">E-mail de récapitulatif (optionnel)</Label>
+              <Input
+                id="auto-close-recap-email"
+                type="email"
+                placeholder="exemple@hotel.com"
+                value={recapEmail}
+                onChange={(e) => setRecapEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Le récapitulatif d'archivage sera envoyé à cette adresse à chaque clôture automatique.
+              </p>
+            </div>
+
+
+
             <p className="text-xs text-muted-foreground">
               La clôture s'effectue selon le fuseau horaire de l'établissement, dans les 15 minutes
               suivant l'heure définie. Les données sont archivées dans les rapports.
