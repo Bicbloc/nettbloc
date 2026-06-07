@@ -651,10 +651,23 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                   <Input
                     value={roomSearch}
                     onChange={(e) => setRoomSearch(e.target.value)}
-                    placeholder="Rechercher une chambre ou un client…"
+                    placeholder="Saisir un n° de chambre ou un client…"
                     className="pl-9 h-9"
+                    list="bf-room-options"
+                    autoComplete="off"
                   />
+                  <datalist id="bf-room-options">
+                    {gridRooms.map((rn) => {
+                      const guest = guestByRoom[rn.trim().toLowerCase()];
+                      return (
+                        <option key={rn} value={rn}>
+                          {guest ? `${rn} — ${guest}` : rn}
+                        </option>
+                      );
+                    })}
+                  </datalist>
                 </div>
+
                 <div className="flex gap-1.5 overflow-x-auto">
                   {([
                     { key: 'all', label: 'Toutes' },
