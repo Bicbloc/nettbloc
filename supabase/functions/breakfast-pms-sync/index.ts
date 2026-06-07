@@ -524,14 +524,22 @@ Deno.serve(async (req) => {
     }
     const date = log_date || new Date().toISOString().split('T')[0]
 
-    // PMS config
-    const { data: config } = await admin
+    // PMS config — on récupère toute config Apaleo/Mews (active ou non) pour
+    // pouvoir distinguer « aucune config » de « config désactivée ».
+    const { data: anyConfig } = await admin
       .from('hotel_pms_configs')
       .select('credentials, property_id, base_url, pms_type, is_active')
       .eq('hotel_id', hotel_id)
-      .eq('is_active', true)
       .in('pms_type', ['apaleo', 'mews'])
+      .order('is_active', { ascending: false })
+      .limit(1)
       .maybeSingle()
+
+    const config = anyConfig && anyConfig.is_active ? anyConfig : null
+    // Message précis selon la cause de l'absence de config exploitable.
+    const noConfigMessage = !anyConfig
+      ? 'Aucune configuration PMS (Apaleo/Mews) pour cet hôtel. Configurez-la dans Configuration PMS.'
+      : 'La configuration PMS de cet hôtel est désactivée. Activez-la dans Configuration PMS.'
 
     const { data: bfCfg } = await admin
       .from('hotel_breakfast_configs')
