@@ -4353,6 +4353,51 @@ export type Database = {
           },
         ]
       }
+      pms_occupancy_forecast: {
+        Row: {
+          arrivals: number
+          computed_at: string
+          created_at: string
+          departures: number
+          forecast_date: string
+          hotel_id: string
+          id: string
+          occupancy_rate: number
+          occupied_rooms: number
+          stayovers: number
+          total_rooms: number
+          updated_at: string
+        }
+        Insert: {
+          arrivals?: number
+          computed_at?: string
+          created_at?: string
+          departures?: number
+          forecast_date: string
+          hotel_id: string
+          id?: string
+          occupancy_rate?: number
+          occupied_rooms?: number
+          stayovers?: number
+          total_rooms?: number
+          updated_at?: string
+        }
+        Update: {
+          arrivals?: number
+          computed_at?: string
+          created_at?: string
+          departures?: number
+          forecast_date?: string
+          hotel_id?: string
+          id?: string
+          occupancy_rate?: number
+          occupied_rooms?: number
+          stayovers?: number
+          total_rooms?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pms_pending_rooms: {
         Row: {
           created_at: string

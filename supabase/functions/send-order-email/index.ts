@@ -9,12 +9,46 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface WeekForecastRow {
+  label: string;
+  departures: number;
+  stayovers: number;
+  needed: number;
+}
+
 interface OrderEmailRequest {
   supplierEmail: string;
   subject: string;
   body: string;
   hotelName: string;
   hotelEmail?: string;
+  weekForecast?: WeekForecastRow[];
+}
+
+function escapeHtml(s: string): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildWeekTableHtml(rows: WeekForecastRow[]): string {
+  const head = `
+    <tr style="background:#2563eb;color:#ffffff;">
+      <th align="left" style="padding:8px 10px;font-size:13px;">Jour</th>
+      <th align="center" style="padding:8px 10px;font-size:13px;">Départs</th>
+      <th align="center" style="padding:8px 10px;font-size:13px;">Recouches</th>
+      <th align="center" style="padding:8px 10px;font-size:13px;">Femmes de chambre</th>
+    </tr>`;
+  const body = rows.map((r, i) => `
+    <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f3f4f6'};">
+      <td style="padding:8px 10px;font-size:13px;border-top:1px solid #e5e7eb;">${escapeHtml(r.label)}</td>
+      <td align="center" style="padding:8px 10px;font-size:13px;border-top:1px solid #e5e7eb;">${r.departures}</td>
+      <td align="center" style="padding:8px 10px;font-size:13px;border-top:1px solid #e5e7eb;">${r.stayovers}</td>
+      <td align="center" style="padding:8px 10px;font-size:13px;border-top:1px solid #e5e7eb;font-weight:bold;color:#2563eb;">${r.needed}</td>
+    </tr>`).join('');
+  return `
+    <p style="font-weight:bold;margin:16px 0 8px 0;">Prévisionnel du besoin en personnel sur 7 jours :</p>
+    <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+      ${head}${body}
+    </table>`;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,19 +58,30 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { supplierEmail, subject, body, hotelName, hotelEmail }: OrderEmailRequest = await req.json();
+    const { supplierEmail, subject, body, hotelName, hotelEmail, weekForecast }: OrderEmailRequest = await req.json();
 
     // Validate required fields
     if (!supplierEmail || !subject || !body) {
       throw new Error("Missing required fields: supplierEmail, subject, or body");
     }
 
+    // When a structured week forecast is provided, drop the plain-text ASCII
+    // table from the body and inject a proper HTML table at its place.
+    const hasWeek = Array.isArray(weekForecast) && weekForecast.length > 0;
+    const cleanedBody = hasWeek
+      ? body.replace(/\n\nPrévisionnel du besoin en personnel sur 7 jours :[\s\S]*?(?=\n\nMerci)/, '\n\n__WEEK_TABLE__')
+      : body;
+
     // Convert plain text body to HTML
-    const htmlBody = body
+    let htmlBody = cleanedBody
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br>')
       .replace(/^/, '<p>')
       .replace(/$/, '</p>');
+
+    if (hasWeek) {
+      htmlBody = htmlBody.replace('__WEEK_TABLE__', buildWeekTableHtml(weekForecast!));
+    }
 
     // Send email via Resend with NettoBloc as sender
     const emailResponse = await resend.emails.send({

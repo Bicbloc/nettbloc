@@ -27,6 +27,12 @@ import { useHotel } from "@/contexts/HotelContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
+import { useOccupancyForecast } from "@/hooks/use-occupancy-forecast";
+
+/** Besoin recommandé de femmes de chambre selon la formule métier : (départs × 1.5 + recouches) / 11 */
+function housekeepersNeeded(departures: number, stayovers: number): number {
+  return Math.max(1, Math.ceil((departures * 1.5 + stayovers) / 11));
+}
 
 export default function Order() {
   const navigate = useNavigate();
@@ -34,6 +40,7 @@ export default function Order() {
   const { hotelId, hotelName, hotelCode } = useHotel();
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { days: forecastDays } = useOccupancyForecast(hotelId);
 
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date>(addDays(new Date(), 1));
@@ -238,14 +245,45 @@ export default function Order() {
   const emailContent = useMemo(() => {
     const displayHotelName = hotelName || "Notre hôtel";
     const formattedDate = format(selectedDate, "EEEE d MMMM yyyy", { locale: fr });
-    
+
     let roomDetails = "";
     if (pdfAnalysisResult) {
       roomDetails = `\n\nDétail des chambres :\n- ${pdfAnalysisResult.departures} départs (à blanc)\n- ${pdfAnalysisResult.stayovers} recouches\n- Total : ${pdfAnalysisResult.totalRooms} chambres`;
     }
-    
-    return `Bonjour,\n\nC'est l'hôtel ${displayHotelName}${hotelAddress ? `, situé au ${hotelAddress}` : ""}.\n\nNous souhaiterions vous commander ${housekeeperCount} femme${housekeeperCount > 1 ? 's' : ''} de chambre pour le ${formattedDate}.${roomDetails}\n\nMerci de nous confirmer la disponibilité.\n\nCordialement,\n\n${displayHotelName}\n${hotelAddress ? `📍 ${hotelAddress}` : ""}\n${hotelPhone ? `📞 ${hotelPhone}` : ""}\n\n---\nGéré via NettoBloc\n🔗 https://nettobloc.bicbloc.eu`;
-  }, [hotelName, selectedDate, housekeeperCount, hotelAddress, hotelPhone, pdfAnalysisResult]);
+
+    // Tableau prévisionnel du besoin par jour sur 7 jours (à partir de la date choisie)
+    let weekTable = "";
+    const startStr = format(selectedDate, "yyyy-MM-dd");
+    const week = forecastDays.filter((d) => d.forecast_date >= startStr).slice(0, 7);
+    if (week.length > 0) {
+      const header = "Jour            | Départs | Recouches | Femmes de chambre";
+      const sep = "----------------|---------|-----------|-------------------";
+      const rows = week.map((d) => {
+        const label = format(new Date(d.forecast_date + "T00:00:00"), "EEE dd/MM", { locale: fr });
+        const need = housekeepersNeeded(d.departures, d.stayovers);
+        return `${label.padEnd(15)} | ${String(d.departures).padEnd(7)} | ${String(d.stayovers).padEnd(9)} | ${need}`;
+      });
+      weekTable = `\n\nPrévisionnel du besoin en personnel sur 7 jours :\n${header}\n${sep}\n${rows.join("\n")}`;
+    }
+
+    return `Bonjour,\n\nC'est l'hôtel ${displayHotelName}${hotelAddress ? `, situé au ${hotelAddress}` : ""}.\n\nNous souhaiterions vous commander ${housekeeperCount} femme${housekeeperCount > 1 ? 's' : ''} de chambre pour le ${formattedDate}.${roomDetails}${weekTable}\n\nMerci de nous confirmer la disponibilité.\n\nCordialement,\n\n${displayHotelName}\n${hotelAddress ? `📍 ${hotelAddress}` : ""}\n${hotelPhone ? `📞 ${hotelPhone}` : ""}\n\n---\nGéré via NettoBloc\n🔗 https://nettobloc.bicbloc.eu`;
+  }, [hotelName, selectedDate, housekeeperCount, hotelAddress, hotelPhone, pdfAnalysisResult, forecastDays]);
+
+  // Lignes structurées du prévisionnel 7 jours (pour le tableau HTML de l'email)
+  const weekForecastRows = useMemo(() => {
+    const startStr = format(selectedDate, "yyyy-MM-dd");
+    return forecastDays
+      .filter((d) => d.forecast_date >= startStr)
+      .slice(0, 7)
+      .map((d) => ({
+        label: format(new Date(d.forecast_date + "T00:00:00"), "EEEE d MMMM", { locale: fr }),
+        departures: d.departures,
+        stayovers: d.stayovers,
+        needed: housekeepersNeeded(d.departures, d.stayovers),
+      }));
+  }, [forecastDays, selectedDate]);
+
+
 
   // Copy email to clipboard
   const handleCopyEmail = async () => {
@@ -290,7 +328,8 @@ export default function Order() {
           subject,
           body: emailContent,
           hotelName: hotelName || 'Hôtel',
-          hotelEmail: hotel?.email
+          hotelEmail: hotel?.email,
+          weekForecast: weekForecastRows,
         }
       });
 

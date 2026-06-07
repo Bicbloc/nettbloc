@@ -27,6 +27,8 @@ import { storageService } from "@/services/storageService";
 import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
+import { OccupancyBanner } from "@/components/occupancy/OccupancyBanner";
+import { OccupancyForecast } from "@/components/occupancy/OccupancyForecast";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { realtimeManager } from "@/services/RealtimeManager";
@@ -878,6 +880,12 @@ const IndexDashboard = () => {
 
         {!isGuestMode && currentHotelId && (
           <div className="mt-6">
+            <OccupancyBanner hotelId={currentHotelId} canRefresh />
+          </div>
+        )}
+
+        {!isGuestMode && currentHotelId && (
+          <div className="mt-6">
             <NewDayBanner
               hotelId={currentHotelId}
               roomsEmpty={rooms.length === 0}
@@ -890,18 +898,21 @@ const IndexDashboard = () => {
         <div className="space-y-6 mt-6">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <OverviewTab
-              rooms={rooms}
-              housekeeperNames={housekeeperNames}
-              cleaningConfig={cleaningConfig}
-              isPremium={isPremium}
-              currentHotelId={currentHotelId}
-              roomStats={roomStats}
-              onPdfProcessed={handlePdfProcessed}
-              onConfigChange={handleConfigChange}
-              onHousekeeperNamesChange={handleHousekeeperNamesChange}
-              onDistribute={handleDistributeWithValidation}
-            />
+            <>
+              {currentHotelId && <OccupancyForecast hotelId={currentHotelId} />}
+              <OverviewTab
+                rooms={rooms}
+                housekeeperNames={housekeeperNames}
+                cleaningConfig={cleaningConfig}
+                isPremium={isPremium}
+                currentHotelId={currentHotelId}
+                roomStats={roomStats}
+                onPdfProcessed={handlePdfProcessed}
+                onConfigChange={handleConfigChange}
+                onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                onDistribute={handleDistributeWithValidation}
+              />
+            </>
           )}
 
           {/* Rooms Tab */}

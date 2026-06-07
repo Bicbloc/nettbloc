@@ -23,6 +23,7 @@ import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
 import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
 import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
+import { OccupancyBanner } from './occupancy/OccupancyBanner';
 import { HousekeeperIncidentsList } from './housekeeper/HousekeeperIncidentsList';
 
 const HOUSEKEEPER_TEMP_LINEN_TASK_ID = 'temp-housekeeper-linen-task';
@@ -1188,6 +1189,12 @@ const HousekeeperWorkContent: React.FC = () => {
       <div className="flex-1 overflow-y-auto overscroll-contain">
       {/* Notification banner compacte et glissable */}
       <StaffNotificationBanner hotelId={hotelId || undefined} />
+
+      {hotelId && (
+        <div className="px-3 pt-3 sm:px-4">
+          <OccupancyBanner hotelId={hotelId} />
+        </div>
+      )}
 
 
       {showActivityLog && (

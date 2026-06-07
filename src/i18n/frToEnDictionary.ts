@@ -4,7 +4,20 @@
 // Hospitality standard (US) terminology.
 
 export const FR_EN_PHRASES: Record<string, string> = {
+  // ============= Occupancy / Forecast =============
+  "Taux d'occupation aujourd'hui": "Occupancy rate today",
+  "Taux d'occupation": "Occupancy rate",
+  "chambres occupées": "occupied rooms",
+  "Actualiser depuis le PMS": "Refresh from the PMS",
+  "Prévisionnel d'occupation": "Occupancy forecast",
+  "Chambres occupées": "Occupied rooms",
+  "Chambres propres": "Clean rooms",
+  "Occupées": "Occupied",
+  "Propres": "Clean",
+  "Aucune donnée prévisionnelle. Synchronisez votre PMS pour l'afficher.": "No forecast data. Sync your PMS to display it.",
+  "Prévisionnel du besoin en personnel sur 7 jours :": "7-day housekeeping needs forecast:",
   // ============= Breakfast / Cafetière =============
+
   "Petit-déjeuner": "Breakfast",
   "petit-déjeuner": "breakfast",
   "petits-déjeuners": "breakfasts",

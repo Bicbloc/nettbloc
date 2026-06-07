@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { useQueryClient } from '@tanstack/react-query';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
+import { OccupancyBanner } from '@/components/occupancy/OccupancyBanner';
 import { cn } from '@/lib/utils';
 
 type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report' | 'plan';
@@ -169,6 +170,7 @@ function TechnicianDashboardContent() {
 
       {/* Content */}
       <div className="px-4 py-4 space-y-4">
+        {currentHotelSession?.hotel_id && <OccupancyBanner hotelId={currentHotelSession.hotel_id} />}
 
         {activeTab === 'incidents' && (
           <div className="space-y-4">
