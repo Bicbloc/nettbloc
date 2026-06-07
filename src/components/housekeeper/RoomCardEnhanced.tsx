@@ -305,7 +305,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 {room.do_not_disturb && (
                   <Badge className="bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs gap-1 shadow-md">
                     <Moon className="h-3 w-3" />
-                    Ne pas déranger
+                    DND
                   </Badge>
                 )}
 
