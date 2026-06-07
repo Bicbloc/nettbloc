@@ -68,20 +68,51 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const loadRooms = useCallback(async () => {
     if (!currentHotelId) return;
     setRoomsLoading(true);
-    const [{ data: reg }, pms] = await Promise.all([
+    const [{ data: reg }, { data: pending }, pms] = await Promise.all([
       supabase.from('hotel_rooms_registry')
         .select('room_number')
         .eq('hotel_id', currentHotelId)
         .eq('is_active', true)
         .order('room_number'),
+      supabase.from('pms_pending_rooms')
+        .select('room_number')
+        .eq('hotel_id', currentHotelId)
+        .eq('status', 'pending')
+        .order('room_number'),
       fetchPmsRooms(currentHotelId),
     ]);
-    setRegistryRooms((reg || []).map((r) => r.room_number));
+    setRegistryRooms(
+      Array.from(new Set([
+        ...(reg || []).map((r) => r.room_number),
+        ...((pending || []).map((r) => r.room_number)),
+      ]))
+    );
     setPmsRooms(pms.ok ? pms.rooms : []);
     setRoomsLoading(false);
   }, [currentHotelId]);
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  useEffect(() => {
+    if (!currentHotelId) return;
+    const channel = supabase
+      .channel(`breakfast-tab-rooms-${currentHotelId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hotel_rooms_registry', filter: `hotel_id=eq.${currentHotelId}` },
+        () => loadRooms()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pms_pending_rooms', filter: `hotel_id=eq.${currentHotelId}` },
+        () => loadRooms()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentHotelId, loadRooms]);
 
   if (!currentHotelId) {
     return <p className="text-muted-foreground">Sélectionnez un hôtel.</p>;
@@ -172,13 +203,12 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     setPreviewProducts(res.products);
   };
 
-  // Pour la facturation, on ne propose QUE les chambres en cours de séjour
-  // (occupées dans le PMS). À défaut de PMS, on retombe sur le registre.
-  const inStayRooms = (pmsRooms || []).filter((r) => r.occupied).map((r) => r.room_number);
-  const availableRooms = (inStayRooms.length > 0
-    ? inStayRooms
-    : registryRooms
-  )
+  // Les chambres proposées au petit-déjeuner incluent le registre permanent,
+  // les nouvelles chambres PMS en attente de validation, et les chambres PMS en séjour.
+  const availableRooms = [
+    ...registryRooms,
+    ...(pmsRooms || []).map((r) => r.room_number),
+  ]
     .filter((v, i, a) => a.indexOf(v) === i)
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
