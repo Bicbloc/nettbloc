@@ -413,6 +413,38 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
     }
   };
 
+  // Lance le flux OAuth « Authorization Code » d'Apaleo. Nécessaire pour les
+  // applications Apaleo interactives (qui refusent grant_type=client_credentials).
+  const connectApaleoOAuth = async () => {
+    if (!hotelId) return;
+    const clientId = (config.credentials.clientId || '').trim();
+    if (!clientId) {
+      toast({ title: 'Client ID manquant', description: 'Renseignez le Client ID puis enregistrez avant de connecter.', variant: 'destructive' });
+      return;
+    }
+    // On sauvegarde d'abord pour que le callback retrouve clientId / clientSecret.
+    await saveConfig();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const redirectUri = `${supabaseUrl}/functions/v1/apaleo-oauth-callback`;
+    const scope = [
+      'offline_access', 'openid', 'profile',
+      'reservations.read', 'reservations.manage',
+      'folios.read', 'folios.manage',
+      'rates.read', 'setup.read', 'availability.read',
+    ].join(' ');
+    const authUrl =
+      'https://identity.apaleo.com/connect/authorize?response_type=code' +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${encodeURIComponent(hotelId)}`;
+    toast({
+      title: 'Connexion Apaleo',
+      description: `Connectez-vous à Apaleo dans la fenêtre ouverte. Pensez à ajouter cette URL de redirection dans votre application Apaleo : ${redirectUri}`,
+    });
+    window.open(authUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const deleteConfig = async () => {
     if (!config.id) return;
     try {
