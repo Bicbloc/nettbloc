@@ -306,6 +306,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
             Un récapitulatif de l'archivage (avec le lien du rapport PDF) sera envoyé à cette adresse au moment de la clôture.
           </p>
         </div>
+        <AlertDialogFooter>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
           <AlertDialogAction onClick={handleCloseDay} className="bg-destructive hover:bg-destructive/90">
             Confirmer la clôture
