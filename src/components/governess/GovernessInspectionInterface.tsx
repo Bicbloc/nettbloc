@@ -69,6 +69,8 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   const loadData = useCallback(async () => {
     try {
+      const today = new Date().toISOString().split('T')[0];
+
       // Charger les chambres propres (à inspecter)
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
@@ -77,7 +79,8 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           room_number,
           status,
           cleaning_type,
-          notes
+          notes,
+          floor
         `)
         .eq('hotel_id', hotelId)
         .eq('status', 'clean')
@@ -101,8 +104,15 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       setRooms(roomsWithHousekeeper);
 
+      // Charger les attributions de gouvernantes du jour (par étage / femme de chambre)
+      const { data: govData } = await supabase
+        .from('daily_governess_assignments')
+        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers')
+        .eq('hotel_id', hotelId)
+        .eq('assignment_date', today);
+      setGovAssignments((govData as DailyGovAssignment[]) || []);
+
       // Charger les inspections du jour
-      const today = new Date().toISOString().split('T')[0];
       const { data: inspectionsData, error: inspectionsError } = await supabase
         .from('room_inspections')
         .select('*')
@@ -113,6 +123,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       const inspectionMap = new Map(inspectionsData?.map(i => [i.room_id, i]) || []);
       setInspections(inspectionMap);
+
 
     } catch (error) {
       console.error('Erreur chargement données:', error);
