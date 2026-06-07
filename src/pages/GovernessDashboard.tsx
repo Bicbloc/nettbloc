@@ -44,6 +44,7 @@ import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
+import { OccupancyBanner } from '@/components/occupancy/OccupancyBanner';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LayoutGrid } from 'lucide-react';
