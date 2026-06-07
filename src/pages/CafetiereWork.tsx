@@ -64,6 +64,8 @@ export default function CafetiereWork() {
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
   const [draftComment, setDraftComment] = useState('');
+  // Prestation en attente de confirmation « doublon » (déjà ajoutée).
+  const [dupConfirm, setDupConfirm] = useState<string | null>(null);
 
   const refreshLogs = useCallback(async () => {
     if (!hotelId) return;
@@ -179,6 +181,22 @@ export default function CafetiereWork() {
       return { ...prev, [name]: next };
     });
   };
+
+  // Ajoute une prestation à la chambre. Si elle est déjà présente (doublon),
+  // on demande confirmation avant de l'ajouter une nouvelle fois.
+  const addPrestation = (name: string) => {
+    if ((draftItems[name] || 0) > 0) {
+      setDupConfirm(name);
+      return;
+    }
+    setItemQty(name, 1);
+  };
+
+  // Liste des prestations effectivement ajoutées (qty > 0).
+  const draftPrestations = useMemo(
+    () => (config?.breakfast_types || []).filter((t) => (draftItems[t.name] || 0) > 0),
+    [config, draftItems]
+  );
 
   // Sauvegarde la chambre dans nettobloc puis l'envoie au PMS si configuré.
   const doSaveRoom = async () => {
@@ -454,39 +472,79 @@ export default function CafetiereWork() {
 
 
             {!draftIncluded && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Quantité par prestation</p>
+              <div className="space-y-4">
                 {(config?.breakfast_types || []).length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Aucune prestation configurée. Configurez les types de petit-déjeuner dans l'administration.
                   </p>
                 ) : (
-                  (config?.breakfast_types || []).map((t) => {
-                    const qty = draftItems[t.name] || 0;
-                    return (
-                      <div key={t.name} className="flex items-center justify-between rounded-lg border p-3">
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{t.name}</p>
-                          <p className="text-xs text-muted-foreground">{t.price.toFixed(2)} {currency}</p>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <Button
-                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
-                            onClick={() => setItemQty(t.name, -1)}
-                          >
-                            <Minus className="h-5 w-5" />
-                          </Button>
-                          <span className="text-2xl font-bold w-8 text-center">{qty}</span>
-                          <Button
-                            variant="outline" size="icon" className="h-10 w-10 rounded-full"
-                            onClick={() => setItemQty(t.name, 1)}
-                          >
-                            <Plus className="h-5 w-5" />
-                          </Button>
-                        </div>
+                  <>
+                    {/* Sélecteur : ajouter une (ou plusieurs) prestation(s) */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Ajouter une prestation</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(config?.breakfast_types || []).map((t) => {
+                          const added = (draftItems[t.name] || 0) > 0;
+                          return (
+                            <button
+                              key={t.name}
+                              type="button"
+                              onClick={() => addPrestation(t.name)}
+                              className={[
+                                'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition active:scale-95',
+                                added
+                                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                                  : 'border-border bg-card text-foreground hover:bg-muted/60',
+                              ].join(' ')}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              {t.name}
+                              <span className="text-xs opacity-70">{t.price.toFixed(2)} {currency}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    );
-                  })
+                    </div>
+
+                    {/* Prestations ajoutées à cette chambre */}
+                    {draftPrestations.length === 0 ? (
+                      <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                        Aucune prestation ajoutée. Touchez une prestation ci-dessus.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Prestations de la chambre</p>
+                        {draftPrestations.map((t) => {
+                          const qty = draftItems[t.name] || 0;
+                          return (
+                            <div key={t.name} className="flex items-center justify-between rounded-xl border bg-card p-3 shadow-sm">
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{t.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {qty} × {t.price.toFixed(2)} = {(qty * t.price).toFixed(2)} {currency}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <Button
+                                  variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                                  onClick={() => setItemQty(t.name, -1)}
+                                >
+                                  <Minus className="h-5 w-5" />
+                                </Button>
+                                <span className="text-2xl font-bold w-8 text-center">{qty}</span>
+                                <Button
+                                  variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                                  onClick={() => setItemQty(t.name, 1)}
+                                >
+                                  <Plus className="h-5 w-5" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -542,6 +600,29 @@ export default function CafetiereWork() {
               onClick={async () => { setConfirmBillIncluded(false); await doSaveRoom(); }}
             >
               Facturer quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation « doublon » : la prestation est déjà ajoutée */}
+      <AlertDialog open={!!dupConfirm} onOpenChange={(o) => { if (!o) setDupConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prestation déjà ajoutée</AlertDialogTitle>
+            <AlertDialogDescription>
+              « {dupConfirm} » est déjà ajoutée à la chambre {selected}
+              {dupConfirm ? ` (${draftItems[dupConfirm] || 0} déjà déclarée${(draftItems[dupConfirm] || 0) > 1 ? 's' : ''})` : ''}.
+              Voulez-vous tout de même en ajouter une de plus ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-700 hover:bg-amber-800"
+              onClick={() => { if (dupConfirm) setItemQty(dupConfirm, 1); setDupConfirm(null); }}
+            >
+              Ajouter quand même
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
