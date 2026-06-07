@@ -73,6 +73,7 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
       included: false,
       items,
       loggedBy: 'Admin',
+      accumulate: true,
     });
     if (!ok) {
       setAdding(false);
@@ -216,16 +217,30 @@ export function BreakfastBilledSection({ hotelId, currency, breakfastTypes, pric
           <>
             <div className="space-y-2">
               {billed.map((l) => (
-                <div key={l.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">Ch. {l.room_number}</span>
-                    <span className="text-muted-foreground">{l.people_count} pers.</span>
-                    {l.breakfast_type && <Badge variant="outline">{l.breakfast_type}</Badge>}
+                <div key={l.id} className="rounded-lg border p-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Ch. {l.room_number}</span>
+                      <span className="text-muted-foreground">{l.people_count} pers.</span>
+                      {l.breakfast_type && <Badge variant="outline">{l.breakfast_type}</Badge>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{Number(l.total_amount).toFixed(2)} {currency}</span>
+                      {statusBadge(l.pms_status)}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{Number(l.total_amount).toFixed(2)} {currency}</span>
-                    {statusBadge(l.pms_status)}
-                  </div>
+                  {Array.isArray(l.items) && l.items.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 border-t pt-2 text-xs text-muted-foreground">
+                      {l.items.map((it, idx) => (
+                        <li key={idx} className="flex items-center justify-between">
+                          <span>
+                            {it.qty} × {it.name}
+                          </span>
+                          <span>{(Number(it.qty) * Number(it.price)).toFixed(2)} {currency}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ))}
             </div>

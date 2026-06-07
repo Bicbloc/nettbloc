@@ -65,6 +65,37 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
     .eq('task_date', reportDate);
   const linenTasksData = linenTasks || [];
 
+  // 2b. Breakfast billing logs of the day (traçabilité facturation PDJ)
+  const { data: breakfastLogs } = await supabase
+    .from('breakfast_logs')
+    .select('*')
+    .eq('hotel_id', hotelId)
+    .eq('log_date', reportDate);
+  const breakfastData = breakfastLogs || [];
+  const breakfastSummary = {
+    rooms_count: breakfastData.length,
+    total_people: breakfastData.reduce((s: number, b: any) => s + Number(b.people_count || 0), 0),
+    billed_amount: Number(
+      breakfastData
+        .filter((b: any) => !b.included)
+        .reduce((s: number, b: any) => s + Number(b.total_amount || 0), 0)
+        .toFixed(2),
+    ),
+    included_count: breakfastData.filter((b: any) => b.included).length,
+    sent_count: breakfastData.filter((b: any) => b.pms_status === 'sent').length,
+    entries: breakfastData.map((b: any) => ({
+      room_number: b.room_number,
+      people_count: b.people_count,
+      breakfast_type: b.breakfast_type,
+      total_amount: b.total_amount,
+      included: b.included,
+      pms_status: b.pms_status,
+      logged_by: b.logged_by,
+      items: b.items,
+      sent_items: b.sent_items,
+    })),
+  };
+
   const linenSummary = linenTasksData.reduce((acc: any, task: any) => {
     (task.linen_inventory_entries || []).forEach((entry: any) => {
       const typeName = entry.linen_types?.name || 'Inconnu';
@@ -132,9 +163,10 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
           tasks_count: linenTasksData.length,
           summary: linenSummary,
         },
+        breakfast_billing: breakfastSummary,
       },
       total_rooms_cleaned: currentRooms.filter((r: any) => r.status === 'clean').length,
-      notes: `Clôture automatique • ${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s), ${linenTasksData.length} inventaire(s) linge`,
+      notes: `Clôture automatique • ${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s), ${linenTasksData.length} inventaire(s) linge, ${breakfastData.length} petit(s)-déjeuner(s)`,
     });
   }
 
@@ -151,6 +183,8 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
   await supabase.from('notifications').delete().eq('hotel_id', hotelId)
     .gte('created_at', reportDate + 'T00:00:00').lte('created_at', reportDate + 'T23:59:59');
   await supabase.from('daily_action_logs').delete().eq('hotel_id', hotelId).eq('log_date', reportDate);
+  // Petits-déjeuners du jour archivés dans le rapport : on purge la table opérationnelle.
+  await supabase.from('breakfast_logs').delete().eq('hotel_id', hotelId).eq('log_date', reportDate);
 
   // 6. Deactivate active hotel sessions
   await supabase.from('hotel_sessions').update({ is_active: false }).eq('hotel_id', hotelId).eq('is_active', true);
