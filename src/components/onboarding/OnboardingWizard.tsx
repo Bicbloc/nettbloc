@@ -190,15 +190,17 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="contactName">Votre nom *</Label>
-              <Input
-                id="contactName"
-                value={info.contactName}
-                onChange={(e) => updateField('contactName', e.target.value)}
-                placeholder="Marie Dupont"
-              />
-            </div>
+            {!hasExistingName && (
+              <div className="space-y-2">
+                <Label htmlFor="contactName">Votre nom *</Label>
+                <Input
+                  id="contactName"
+                  value={info.contactName}
+                  onChange={(e) => updateField('contactName', e.target.value)}
+                  placeholder="Marie Dupont"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="phone">Téléphone *</Label>
