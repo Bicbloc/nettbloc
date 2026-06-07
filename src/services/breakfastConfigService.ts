@@ -201,9 +201,8 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     .eq('log_date', logDate)
     .maybeSingle();
 
-  const sentList = Array.isArray((existing as { sent_items?: BreakfastLogItem[] } | null)?.sent_items)
-    ? ((existing as { sent_items?: BreakfastLogItem[] }).sent_items as BreakfastLogItem[])
-    : [];
+  const rawSent = (existing as unknown as { sent_items?: unknown } | null)?.sent_items;
+  const sentList = Array.isArray(rawSent) ? (rawSent as BreakfastLogItem[]) : [];
   const sentMap: Record<string, number> = {};
   for (const s of sentList) sentMap[s.name] = (sentMap[s.name] || 0) + Number(s.qty || 0);
   const hasNewToBill =
