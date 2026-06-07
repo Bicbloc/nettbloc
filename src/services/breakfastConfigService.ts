@@ -337,6 +337,31 @@ export async function fetchPmsProducts(
   return { ok: true, service_id: data.service_id ?? null, products: (data.products || []) as PmsProduct[] };
 }
 
+export interface PmsRatePlan {
+  id: string;
+  code: string | null;
+  name: string;
+}
+
+/**
+ * Récupère tous les plans tarifaires (rate plans) du PMS (Mews/Apaleo)
+ * pour que l'admin choisisse ceux qui incluent le petit-déjeuner.
+ */
+export async function fetchPmsRatePlans(
+  hotelId: string,
+): Promise<{ ok: boolean; error?: string; ratePlans: PmsRatePlan[] }> {
+  const { data, error } = await supabase.functions.invoke('breakfast-pms-sync', {
+    body: { hotel_id: hotelId, mode: 'fetch_rate_plans' },
+  });
+  if (error) {
+    return { ok: false, error: error.message, ratePlans: [] };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.message || 'Aucun plan tarifaire trouvé', ratePlans: [] };
+  }
+  return { ok: true, ratePlans: (data.rate_plans || []) as PmsRatePlan[] };
+}
+
 export interface PmsRoom {
   room_number: string;
   occupied: boolean;
