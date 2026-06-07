@@ -93,6 +93,27 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
 
+  useEffect(() => {
+    if (!currentHotelId) return;
+    const channel = supabase
+      .channel(`breakfast-tab-rooms-${currentHotelId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hotel_rooms_registry', filter: `hotel_id=eq.${currentHotelId}` },
+        () => loadRooms()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pms_pending_rooms', filter: `hotel_id=eq.${currentHotelId}` },
+        () => loadRooms()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentHotelId, loadRooms]);
+
   if (!currentHotelId) {
     return <p className="text-muted-foreground">Sélectionnez un hôtel.</p>;
   }

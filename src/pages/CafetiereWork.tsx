@@ -139,7 +139,7 @@ export default function CafetiereWork() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Realtime sync of breakfast logs + room registry
+  // Realtime sync of breakfast logs + room sources
   useEffect(() => {
     if (!hotelId) return;
     const channel = supabase
@@ -149,6 +149,9 @@ export default function CafetiereWork() {
         () => refreshLogs())
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'hotel_rooms_registry', filter: `hotel_id=eq.${hotelId}` },
+        () => loadAll())
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'pms_pending_rooms', filter: `hotel_id=eq.${hotelId}` },
         () => loadAll())
       .subscribe();
     return () => { supabase.removeChannel(channel); };

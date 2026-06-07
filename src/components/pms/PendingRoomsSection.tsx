@@ -43,6 +43,22 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     load();
   }, [load, refreshKey]);
 
+  useEffect(() => {
+    if (!hotelId) return;
+    const channel = supabase
+      .channel(`pending-rooms-${hotelId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pms_pending_rooms', filter: `hotel_id=eq.${hotelId}` },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hotelId, load]);
+
   const addToRegistry = async (room: PendingRoom) => {
     if (!hotelId) return;
     setBusyId(room.id);
