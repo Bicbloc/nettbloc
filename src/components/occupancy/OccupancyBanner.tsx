@@ -84,6 +84,25 @@ export function OccupancyBanner({ hotelId, canRefresh = false, className }: Occu
           )}
         </div>
       </div>
+
+      {roomsTotal > 0 && (
+        <div className="border-t border-primary/10 bg-background/40 px-5 py-4">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+              <Sparkles className="h-4 w-4" /> {clean} propres
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">{cleanPct}%</span>
+            <span className="flex items-center gap-1.5 font-medium text-amber-600">
+              {dirty} sales <Trash2 className="h-4 w-4" />
+            </span>
+          </div>
+          <Progress value={cleanPct} className="h-2.5" />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {clean} / {roomsTotal} chambres propres
+          </p>
+        </div>
+      )}
     </Card>
+
   );
 }
