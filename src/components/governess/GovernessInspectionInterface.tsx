@@ -55,6 +55,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   governessId
 }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [govAssignments, setGovAssignments] = useState<DailyGovAssignment[]>([]);
   const [inspections, setInspections] = useState<Map<string, Inspection>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
