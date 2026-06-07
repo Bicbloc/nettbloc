@@ -148,8 +148,8 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
             <SelectTrigger className="flex-1">
               <SelectValue placeholder={
                 loading ? 'Chargement…'
-                  : selectableProfiles.length === 0 ? 'Aucune cafetière disponible'
-                  : 'Sélectionner une cafetière'
+                  : selectableProfiles.length === 0 ? 'Aucun personnel disponible'
+                  : 'Sélectionner un membre du personnel'
               } />
             </SelectTrigger>
             <SelectContent>
