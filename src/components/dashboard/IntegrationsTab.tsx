@@ -4,16 +4,13 @@
  * les données par fonctionnalité en temps réel.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { Webhook, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Webhook, Plus, Trash2, RefreshCw, Slack, Zap, Globe, ExternalLink, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   HotelWebhook, WebhookDelivery, WebhookProvider, WEBHOOK_EVENTS,
@@ -29,6 +26,47 @@ const PROVIDER_LABELS: Record<WebhookProvider, string> = {
   zapier: 'Zapier / Make (Trello, Drive…)',
   generic: 'Webhook générique',
 };
+
+interface ProviderPreset {
+  value: WebhookProvider;
+  label: string;
+  description: string;
+  icon: typeof Slack;
+  placeholder: string;
+  helpUrl: string;
+  helpText: string;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    value: 'slack',
+    label: 'Slack',
+    description: 'Recevez les alertes dans un canal',
+    icon: Slack,
+    placeholder: 'https://hooks.slack.com/services/…',
+    helpUrl: 'https://api.slack.com/messaging/webhooks',
+    helpText: 'Créez un “Incoming Webhook” dans Slack et collez l’URL fournie.',
+  },
+  {
+    value: 'zapier',
+    label: 'Zapier / Make',
+    description: 'Vers Trello, Google Drive, Sheets…',
+    icon: Zap,
+    placeholder: 'https://hooks.zapier.com/hooks/catch/…',
+    helpUrl: 'https://zapier.com/apps/webhook/integrations',
+    helpText: 'Créez un déclencheur “Webhooks by Zapier” (Catch Hook) et collez l’URL.',
+  },
+  {
+    value: 'generic',
+    label: 'Webhook générique',
+    description: 'Toute URL qui reçoit du JSON',
+    icon: Globe,
+    placeholder: 'https://votre-service.com/webhook',
+    helpUrl: '',
+    helpText: 'Les événements sont envoyés en POST au format JSON.',
+  },
+];
+
 
 export function IntegrationsTab({ currentHotelId }: IntegrationsTabProps) {
   const [webhooks, setWebhooks] = useState<HotelWebhook[]>([]);
