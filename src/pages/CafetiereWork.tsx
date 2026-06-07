@@ -223,7 +223,7 @@ export default function CafetiereWork() {
       unitPrice: firstUnit,
       included: draftIncluded,
       items,
-      loggedBy: 'Cafetière',
+      loggedBy: 'Personnel point de vente',
       comment: draftComment.trim() || null,
     });
     await refreshLogs();
