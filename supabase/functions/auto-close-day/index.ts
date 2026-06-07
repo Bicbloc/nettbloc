@@ -65,6 +65,37 @@ async function closeHotelDay(supabase: any, hotelId: string, reportDate: string)
     .eq('task_date', reportDate);
   const linenTasksData = linenTasks || [];
 
+  // 2b. Breakfast billing logs of the day (traçabilité facturation PDJ)
+  const { data: breakfastLogs } = await supabase
+    .from('breakfast_logs')
+    .select('*')
+    .eq('hotel_id', hotelId)
+    .eq('log_date', reportDate);
+  const breakfastData = breakfastLogs || [];
+  const breakfastSummary = {
+    rooms_count: breakfastData.length,
+    total_people: breakfastData.reduce((s: number, b: any) => s + Number(b.people_count || 0), 0),
+    billed_amount: Number(
+      breakfastData
+        .filter((b: any) => !b.included)
+        .reduce((s: number, b: any) => s + Number(b.total_amount || 0), 0)
+        .toFixed(2),
+    ),
+    included_count: breakfastData.filter((b: any) => b.included).length,
+    sent_count: breakfastData.filter((b: any) => b.pms_status === 'sent').length,
+    entries: breakfastData.map((b: any) => ({
+      room_number: b.room_number,
+      people_count: b.people_count,
+      breakfast_type: b.breakfast_type,
+      total_amount: b.total_amount,
+      included: b.included,
+      pms_status: b.pms_status,
+      logged_by: b.logged_by,
+      items: b.items,
+      sent_items: b.sent_items,
+    })),
+  };
+
   const linenSummary = linenTasksData.reduce((acc: any, task: any) => {
     (task.linen_inventory_entries || []).forEach((entry: any) => {
       const typeName = entry.linen_types?.name || 'Inconnu';
