@@ -648,6 +648,10 @@ Deno.serve(async (req) => {
     }
 
     // ─── POST MODE ────────────────────────────────────────────────
+    // On envoie au PMS les prestations facturées qui n'ont pas encore été
+    // transmises. La cafetière peut ajouter de nouvelles prestations à tout
+    // moment : on n'envoie QUE le delta (différence entre les prestations
+    // déclarées et celles déjà envoyées, mémorisées dans `sent_items`).
     let logsQuery = admin
       .from('breakfast_logs')
       .select('*')
@@ -655,7 +659,6 @@ Deno.serve(async (req) => {
       .eq('log_date', date)
       .eq('included', false)
       .gt('total_amount', 0)
-      .neq('pms_status', 'sent')
     if (room_number) logsQuery = logsQuery.eq('room_number', room_number)
     const { data: logs, error: logsErr } = await logsQuery
     if (logsErr) throw logsErr
