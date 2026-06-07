@@ -965,7 +965,7 @@ export function LostItemReportWizard({
                           <RadioGroupItem value={guest.key} id={`wizard-guest-${guest.key}`} />
                           <label htmlFor={`wizard-guest-${guest.key}`} className="flex-1 cursor-pointer text-sm">
                             <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 {guest.key === 'departure' ? (
                                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                                 ) : guest.key === 'arrival' ? (
@@ -974,6 +974,9 @@ export function LostItemReportWizard({
                                   <User className="h-4 w-4 text-muted-foreground" />
                                 )}
                                 <span className="font-medium">{guest.label}</span>
+                                {guest.key === 'checked_out' && (
+                                  <Badge variant="secondary" className="text-[10px]">Déjà parti</Badge>
+                                )}
                                 <span className="text-muted-foreground">
                                   {guest.info.firstName} {guest.info.lastName}
                                 </span>
