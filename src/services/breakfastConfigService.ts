@@ -26,6 +26,8 @@ export interface BreakfastConfig {
   pms_service_id: string | null;
   /** Code de taxe PMS appliqué aux charges (requis pour Mews). */
   pms_tax_code: string | null;
+  /** Plans tarifaires (rate plans) du PMS qui signifient « petit-déjeuner inclus ». */
+  included_rate_plan_ids: string[];
 }
 
 export interface BreakfastLogItem {
