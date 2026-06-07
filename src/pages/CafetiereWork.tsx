@@ -604,6 +604,29 @@ export default function CafetiereWork() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirmation « doublon » : la prestation est déjà ajoutée */}
+      <AlertDialog open={!!dupConfirm} onOpenChange={(o) => { if (!o) setDupConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prestation déjà ajoutée</AlertDialogTitle>
+            <AlertDialogDescription>
+              « {dupConfirm} » est déjà ajoutée à la chambre {selected}
+              {dupConfirm ? ` (${draftItems[dupConfirm] || 0} déjà déclarée${(draftItems[dupConfirm] || 0) > 1 ? 's' : ''})` : ''}.
+              Voulez-vous tout de même en ajouter une de plus ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-700 hover:bg-amber-800"
+              onClick={() => { if (dupConfirm) setItemQty(dupConfirm, 1); setDupConfirm(null); }}
+            >
+              Ajouter quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
