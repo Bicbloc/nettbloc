@@ -187,10 +187,37 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
       ];
       toast.success(`Journée clôturée ! Archivés: ${successParts.join(', ')}`);
 
+      // 8b. Envoyer le récapitulatif d'archivage par e-mail (optionnel)
+      const emailTo = recapEmail.trim();
+      if (emailTo && isValidEmail(emailTo)) {
+        try {
+          localStorage.setItem(recapEmailKey, emailTo);
+          await supabase.functions.invoke('send-archive-recap', {
+            body: {
+              to: emailTo,
+              hotelName: hotelData?.name,
+              reportDate: today,
+              pdfUrl,
+              summary: {
+                roomsArchived: archiveResult.archived,
+                assignmentsCleared: archiveResult.assignmentsCleared,
+                linenTasksArchived: archiveResult.linenTasksArchived,
+                totalActions: (todayLogs || []).length,
+              },
+            },
+          });
+          toast.success(`Récapitulatif envoyé à ${emailTo}`);
+        } catch (mailError) {
+          console.error('Envoi du récapitulatif échoué:', mailError);
+          toast.error("Le récapitulatif n'a pas pu être envoyé par e-mail");
+        }
+      }
+
       // 9. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
         onReportClosed();
       }
+
 
       // 10. Rafraîchir la page pour afficher la nouvelle session
       setTimeout(() => {
