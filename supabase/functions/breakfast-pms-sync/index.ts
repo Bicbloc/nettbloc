@@ -93,14 +93,26 @@ async function buildApaleoReservationMap(token: string, propertyId: string): Pro
 async function postApaleoCharge(
   token: string, reservationId: string, name: string, amount: number, currency: string, quantity: number,
 ): Promise<void> {
+  // IMPORTANT : le filtre Apaleo est `reservationIds` (pluriel). Avec
+  // `reservationId` (singulier), Apaleo IGNORE le filtre et renvoie TOUS les
+  // folios — on facturait alors la mauvaise réservation (404/charge erronée).
   const folioRes = await fetch(
-    `https://api.apaleo.com/finance/v1/folios?reservationId=${reservationId}&pageSize=1`,
+    `https://api.apaleo.com/finance/v1/folios?reservationIds=${encodeURIComponent(reservationId)}&pageSize=50`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
   )
   if (!folioRes.ok) throw new Error(`Folio Apaleo introuvable [${folioRes.status}]`)
   const folioData = await folioRes.json()
-  const folioId = folioData.folios?.[0]?.id
+  const folios = (folioData.folios || []) as Array<{ id: string; isMainFolio?: boolean; status?: string; balance?: { currency?: string } }>
+  // Préférer le folio principal ouvert de la réservation.
+  const folio = folios.find((f) => f.isMainFolio && f.status === 'Open')
+    || folios.find((f) => f.status === 'Open')
+    || folios[0]
+  const folioId = folio?.id
   if (!folioId) throw new Error('Aucun folio ouvert pour la réservation')
+
+  // Utiliser la devise réelle du folio si disponible (évite un refus pour
+  // incompatibilité de devise, ex. folio en GBP vs config en EUR).
+  const folioCurrency = folio?.balance?.currency || currency
 
   const chargeRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${folioId}/charges`, {
     method: 'POST',
@@ -109,7 +121,7 @@ async function postApaleoCharge(
       serviceType: 'FoodAndBeverages',
       name,
       quantity,
-      amount: { amount, currency },
+      amount: { amount, currency: folioCurrency },
     }),
   })
   if (!chargeRes.ok) throw new Error(`Charge Apaleo refusée [${chargeRes.status}]: ${await chargeRes.text()}`)
