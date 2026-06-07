@@ -731,15 +731,19 @@ Deno.serve(async (req) => {
       const folios = (folioData.folios || []) as any[]
       const detailed: any[] = []
       for (const f of folios) {
-        const cRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${f.id}/charges`,
+        // Le détail des charges est dans le folio lui-même (expand=charges).
+        const cRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${f.id}?expand=charges`,
           { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-        const cData = cRes.ok ? await cRes.json() : { charges: [] }
+        const cStatus = cRes.status
+        const cData = cRes.ok ? await cRes.json() : {}
         detailed.push({
           id: f.id, isMainFolio: f.isMainFolio, status: f.status,
           currency: f.balance?.currency,
+          detail_status: cStatus,
           charges: (cData.charges || []).map((c: any) => ({ name: c.name, amount: c.amount, quantity: c.quantity, serviceType: c.serviceType })),
         })
       }
+
       return new Response(JSON.stringify({ ok: true, room_number, reservationId, folios: detailed }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
