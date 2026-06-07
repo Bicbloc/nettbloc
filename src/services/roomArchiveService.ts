@@ -73,7 +73,38 @@ export class RoomArchiveService {
         .eq('task_date', today);
       
       const linenTasksData = linenTasks || [];
-      
+
+      // 5b. Récupérer les petits-déjeuners facturés du jour (traçabilité)
+      const { data: breakfastLogs } = await supabase
+        .from('breakfast_logs')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('log_date', today);
+      const breakfastData = breakfastLogs || [];
+      const breakfastSummary = {
+        rooms_count: breakfastData.length,
+        total_people: breakfastData.reduce((s, b: any) => s + Number(b.people_count || 0), 0),
+        billed_amount: Number(
+          breakfastData
+            .filter((b: any) => !b.included)
+            .reduce((s, b: any) => s + Number(b.total_amount || 0), 0)
+            .toFixed(2),
+        ),
+        included_count: breakfastData.filter((b: any) => b.included).length,
+        sent_count: breakfastData.filter((b: any) => b.pms_status === 'sent').length,
+        entries: breakfastData.map((b: any) => ({
+          room_number: b.room_number,
+          people_count: b.people_count,
+          breakfast_type: b.breakfast_type,
+          total_amount: b.total_amount,
+          included: b.included,
+          pms_status: b.pms_status,
+          logged_by: b.logged_by,
+          items: b.items,
+          sent_items: b.sent_items,
+        })),
+      };
+
       // Calculer les totaux d'inventaire linge
       const linenSummary = linenTasksData.reduce((acc, task) => {
         const entries = (task as any).linen_inventory_entries || [];
