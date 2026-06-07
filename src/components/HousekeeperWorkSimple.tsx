@@ -23,6 +23,7 @@ import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
 import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
 import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
+import { OccupancyBanner } from './occupancy/OccupancyBanner';
 import { HousekeeperIncidentsList } from './housekeeper/HousekeeperIncidentsList';
 
 const HOUSEKEEPER_TEMP_LINEN_TASK_ID = 'temp-housekeeper-linen-task';
