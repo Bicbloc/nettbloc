@@ -6,10 +6,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle, Download } from 'lucide-react';
+import { CalendarIcon, FileText, ClipboardList, Users, Package, Loader2, Archive, ChevronDown, Home, AlertTriangle, MessageSquare, Sparkles, BedDouble, XCircle, Download, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -48,6 +49,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [selectedLog, setSelectedLog] = useState<ArchivedLog | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
   const exportRef = useRef<HTMLDivElement>(null);
 
   const handleExportPdf = async () => {
@@ -546,43 +548,88 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   };
 
   const renderActionLogs = (logsData: any) => {
-    const logs = Array.isArray(logsData) ? logsData : logsData?.logs || [];
-    if (logs.length === 0) {
+    const allLogs = Array.isArray(logsData) ? logsData : logsData?.logs || [];
+    if (allLogs.length === 0) {
       return <p className="text-muted-foreground text-center py-4">Aucune action enregistrée</p>;
     }
 
+    const q = logSearch.trim().toLowerCase();
+    const logs = q
+      ? allLogs.filter((log: any) => {
+          const haystack = [
+            log.action_type, log.type,
+            log.description, log.message,
+            log.actor_name, log.actor_type,
+            log.room_number,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        })
+      : allLogs;
+
     return (
-      <ScrollArea className="h-[400px]">
-        <div className="space-y-2">
-          {logs.map((log: any, index: number) => (
-            <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs">
-                    {log.action_type || log.type}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {log.created_at ? format(parseISO(log.created_at), 'HH:mm', { locale: fr }) : ''}
-                  </span>
-                </div>
-                <p className="text-sm">{log.description || log.message}</p>
-                {log.actor_name && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Par: {log.actor_name} ({log.actor_type})
-                  </p>
-                )}
-                {log.room_number && (
-                  <Badge variant="secondary" className="mt-1 text-xs">
-                    Chambre {log.room_number}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          ))}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={logSearch}
+            onChange={(e) => setLogSearch(e.target.value)}
+            placeholder="Rechercher une action, un nom, une chambre…"
+            className="pl-9 pr-9"
+          />
+          {logSearch && (
+            <button
+              type="button"
+              onClick={() => setLogSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Effacer la recherche"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-      </ScrollArea>
+        <p className="text-xs text-muted-foreground">
+          {logs.length} action(s){q ? ` sur ${allLogs.length}` : ''}
+        </p>
+        {logs.length === 0 ? (
+          <p className="text-muted-foreground text-center py-4">Aucun résultat pour « {logSearch} »</p>
+        ) : (
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-2">
+              {logs.map((log: any, index: number) => (
+                <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs">
+                        {log.action_type || log.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {log.created_at ? format(parseISO(log.created_at), 'HH:mm', { locale: fr }) : ''}
+                      </span>
+                    </div>
+                    <p className="text-sm">{log.description || log.message}</p>
+                    {log.actor_name && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Par: {log.actor_name} ({log.actor_type})
+                      </p>
+                    )}
+                    {log.room_number && (
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        Chambre {log.room_number}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </div>
     );
   };
+
 
   const renderBreakfast = () => {
     if (!breakfastLogs || breakfastLogs.length === 0) return null;

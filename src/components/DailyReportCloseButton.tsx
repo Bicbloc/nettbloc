@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Calendar, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Loader2, CheckCircle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { storageService } from '@/services/storageService';
@@ -19,6 +21,8 @@ interface DailyReportCloseButtonProps {
   hideTrigger?: boolean;
 }
 
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
 export function DailyReportCloseButton({ hotelId, onReportClosed, open: controlledOpen, onOpenChange, hideTrigger }: DailyReportCloseButtonProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -28,6 +32,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
   };
   const [isClosing, setIsClosing] = useState(false);
   const [closingStep, setClosingStep] = useState('');
+  const recapEmailKey = `closing_recap_email_${hotelId}`;
+  const [recapEmail, setRecapEmail] = useState('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(recapEmailKey);
+      if (saved) setRecapEmail(saved);
+    } catch { /* ignore */ }
+  }, [recapEmailKey]);
+
 
   const handleCloseDay = async () => {
     setIsClosing(true);
@@ -173,10 +187,37 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
       ];
       toast.success(`Journée clôturée ! Archivés: ${successParts.join(', ')}`);
 
+      // 8b. Envoyer le récapitulatif d'archivage par e-mail (optionnel)
+      const emailTo = recapEmail.trim();
+      if (emailTo && isValidEmail(emailTo)) {
+        try {
+          localStorage.setItem(recapEmailKey, emailTo);
+          await supabase.functions.invoke('send-archive-recap', {
+            body: {
+              to: emailTo,
+              hotelName: hotelData?.name,
+              reportDate: today,
+              pdfUrl,
+              summary: {
+                roomsArchived: archiveResult.archived,
+                assignmentsCleared: archiveResult.assignmentsCleared,
+                linenTasksArchived: archiveResult.linenTasksArchived,
+                totalActions: (todayLogs || []).length,
+              },
+            },
+          });
+          toast.success(`Récapitulatif envoyé à ${emailTo}`);
+        } catch (mailError) {
+          console.error('Envoi du récapitulatif échoué:', mailError);
+          toast.error("Le récapitulatif n'a pas pu être envoyé par e-mail");
+        }
+      }
+
       // 9. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
         onReportClosed();
       }
+
 
       // 10. Rafraîchir la page pour afficher la nouvelle session
       setTimeout(() => {
@@ -244,6 +285,27 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
+
+        {/* Récapitulatif d'archivage par e-mail (optionnel) */}
+        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+          <Label htmlFor="recap-email" className="flex items-center gap-2 text-sm font-medium">
+            <Mail className="h-4 w-4 text-primary" />
+            Recevoir le récapitulatif par e-mail (optionnel)
+          </Label>
+          <Input
+            id="recap-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="ex : direction@hotel.com"
+            value={recapEmail}
+            onChange={(e) => setRecapEmail(e.target.value)}
+            disabled={isClosing}
+          />
+          <p className="text-xs text-muted-foreground">
+            Un récapitulatif de l'archivage (avec le lien du rapport PDF) sera envoyé à cette adresse au moment de la clôture.
+          </p>
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
           <AlertDialogAction onClick={handleCloseDay} className="bg-destructive hover:bg-destructive/90">
