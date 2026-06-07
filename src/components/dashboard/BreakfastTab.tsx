@@ -319,12 +319,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
           <h2 className="text-2xl font-bold">Petit-déjeuner</h2>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline" size="sm" className="gap-2"
-            onClick={() => window.open(`/cafetiere?hotel=${currentHotelId}`, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4" /> Interface Cafetière
-          </Button>
+
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
               <Button variant="secondary" size="sm" className="gap-2">
