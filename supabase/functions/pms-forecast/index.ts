@@ -78,6 +78,7 @@ async function fetchMews(credentials: PmsCredentials, startUtc: string, endUtc: 
       StartUtc: `${startUtc}T00:00:00Z`,
       EndUtc: `${endUtc}T23:59:59Z`,
       TimeFilter: 'Colliding',
+      Extent: { Reservations: true },
       States: ['Started', 'Confirmed', 'Processed'],
       Limitation: cursor ? { Cursor: cursor, Count: 1000 } : { Count: 1000 },
     };
