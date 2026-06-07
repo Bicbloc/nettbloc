@@ -303,10 +303,14 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     for (const a of govAssignments) {
       const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
       sectionRooms.forEach((r) => claimed.add(r.id));
-      const scope =
-        a.assignment_type === 'floor'
-          ? `Étages : ${(a.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ') || '—'}`
-          : `Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ') || '—'}`;
+      const scopeParts: string[] = [];
+      if ((a.assigned_floors || []).length > 0) {
+        scopeParts.push(`Étages : ${(a.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
+      }
+      if ((a.assigned_housekeepers || []).length > 0) {
+        scopeParts.push(`Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ')}`);
+      }
+      const scope = scopeParts.join(' • ') || '—';
       result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
     }
 
