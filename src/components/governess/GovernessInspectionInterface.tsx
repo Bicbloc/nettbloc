@@ -407,7 +407,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Button>
       </div>
 
-      {/* Room list */}
+      {/* Room list grouped by governess */}
       {rooms.length === 0 ? (
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -417,63 +417,32 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {rooms.map(room => {
-            const inspection = getInspectionStatus(room.id);
-            const StatusIcon = inspection ? statusConfig[inspection.status].icon : Eye;
-
+        <div className="space-y-6">
+          {sections.map(section => {
+            const doneCount = section.rooms.filter(
+              r => getInspectionStatus(r.id)?.status === 'passed'
+            ).length;
             return (
-              <Card 
-                key={room.id}
-                className={`cursor-pointer transition-all hover:shadow-lg ${
-                  inspection?.status === 'passed' ? 'border-green-200 bg-green-50/50' :
-                  inspection?.status === 'failed' ? 'border-red-200 bg-red-50/50' :
-                  inspection?.status === 'needs_rework' ? 'border-orange-200 bg-orange-50/50' :
-                  ''
-                }`}
-                onClick={() => openInspectionDialog(room)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Home className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-bold text-lg">{room.room_number}</span>
-                    </div>
-                    {inspection ? (
-                      <Badge className={statusConfig[inspection.status].color}>
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        {statusConfig[inspection.status].label}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <Eye className="h-3 w-3 mr-1" />
-                        À inspecter
-                      </Badge>
-                    )}
+              <div key={section.key} className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-base">{section.name}</h3>
+                    <span className="text-xs text-muted-foreground">{section.scope}</span>
                   </div>
-
-                  {room.housekeeper_name && (
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Nettoyée par: {room.housekeeper_name}
-                    </p>
-                  )}
-
-                  {inspection?.cleanliness_score && (
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <Star 
-                          key={star}
-                          className={`h-4 w-4 ${star <= inspection.cleanliness_score! ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  <Badge variant="secondary">
+                    {doneCount}/{section.rooms.length} validée(s)
+                  </Badge>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {section.rooms.map(renderRoomCard)}
+                </div>
+              </div>
             );
           })}
         </div>
       )}
+
 
       {/* Inspection Dialog */}
       <Dialog open={inspectionDialog} onOpenChange={setInspectionDialog}>
