@@ -49,6 +49,7 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [selectedLog, setSelectedLog] = useState<ArchivedLog | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
   const exportRef = useRef<HTMLDivElement>(null);
 
   const handleExportPdf = async () => {
