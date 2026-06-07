@@ -69,32 +69,47 @@ async function fetchMews(credentials: PmsCredentials, startUtc: string, endUtc: 
     await resourcesRes.text().catch(() => {});
   }
 
-  // Reservations colliding with the horizon window
+  // Mews limits reservations/getAll to a ~100h window, so we chunk by 4 days.
+  // Dedupe reservations by Id across overlapping windows.
+  const seen = new Set<string>();
   const stays: Stay[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < 10; page++) {
-    const body: any = {
-      ...auth,
-      StartUtc: `${startUtc}T00:00:00Z`,
-      EndUtc: `${endUtc}T23:59:59Z`,
-      TimeFilter: 'Colliding',
-      States: ['Started', 'Confirmed', 'Processed'],
-      Limitation: cursor ? { Cursor: cursor, Count: 1000 } : { Count: 1000 },
-    };
-    const res = await mewsFetch(`${baseUrl}/reservations/getAll`, body);
-    if (!res.ok) {
-      await res.text().catch(() => {});
-      break;
+  const windowStart = new Date(`${startUtc}T00:00:00Z`);
+  const windowEnd = new Date(`${endUtc}T23:59:59Z`);
+  const CHUNK_DAYS = 4;
+
+  for (let chunkStart = new Date(windowStart); chunkStart < windowEnd; chunkStart = addDays(chunkStart, CHUNK_DAYS)) {
+    let chunkEnd = addDays(chunkStart, CHUNK_DAYS);
+    if (chunkEnd > windowEnd) chunkEnd = windowEnd;
+
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page++) {
+      const body: any = {
+        ...auth,
+        StartUtc: chunkStart.toISOString(),
+        EndUtc: chunkEnd.toISOString(),
+        TimeFilter: 'Colliding',
+        Extent: { Reservations: true },
+        States: ['Started', 'Confirmed', 'Processed'],
+        Limitation: cursor ? { Cursor: cursor, Count: 1000 } : { Count: 1000 },
+      };
+      const res = await mewsFetch(`${baseUrl}/reservations/getAll`, body);
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        break;
+      }
+      const data = await res.json();
+      const reservations = data.Reservations || [];
+      for (const r of reservations) {
+        const id = r.Id || `${r.ScheduledStartUtc}-${r.ScheduledEndUtc}-${r.AssignedResourceId}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const start = (r.ScheduledStartUtc || r.StartUtc || '').split('T')[0];
+        const end = (r.ScheduledEndUtc || r.EndUtc || '').split('T')[0];
+        if (start && end) stays.push({ start, end });
+      }
+      cursor = data.Cursor;
+      if (!cursor || reservations.length === 0) break;
     }
-    const data = await res.json();
-    const reservations = data.Reservations || [];
-    for (const r of reservations) {
-      const start = (r.ScheduledStartUtc || r.StartUtc || '').split('T')[0];
-      const end = (r.ScheduledEndUtc || r.EndUtc || '').split('T')[0];
-      if (start && end) stays.push({ start, end });
-    }
-    cursor = data.Cursor;
-    if (!cursor || reservations.length === 0) break;
   }
 
   return { stays, totalRooms };
