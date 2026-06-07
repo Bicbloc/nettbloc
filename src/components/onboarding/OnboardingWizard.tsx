@@ -130,14 +130,14 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     switch (currentStep) {
       case 0:
         return (
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-2 sm:py-4">
             <div className="text-center space-y-4">
-              <div className="w-24 h-24 mx-auto bg-gradient-to-br from-primary/20 to-primary/40 rounded-full flex items-center justify-center">
-                <Sparkles className="h-12 w-12 text-primary" />
+              <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto bg-gradient-to-br from-primary/20 to-primary/40 rounded-full flex items-center justify-center">
+                <Sparkles className="h-12 w-12 sm:h-14 sm:w-14 text-primary" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold">Bienvenue sur NettoBloc !</h3>
-                <p className="text-muted-foreground mt-2">
+                <h3 className="text-2xl sm:text-3xl font-bold">Bienvenue sur NettoBloc !</h3>
+                <p className="text-muted-foreground mt-3 text-sm sm:text-base leading-relaxed">
                   Quelques informations de base suffisent pour démarrer. La configuration complète
                   (chambres, équipe, consignes…) se fait ensuite tranquillement depuis votre tableau de bord.
                 </p>
@@ -145,11 +145,11 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </div>
 
             <Card className="border-primary/20 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Gift className="h-8 w-8 text-green-600 shrink-0" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <Gift className="h-9 w-9 sm:h-10 sm:w-10 text-green-600 shrink-0" />
                   <div>
-                    <p className="font-semibold text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
+                    <p className="font-semibold text-base text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       Accès complet à toutes les fonctionnalités, sans carte bancaire.
                     </p>
@@ -159,14 +159,14 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </Card>
 
             <Card className="bg-muted/50">
-              <CardContent className="p-4 space-y-2 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Vous pourrez faire plus tard :</p>
-                <ul className="space-y-1 list-disc pl-4">
+              <CardContent className="p-5 space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground text-base">Vous pourrez faire plus tard :</p>
+                <ul className="space-y-1.5 list-disc pl-5">
                   <li>Importer ou créer vos chambres</li>
                   <li>Inviter vos gouvernantes et femmes de chambre</li>
                   <li>Définir vos consignes et temps de nettoyage</li>
                 </ul>
-                <p className="pt-1">Rien d'urgent : tout reste modifiable à tout moment.</p>
+                <p className="pt-2">Rien d'urgent : tout reste modifiable à tout moment.</p>
               </CardContent>
             </Card>
           </div>
