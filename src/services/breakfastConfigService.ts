@@ -189,16 +189,26 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     ? 0
     : Number(cleanItems.reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
 
-  // Anti-doublon PMS : si la chambre a déjà été envoyée au PMS aujourd'hui,
-  // on conserve le statut « sent » pour ne JAMAIS renvoyer la même charge.
+  // La cafetière peut ajouter des prestations à tout moment. On compare les
+  // prestations déclarées aux prestations déjà envoyées au PMS (`sent_items`)
+  // pour savoir s'il reste un delta à transmettre. S'il reste quelque chose,
+  // on repasse en « pending » pour déclencher un nouvel envoi (du delta seul).
   const { data: existing } = await supabase
     .from('breakfast_logs')
-    .select('pms_status')
+    .select('pms_status, sent_items')
     .eq('hotel_id', hotelId)
     .eq('room_number', roomNumber)
     .eq('log_date', logDate)
     .maybeSingle();
-  const alreadySent = existing?.pms_status === 'sent';
+
+  const rawSent = (existing as unknown as { sent_items?: unknown } | null)?.sent_items;
+  const sentList = Array.isArray(rawSent) ? (rawSent as BreakfastLogItem[]) : [];
+  const sentMap: Record<string, number> = {};
+  for (const s of sentList) sentMap[s.name] = (sentMap[s.name] || 0) + Number(s.qty || 0);
+  const hasNewToBill =
+    !included && cleanItems.some((i) => i.qty - (sentMap[i.name] || 0) > 0);
+  // Si rien de nouveau à facturer, on conserve le statut existant (ex. « sent »).
+  const nextStatus = hasNewToBill ? 'pending' : (existing?.pms_status || 'pending');
 
   const payload = {
     hotel_id: hotelId,
@@ -213,7 +223,7 @@ export async function upsertBreakfastLog(params: UpsertLogParams): Promise<boole
     source: 'manual',
     logged_by: loggedBy,
     comment,
-    pms_status: alreadySent ? 'sent' : 'pending',
+    pms_status: nextStatus,
   };
 
   const { error } = await supabase

@@ -437,6 +437,7 @@ export type Database = {
           people_count: number
           pms_status: string
           room_number: string
+          sent_items: Json
           source: string
           total_amount: number
           unit_price: number
@@ -455,6 +456,7 @@ export type Database = {
           people_count?: number
           pms_status?: string
           room_number: string
+          sent_items?: Json
           source?: string
           total_amount?: number
           unit_price?: number
@@ -473,6 +475,7 @@ export type Database = {
           people_count?: number
           pms_status?: string
           room_number?: string
+          sent_items?: Json
           source?: string
           total_amount?: number
           unit_price?: number

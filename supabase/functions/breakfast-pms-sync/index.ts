@@ -648,6 +648,10 @@ Deno.serve(async (req) => {
     }
 
     // ─── POST MODE ────────────────────────────────────────────────
+    // On envoie au PMS les prestations facturées qui n'ont pas encore été
+    // transmises. La cafetière peut ajouter de nouvelles prestations à tout
+    // moment : on n'envoie QUE le delta (différence entre les prestations
+    // déclarées et celles déjà envoyées, mémorisées dans `sent_items`).
     let logsQuery = admin
       .from('breakfast_logs')
       .select('*')
@@ -655,7 +659,6 @@ Deno.serve(async (req) => {
       .eq('log_date', date)
       .eq('included', false)
       .gt('total_amount', 0)
-      .neq('pms_status', 'sent')
     if (room_number) logsQuery = logsQuery.eq('room_number', room_number)
     const { data: logs, error: logsErr } = await logsQuery
     if (logsErr) throw logsErr
@@ -697,6 +700,22 @@ Deno.serve(async (req) => {
       }]
     }
 
+    // Calcule le delta : prestations déclarées non encore envoyées au PMS.
+    // `sent_items` mémorise les quantités déjà facturées par prestation.
+    const deltaItemsOf = (log: any): BreakfastItem[] => {
+      const current = itemsOf(log)
+      const sent = Array.isArray(log.sent_items) ? log.sent_items : []
+      const sentMap: Record<string, number> = {}
+      for (const s of sent) {
+        const key = String(s?.name ?? '')
+        sentMap[key] = (sentMap[key] || 0) + Number(s?.qty || 0)
+      }
+      return current
+        .map((it) => ({ ...it, qty: it.qty - (sentMap[it.name] || 0) }))
+        .filter((it) => it.qty > 0)
+    }
+
+
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
@@ -705,13 +724,17 @@ Deno.serve(async (req) => {
       const resMap = await buildApaleoReservationMap(token, propertyId)
 
       for (const log of logs) {
+        const delta = deltaItemsOf(log)
+        if (delta.length === 0) continue // Rien de nouveau à facturer.
         try {
           const reservationId = resMap.get(String(log.room_number).trim().toLowerCase())
           if (!reservationId) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          for (const it of itemsOf(log)) {
+          for (const it of delta) {
             await postApaleoCharge(token, reservationId, `Petit-déjeuner ${it.name}`.trim(), Number(it.price), currency, Number(it.qty))
           }
-          await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
+          await admin.from('breakfast_logs')
+            .update({ pms_status: 'sent', sent_items: itemsOf(log) as unknown as never })
+            .eq('id', log.id)
           sent++
         } catch (e) {
           console.error('apaleo charge error', log.room_number, e)
@@ -734,11 +757,15 @@ Deno.serve(async (req) => {
       }
       const { map } = await buildMewsReservationMap(creds)
       for (const log of logs) {
+        const delta = deltaItemsOf(log)
+        if (delta.length === 0) continue // Rien de nouveau à facturer.
         try {
           const match = map.get(String(log.room_number).trim().toLowerCase())
           if (!match) throw new Error(`Aucune réservation en cours pour la chambre ${log.room_number}`)
-          await postMewsOrder(creds, serviceId, match.customerId, match.reservationId, itemsOf(log), currency, bfCfg?.pms_tax_code || null)
-          await admin.from('breakfast_logs').update({ pms_status: 'sent' }).eq('id', log.id)
+          await postMewsOrder(creds, serviceId, match.customerId, match.reservationId, delta, currency, bfCfg?.pms_tax_code || null)
+          await admin.from('breakfast_logs')
+            .update({ pms_status: 'sent', sent_items: itemsOf(log) as unknown as never })
+            .eq('id', log.id)
           sent++
         } catch (e) {
           console.error('mews order error', log.room_number, e)
