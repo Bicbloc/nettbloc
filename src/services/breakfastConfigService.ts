@@ -99,6 +99,9 @@ export async function loadBreakfastConfig(hotelId: string): Promise<BreakfastCon
     default_included: !!data.default_included,
     pms_service_id: (data as { pms_service_id?: string | null }).pms_service_id ?? null,
     pms_tax_code: (data as { pms_tax_code?: string | null }).pms_tax_code ?? null,
+    included_rate_plan_ids: Array.isArray((data as { included_rate_plan_ids?: string[] }).included_rate_plan_ids)
+      ? ((data as { included_rate_plan_ids?: string[] }).included_rate_plan_ids as string[])
+      : [],
   };
 }
 
