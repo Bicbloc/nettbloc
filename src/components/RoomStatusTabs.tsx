@@ -27,7 +27,7 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
     { value: 'dirty', label: 'À nettoyer', icon: Trash2, count: counts.dirty, color: 'bg-yellow-500' },
     { value: 'stayover', label: 'Recouche', icon: Bed, count: counts.stayover, color: 'bg-purple-500' },
     { value: 'checkout', label: 'Client sorti', icon: LogOut, count: counts.checkout, color: 'bg-red-500' },
-    { value: 'dnd', label: 'Ne pas déranger', icon: Moon, count: counts.dnd, color: 'bg-rose-500' },
+    { value: 'dnd', label: 'DND', icon: Moon, count: counts.dnd, color: 'bg-rose-500' },
   ];
 
   const handleTabChange = (value: string) => {
