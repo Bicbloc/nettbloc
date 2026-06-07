@@ -699,6 +699,49 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ─── INSPECT ROOM MODE (diagnostic Apaleo) ────────────────────
+    // Retourne la réservation, les folios et leurs charges pour une chambre,
+    // afin de vérifier si la prestation a réellement atterri côté PMS.
+    if (mode === 'inspect_room') {
+      if (!config) {
+        return new Response(JSON.stringify({ ok: false, message: noConfigMessage }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      if (config.pms_type !== 'apaleo') {
+        return new Response(JSON.stringify({ ok: false, message: 'inspect_room: Apaleo uniquement' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
+      const propertyId = creds.propertyId || config.property_id
+      const token = await getApaleoToken(creds)
+      const resMap = await buildApaleoReservationMap(token, propertyId!)
+      const key = String(room_number || '').trim().toLowerCase()
+      const reservationId = resMap.get(key)
+      if (!reservationId) {
+        return new Response(JSON.stringify({ ok: false, message: `Aucune réservation pour ${room_number}`, known_rooms: [...resMap.keys()] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const folioRes = await fetch(
+        `https://api.apaleo.com/finance/v1/folios?reservationIds=${encodeURIComponent(reservationId)}&pageSize=50`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
+      )
+      const folioData = folioRes.ok ? await folioRes.json() : { folios: [] }
+      const folios = (folioData.folios || []) as any[]
+      const detailed: any[] = []
+      for (const f of folios) {
+        const cRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${f.id}/charges`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
+        const cData = cRes.ok ? await cRes.json() : { charges: [] }
+        detailed.push({
+          id: f.id, isMainFolio: f.isMainFolio, status: f.status,
+          currency: f.balance?.currency,
+          charges: (cData.charges || []).map((c: any) => ({ name: c.name, amount: c.amount, quantity: c.quantity, serviceType: c.serviceType })),
+        })
+      }
+      return new Response(JSON.stringify({ ok: true, room_number, reservationId, folios: detailed }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // ─── POST MODE ────────────────────────────────────────────────
     // On envoie au PMS les prestations facturées qui n'ont pas encore été
     // transmises. La cafetière peut ajouter de nouvelles prestations à tout
