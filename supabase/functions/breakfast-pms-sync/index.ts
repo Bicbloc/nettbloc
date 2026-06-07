@@ -636,7 +636,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
-        const token = await getApaleoToken(creds)
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
         const products = await fetchApaleoProducts(token, propertyId!)
         return new Response(JSON.stringify({ ok: true, pms: 'apaleo', service_id: null, products }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -659,7 +659,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
-        const token = await getApaleoToken(creds)
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
         const rooms = await fetchApaleoRooms(token, propertyId!)
         return new Response(JSON.stringify({ ok: true, pms: 'apaleo', rooms }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -682,7 +682,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
-        const token = await getApaleoToken(creds)
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
         const guests = await fetchApaleoRoomGuests(token, propertyId!)
         return new Response(JSON.stringify({ ok: true, pms: 'apaleo', guests }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -736,7 +736,7 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       } else {
         const propertyId = creds.propertyId || config.property_id
-        const token = await getApaleoToken(creds)
+        const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
         const resMap = await buildApaleoReservationMap(token, propertyId!)
         const matched = billableRooms.filter((r) => resMap.has(r.trim().toLowerCase()))
         return new Response(JSON.stringify({
@@ -763,7 +763,7 @@ Deno.serve(async (req) => {
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
       const propertyId = creds.propertyId || config.property_id
-      const token = await getApaleoToken(creds)
+      const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
       const resMap = await buildApaleoReservationMap(token, propertyId!)
       const key = String(room_number || '').trim().toLowerCase()
       const reservationId = resMap.get(key)
@@ -869,7 +869,7 @@ Deno.serve(async (req) => {
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
       if (!propertyId) throw new Error('Property ID Apaleo manquant')
-      const token = await getApaleoToken(creds)
+      const token = await getApaleoToken(creds, { admin, hotelId: hotel_id })
       const resMap = await buildApaleoReservationMap(token, propertyId)
 
       for (const log of logs) {
