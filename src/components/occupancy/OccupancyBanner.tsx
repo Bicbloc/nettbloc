@@ -1,8 +1,10 @@
-import { TrendingUp, BedDouble, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { TrendingUp, BedDouble, LogIn, LogOut, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useOccupancyForecast } from '@/hooks/use-occupancy-forecast';
+import { useRoomCleanliness } from '@/hooks/use-room-cleanliness';
 
 interface OccupancyBannerProps {
   hotelId: string | null | undefined;
@@ -17,13 +19,15 @@ interface OccupancyBannerProps {
  */
 export function OccupancyBanner({ hotelId, canRefresh = false, className }: OccupancyBannerProps) {
   const { today, loading, refreshing, refresh } = useOccupancyForecast(hotelId, { autoRefresh: canRefresh });
+  const { clean, dirty, total: roomsTotal } = useRoomCleanliness(hotelId);
 
   if (!hotelId) return null;
-  if (!today && !loading && !canRefresh) return null;
+  if (!today && !loading && !canRefresh && roomsTotal === 0) return null;
 
   const rate = today?.occupancy_rate ?? 0;
   const occupied = today?.occupied_rooms ?? 0;
   const total = today?.total_rooms ?? 0;
+  const cleanPct = roomsTotal > 0 ? Math.round((clean / roomsTotal) * 100) : 0;
 
   return (
     <Card className={cn('overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10', className)}>
@@ -80,6 +84,25 @@ export function OccupancyBanner({ hotelId, canRefresh = false, className }: Occu
           )}
         </div>
       </div>
+
+      {roomsTotal > 0 && (
+        <div className="border-t border-primary/10 bg-background/40 px-5 py-4">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+              <Sparkles className="h-4 w-4" /> {clean} propres
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">{cleanPct}%</span>
+            <span className="flex items-center gap-1.5 font-medium text-amber-600">
+              {dirty} sales <Trash2 className="h-4 w-4" />
+            </span>
+          </div>
+          <Progress value={cleanPct} className="h-2.5" />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {clean} / {roomsTotal} chambres propres
+          </p>
+        </div>
+      )}
     </Card>
+
   );
 }
