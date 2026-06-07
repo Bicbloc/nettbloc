@@ -133,16 +133,45 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
 
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from('daily_governess_assignments').insert({
-      hotel_id: hotelId,
-      assignment_date: todayDate(),
-      governess_profile_id: gov.id,
-      governess_name: gov.name,
-      assignment_type: mode,
-      assigned_floors: mode === 'floor' ? pickedFloors : [],
-      assigned_housekeepers: mode === 'housekeeper' ? pickedHousekeepers : [],
-      created_by: userData.user?.id ?? null,
-    });
+
+    // Une seule ligne par gouvernante et par jour (contrainte unique).
+    // On fusionne donc la nouvelle sélection avec une éventuelle attribution existante.
+    const existing = assignments.find((a) => a.governess_profile_id === gov.id);
+
+    const mergedFloors =
+      mode === 'floor'
+        ? [...new Set([...(existing?.assigned_floors || []), ...pickedFloors])].sort((a, b) => a - b)
+        : existing?.assigned_floors || [];
+    const mergedHousekeepers =
+      mode === 'housekeeper'
+        ? [...new Set([...(existing?.assigned_housekeepers || []), ...pickedHousekeepers])]
+        : existing?.assigned_housekeepers || [];
+
+    let error;
+    if (existing) {
+      ({ error } = await supabase
+        .from('daily_governess_assignments')
+        .update({
+          // On conserve un type cohérent : si on ajoute par étage et qu'il y a aussi
+          // des femmes de chambre (ou inverse), le type devient mixte.
+          assignment_type:
+            mergedFloors.length > 0 && mergedHousekeepers.length > 0 ? 'mixed' : mode,
+          assigned_floors: mergedFloors,
+          assigned_housekeepers: mergedHousekeepers,
+        })
+        .eq('id', existing.id));
+    } else {
+      ({ error } = await supabase.from('daily_governess_assignments').insert({
+        hotel_id: hotelId,
+        assignment_date: todayDate(),
+        governess_profile_id: gov.id,
+        governess_name: gov.name,
+        assignment_type: mode,
+        assigned_floors: mode === 'floor' ? pickedFloors : [],
+        assigned_housekeepers: mode === 'housekeeper' ? pickedHousekeepers : [],
+        created_by: userData.user?.id ?? null,
+      }));
+    }
     setSaving(false);
     if (error) {
       console.error('[governess] assign error:', error);
