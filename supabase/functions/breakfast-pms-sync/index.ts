@@ -120,6 +120,47 @@ async function getApaleoToken(creds: PmsCredentials, persist?: ApaleoPersistCtx)
 }
 
 
+// Nom de l'unité (chambre) d'une réservation Apaleo.
+function apaleoUnitName(r: any): string | null {
+  const slices = r.timeSlices || []
+  return slices.map((s: any) => s.unit?.name || s.unit?.id).find(Boolean) || null
+}
+
+// Une même chambre peut avoir PLUSIEURS réservations « InHouse » qui se
+// chevauchent (ex. arrivée du jour + séjour en cours). Pour éviter de facturer
+// ou d'afficher le mauvais client, on sélectionne UN occupant déterministe par
+// chambre : on privilégie la réservation réellement présente cette nuit
+// (arrivée ≤ aujourd'hui < départ), puis, à égalité, celle arrivée le plus tôt
+// (l'occupant installé depuis le plus longtemps).
+function apaleoResRank(r: any, today: string): [number, number] {
+  const arr = (r.arrival || '').split('T')[0]
+  const dep = (r.departure || '').split('T')[0]
+  const inHouseNow = arr && dep && arr <= today && today < dep ? 1 : 0
+  // Arrivée la plus tôt = meilleure ; on encode en négatif pour comparer "plus grand = mieux".
+  const arrMs = arr ? Date.parse(arr) : Number.MAX_SAFE_INTEGER
+  return [inHouseNow, -arrMs]
+}
+
+function apaleoBetter(a: [number, number], b: [number, number]): boolean {
+  if (a[0] !== b[0]) return a[0] > b[0]
+  return a[1] > b[1]
+}
+
+// Sélectionne une réservation par chambre (clé = nom d'unité en minuscules).
+function selectApaleoReservationsByUnit(reservations: any[], today: string): Map<string, any> {
+  const map = new Map<string, any>()
+  for (const r of reservations) {
+    const name = apaleoUnitName(r)
+    if (!name) continue
+    const key = String(name).trim().toLowerCase()
+    const existing = map.get(key)
+    if (!existing || apaleoBetter(apaleoResRank(r, today), apaleoResRank(existing, today))) {
+      map.set(key, r)
+    }
+  }
+  return map
+}
+
 async function buildApaleoReservationMap(token: string, propertyId: string): Promise<Map<string, string>> {
   const res = await fetch(
     `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}&status=InHouse&pageSize=200&expand=timeSlices`,
@@ -127,14 +168,10 @@ async function buildApaleoReservationMap(token: string, propertyId: string): Pro
   )
   if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
   const data = await res.json()
+  const today = new Date().toISOString().split('T')[0]
+  const selected = selectApaleoReservationsByUnit(data.reservations || [], today)
   const map = new Map<string, string>()
-  for (const r of data.reservations || []) {
-    const slices = r.timeSlices || []
-    for (const s of slices) {
-      const name = s.unit?.name || s.unit?.id
-      if (name) map.set(String(name).trim().toLowerCase(), r.id)
-    }
-  }
+  for (const [key, r] of selected) map.set(key, r.id)
   return map
 }
 
