@@ -168,7 +168,7 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
 
         {shared.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Cafetières ayant accès</p>
+            <p className="text-xs font-medium text-muted-foreground">Personnel ayant accès</p>
             {shared.map((s) => (
               <div key={s.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
                 <div className="flex items-center gap-2">
