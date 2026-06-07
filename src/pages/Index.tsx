@@ -27,6 +27,8 @@ import { storageService } from "@/services/storageService";
 import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
+import { OccupancyBanner } from "@/components/occupancy/OccupancyBanner";
+import { OccupancyForecast } from "@/components/occupancy/OccupancyForecast";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { realtimeManager } from "@/services/RealtimeManager";
