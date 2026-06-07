@@ -554,7 +554,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_products') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+          ok: false, message: noConfigMessage,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -583,7 +583,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_rooms') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', rooms: [],
+          ok: false, message: noConfigMessage, rooms: [],
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -606,7 +606,7 @@ Deno.serve(async (req) => {
     if (mode === 'fetch_room_guests') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.', guests: [],
+          ok: false, message: noConfigMessage, guests: [],
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
@@ -632,7 +632,7 @@ Deno.serve(async (req) => {
     if (mode === 'test') {
       if (!config) {
         return new Response(JSON.stringify({
-          ok: false, pms: null, message: 'Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel.',
+          ok: false, pms: null, message: noConfigMessage,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
