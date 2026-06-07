@@ -282,15 +282,17 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Détermine si une chambre relève d'une attribution de gouvernante donnée.
   const roomMatchesAssignment = (room: Room, a: DailyGovAssignment): boolean => {
-    if (a.assignment_type === 'floor') {
-      const floors = (a.assigned_floors || []).map(Number);
-      return room.floor != null && floors.includes(Number(room.floor));
-    }
-    if (a.assignment_type === 'housekeeper') {
-      const hks = (a.assigned_housekeepers || []).map((h) => (h || '').trim().toLowerCase());
-      return !!room.housekeeper_name && hks.includes(room.housekeeper_name.trim().toLowerCase());
-    }
-    return false;
+    const floors = (a.assigned_floors || []).map(Number);
+    const matchFloor =
+      floors.length > 0 && room.floor != null && floors.includes(Number(room.floor));
+
+    const hks = (a.assigned_housekeepers || []).map((h) => (h || '').trim().toLowerCase());
+    const matchHk =
+      hks.length > 0 &&
+      !!room.housekeeper_name &&
+      hks.includes(room.housekeeper_name.trim().toLowerCase());
+
+    return matchFloor || matchHk;
   };
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
