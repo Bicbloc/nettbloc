@@ -587,10 +587,21 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
         </div>
       </div>
 
-      {/* Partage des chambres avec une cafetière existante */}
+      {/* Personnel point de vente du jour */}
       <CafetiereShareCard hotelId={currentHotelId} />
 
-      {/* Page principale : chambres + petits-déjeuners du jour */}
+      <Tabs defaultValue="rooms" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="rooms" className="gap-2">
+            <BedDouble className="h-4 w-4" /> Chambres
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="gap-2">
+            <Coffee className="h-4 w-4" /> Facturation du jour
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rooms" className="mt-4 space-y-6">
+      {/* Page principale : chambres */}
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
