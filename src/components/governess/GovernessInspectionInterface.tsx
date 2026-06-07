@@ -21,7 +21,16 @@ interface Room {
   status: string;
   cleaning_type: string;
   notes: string | null;
+  floor?: number | null;
   housekeeper_name?: string;
+}
+
+interface DailyGovAssignment {
+  id: string;
+  governess_name: string;
+  assignment_type: string;
+  assigned_floors: number[] | null;
+  assigned_housekeepers: string[] | null;
 }
 
 interface Inspection {
