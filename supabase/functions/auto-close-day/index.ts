@@ -232,11 +232,33 @@ Deno.serve(async (req) => {
       try {
         const summary = await closeHotelDay(supabase, hotel.id, date);
         await supabase.from('hotels').update({ last_auto_close_date: date }).eq('id', hotel.id);
+
+        // Envoi du récapitulatif d'archivage par e-mail si configuré
+        if (hotel.auto_close_recap_email) {
+          try {
+            await supabase.functions.invoke('send-archive-recap', {
+              body: {
+                to: hotel.auto_close_recap_email,
+                hotelName: hotel.name,
+                reportDate: date,
+                summary: {
+                  roomsArchived: summary.rooms,
+                  assignmentsCleared: summary.assignments,
+                  linenTasksArchived: summary.linenTasks,
+                },
+              },
+            });
+          } catch (mailErr) {
+            console.error(`Erreur envoi récap hôtel ${hotel.id}:`, mailErr);
+          }
+        }
+
         results.push({ hotel_id: hotel.id, name: hotel.name, closed: true, ...summary });
       } catch (e) {
         console.error(`Erreur clôture hôtel ${hotel.id}:`, e);
         results.push({ hotel_id: hotel.id, name: hotel.name, closed: false, error: String(e) });
       }
+
     }
 
     return new Response(JSON.stringify({ processed: results.length, results }), {
