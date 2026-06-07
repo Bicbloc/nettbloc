@@ -421,10 +421,12 @@ async function fetchApaleoRooms(token: string, propertyId: string): Promise<PmsR
   )
   if (!res.ok) throw new Error(`Récupération réservations Apaleo échouée [${res.status}]`)
   const data = await res.json()
+  const today = new Date().toISOString().split('T')[0]
+  // Dédoublonne par chambre : un seul occupant (le même que celui facturé).
+  const selected = selectApaleoReservationsByUnit(data.reservations || [], today)
   const rooms: PmsRoom[] = []
-  for (const r of data.reservations || []) {
-    const slices = r.timeSlices || []
-    const unitName = slices.map((s: any) => s.unit?.name || s.unit?.id).find(Boolean)
+  for (const [, r] of selected) {
+    const unitName = apaleoUnitName(r)
     if (!unitName) continue
     const services = r.services || []
     const breakfast = services.some((s: any) => BREAKFAST_RE.test(String(s.service?.name || s.name || '')))
