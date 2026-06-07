@@ -207,19 +207,18 @@ export default function CafetiereWork() {
     });
     await refreshLogs();
 
-    // Anti-doublon : on n'envoie au PMS que si la chambre n'a pas déjà été envoyée.
-    const alreadySent = logs[selected]?.pms_status === 'sent';
-    if (pmsConfigured && !draftIncluded && peopleCount > 0 && !alreadySent) {
+    // Chaque prestation ajoutée est immédiatement envoyée au PMS. La fonction
+    // edge ne facture que le delta (nouvelles prestations non encore envoyées),
+    // donc on peut en ajouter autant que voulu sans jamais facturer en double.
+    if (pmsConfigured && !draftIncluded && peopleCount > 0) {
       const res = await sendBreakfastsToPms(hotelId, todayDate(), selected);
       if (res.ok && res.sent > 0) {
         toast.success(`Chambre ${selected} enregistrée et envoyée au PMS`);
       } else if (res.ok) {
-        toast.success(`Chambre ${selected} enregistrée`);
+        toast.success(`Chambre ${selected} enregistrée (aucune nouvelle prestation à envoyer)`);
       } else {
         toast.warning(`Chambre ${selected} enregistrée — envoi PMS échoué`);
       }
-    } else if (alreadySent) {
-      toast.success(`Chambre ${selected} mise à jour (déjà envoyée au PMS)`);
     } else {
       toast.success(`Chambre ${selected} enregistrée`);
     }
