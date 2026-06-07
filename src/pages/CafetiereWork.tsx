@@ -64,6 +64,8 @@ export default function CafetiereWork() {
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
   const [draftIncluded, setDraftIncluded] = useState(false);
   const [draftComment, setDraftComment] = useState('');
+  // Prestation en attente de confirmation « doublon » (déjà ajoutée).
+  const [dupConfirm, setDupConfirm] = useState<string | null>(null);
 
   const refreshLogs = useCallback(async () => {
     if (!hotelId) return;
