@@ -230,6 +230,16 @@ export class RoomArchiveService {
           .eq('task_date', today);
         
       }
+
+      // 8b. Purger les petits-déjeuners du jour (déjà archivés dans le rapport)
+      if (breakfastData.length > 0) {
+        await supabase
+          .from('breakfast_logs')
+          .delete()
+          .eq('hotel_id', hotelId)
+          .eq('log_date', today);
+      }
+
       
       // 9. Supprimer les chambres pour vider la page (registre préservé)
       const { error: deleteError } = await supabase
