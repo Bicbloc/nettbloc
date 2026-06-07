@@ -114,11 +114,10 @@ async function postApaleoCharge(
   // incompatibilité de devise, ex. folio en GBP vs config en EUR).
   const folioCurrency = folio?.balance?.currency || currency
 
-  // Endpoint correct = `finance/v1/folios/{folioId}/charges` (POST). C'est
-  // celui-ci qui crée RÉELLEMENT une charge visible dans le folio. L'ancien
-  // `folio-actions/{id}/charges` renvoyait 200 mais ne créait aucune charge.
-  // `vatType` est requis AU NIVEAU RACINE (pas dans `amount`), sinon 422.
-  const chargeRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${folioId}/charges`, {
+  // Endpoint correct = `finance/v1/folio-actions/{folioId}/charges` (l'ancien
+  // `folios/{id}/charges` renvoie 404). `vatType` est requis AU NIVEAU RACINE
+  // de la charge (pas dans `amount`), sinon Apaleo renvoie 422.
+  const chargeRes = await fetch(`https://api.apaleo.com/finance/v1/folio-actions/${folioId}/charges`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -130,6 +129,7 @@ async function postApaleoCharge(
     }),
   })
   if (!chargeRes.ok) throw new Error(`Charge Apaleo refusée [${chargeRes.status}]: ${await chargeRes.text()}`)
+
 
 }
 
@@ -731,15 +731,19 @@ Deno.serve(async (req) => {
       const folios = (folioData.folios || []) as any[]
       const detailed: any[] = []
       for (const f of folios) {
-        const cRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${f.id}/charges`,
+        // Le détail des charges est dans le folio lui-même (expand=charges).
+        const cRes = await fetch(`https://api.apaleo.com/finance/v1/folios/${f.id}?expand=charges`,
           { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-        const cData = cRes.ok ? await cRes.json() : { charges: [] }
+        const cStatus = cRes.status
+        const cData = cRes.ok ? await cRes.json() : {}
         detailed.push({
           id: f.id, isMainFolio: f.isMainFolio, status: f.status,
           currency: f.balance?.currency,
+          detail_status: cStatus,
           charges: (cData.charges || []).map((c: any) => ({ name: c.name, amount: c.amount, quantity: c.quantity, serviceType: c.serviceType })),
         })
       }
+
       return new Response(JSON.stringify({ ok: true, room_number, reservationId, folios: detailed }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
