@@ -829,6 +829,13 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Total objets": "Total items",
   "Client contacté": "Guest contacted",
   "Clients contactés": "Guests contacted",
+  "Client répondu": "Guest replied",
+  "Personne non trouvée": "Person not found",
+  "Envoi postal (notre charge)": "Postal shipment (our charge)",
+  "Envoi postal (charge client)": "Postal shipment (guest charge)",
+  "Récupéré en personne": "Picked up in person",
+  "Clôturé": "Closed",
+  "Détails de l'objet trouvé": "Found item details",
 
   // Tasks
   "Planifiez des tâches récurrentes ou ponctuelles pour votre équipe":
