@@ -648,10 +648,16 @@ Deno.serve(async (req) => {
 
     const { data: bfCfg } = await admin
       .from('hotel_breakfast_configs')
-      .select('currency, pms_service_id, pms_tax_code')
+      .select('currency, pms_service_id, pms_tax_code, included_rate_plan_ids')
       .eq('hotel_id', hotel_id)
       .maybeSingle()
     const currency = bfCfg?.currency || 'EUR'
+    // Plans tarifaires (rate plans) du PMS marqués « petit-déjeuner inclus » par l'admin.
+    const includedRatePlanIds = new Set<string>(
+      ((bfCfg?.included_rate_plan_ids as string[] | null) || [])
+        .map((v) => String(v).trim().toLowerCase())
+        .filter(Boolean),
+    )
 
     // ─── FETCH PRODUCTS / PRESTATIONS MODE ────────────────────────
     // Returns the breakfast prestations directly from the PMS (single config),
