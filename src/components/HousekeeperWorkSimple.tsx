@@ -1268,7 +1268,7 @@ const HousekeeperWorkContent: React.FC = () => {
             <div className="flex gap-2 flex-wrap">
               <Button 
                 variant="outline" 
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 rounded-xl active:scale-95"
                 onClick={() => loadWorkData()}
                 disabled={isRefreshing}
               >
