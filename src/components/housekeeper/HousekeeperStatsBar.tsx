@@ -118,13 +118,13 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
           </div>
           
           {!startTime && (
-            <Button size="sm" onClick={onStartPointage} className="rounded-xl gap-1.5 h-9 bg-green-500 hover:bg-green-600">
+            <Button size="sm" onClick={onStartPointage} className="rounded-xl gap-1.5 h-9 bg-emerald-500 hover:bg-emerald-600 active:scale-95">
               <Play className="h-3.5 w-3.5" />
               Commencer
             </Button>
           )}
           {startTime && !endTime && (
-            <Button size="sm" variant="secondary" onClick={onEndPointage} className="rounded-xl gap-1.5 h-9">
+            <Button size="sm" variant="secondary" onClick={onEndPointage} className="rounded-xl gap-1.5 h-9 active:scale-95">
               <Square className="h-3.5 w-3.5" />
               Terminer
             </Button>
