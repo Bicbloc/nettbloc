@@ -11,45 +11,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
-  Crown, 
   LogOut, 
   Building2, 
   CheckCircle, 
   AlertTriangle, 
-  Eye, 
   Loader2, 
-  RefreshCw, 
   Clock, 
   XCircle, 
   Home, 
   Users, 
-  FileText,
   Package,
   Shirt,
-  ClipboardCheck,
-  ArrowLeft,
-  Info,
   ClipboardList
 } from 'lucide-react';
-import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
 import { GovernessStaffPanel } from '@/components/governess/GovernessStaffPanel';
-import { GovernessActionLog } from '@/components/governess/GovernessActionLog';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReportWizard';
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
-import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
-import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { OccupancyBanner } from '@/components/occupancy/OccupancyBanner';
-import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { LayoutGrid } from 'lucide-react';
 
-type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions' | 'plan';
+type GovTab = 'rooms' | 'staff' | 'tasks' | 'declare';
+type DeclareSection = 'incident' | 'lost' | 'linen';
 
 interface GovernessProfile {
   id: string;
@@ -97,6 +85,7 @@ function GovernessDashboardContent() {
   // Identifiant de session stable pour éviter de créer une tâche à chaque rendu
   const [govLinenTaskId, setGovLinenTaskId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<GovTab>('rooms');
+  const [declareSection, setDeclareSection] = useState<DeclareSection>('incident');
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -407,19 +396,15 @@ function GovernessDashboardContent() {
 
   const bottomTabs: { key: GovTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'rooms', label: 'Chambres', icon: Home },
-    { key: 'inspection', label: 'Contrôle', icon: Eye },
-    { key: 'incidents', label: 'Incidents', icon: AlertTriangle, badge: stats.pendingIncidents },
     { key: 'staff', label: 'Personnel', icon: Users },
     { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+    { key: 'declare', label: 'Déclarations', icon: AlertTriangle, badge: stats.pendingIncidents + stats.lostItems },
   ];
 
-  const secondaryTabs: { key: GovTab; label: string; icon: React.ElementType }[] = [
-    { key: 'lost', label: 'Objets trouvés', icon: Package },
-    { key: 'linen', label: 'Linge', icon: Shirt },
-    { key: 'validate', label: 'Validation', icon: ClipboardCheck },
-    { key: 'plan', label: 'Plan', icon: LayoutGrid },
-    { key: 'instructions', label: 'Consignes', icon: Info },
-    { key: 'logs', label: 'Journal', icon: FileText },
+  const declareSections: { key: DeclareSection; label: string; icon: React.ElementType; badge?: number }[] = [
+    { key: 'incident', label: 'Incident IA', icon: AlertTriangle, badge: stats.pendingIncidents },
+    { key: 'lost', label: 'Objet IA', icon: Package, badge: stats.lostItems },
+    { key: 'linen', label: 'Linge IA', icon: Shirt },
   ];
 
   return (
@@ -456,26 +441,9 @@ function GovernessDashboardContent() {
             </div>
           </div>
         </div>
-
-        {/* Secondary tabs - scrollable */}
-        <div className="flex overflow-x-auto gap-1 px-4 pb-2 scrollbar-hide">
-          {secondaryTabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all",
-                activeTab === key
-                  ? "bg-white text-amber-700"
-                  : "bg-white/15 text-white/80 hover:bg-white/25"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
+
+
 
       <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
       <StaffNotificationBanner hotelId={selectedHotel?.id} />
@@ -555,11 +523,10 @@ function GovernessDashboardContent() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {[
-                { value: stats.totalRooms, label: 'Total', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
+                { value: stats.totalRooms, label: 'Chambres', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
                 { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
-                { value: stats.inspectedRooms, label: 'Inspectées', color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/30', icon: Eye },
                 { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-red-100 text-red-600 dark:bg-red-950/30', icon: AlertTriangle },
                 { value: stats.lostItems, label: 'Objets', color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30', icon: Package },
               ].map(({ value, label, color, icon: StatIcon }) => (
@@ -599,7 +566,7 @@ function GovernessDashboardContent() {
                   <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
                     <div className="p-4 border-b">
                       <h2 className="font-semibold">Chambres & assignations</h2>
-                      <p className="text-xs text-muted-foreground">Assignation gouvernante du jour et attribution des chambres</p>
+                      <p className="text-xs text-muted-foreground">Assignez ou désassignez les chambres aux femmes de chambre</p>
                     </div>
                     <div className="p-4">
                       <GovernessRoomManagement hotelId={selectedHotel.id} governessName={profile.name} governessId={profile.id} />
@@ -607,106 +574,14 @@ function GovernessDashboardContent() {
                   </div>
                 )}
 
-                {activeTab === 'inspection' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b flex items-center justify-between">
-                      <div>
-                        <h2 className="font-semibold">Inspections</h2>
-                        <p className="text-xs text-muted-foreground">Validez les chambres nettoyées</p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={loadStats} className="rounded-xl">
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Actualiser
-                      </Button>
-                    </div>
-                    <div className="p-4">
-                      <GovernessInspectionInterface hotelId={selectedHotel.id} governessName={profile.name} governessId={profile.id} />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'incidents' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h2 className="font-semibold">Incidents</h2>
-                        <p className="text-xs text-muted-foreground">Signalez et suivez les incidents</p>
-                      </div>
-                      <IncidentReportWizard hotelId={selectedHotel.id} userType="governess" userName={profile.name} userId={profile.id} onSuccess={loadStats} />
-                    </div>
-                    <div className="p-4">
-                      <IncidentList hotelId={selectedHotel.id} />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'lost' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h2 className="font-semibold">Objets trouvés</h2>
-                        <p className="text-xs text-muted-foreground">Déclarez et gérez les objets perdus</p>
-                      </div>
-                      <LostItemReportWizard hotelId={selectedHotel.id} reporterName={profile.name} reporterType="governess" onSuccess={loadStats} />
-                    </div>
-                    <div className="p-4">
-                      <LostAndFoundList hotelId={selectedHotel.id} />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'linen' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h2 className="font-semibold">Inventaire du linge</h2>
-                        <p className="text-xs text-muted-foreground">Scanner et compter le linge</p>
-                      </div>
-                      <Button onClick={() => { setGovLinenTaskId(`temp-governess-${Date.now()}`); setShowLinenScanner(true); }} className="rounded-xl">
-                        <Shirt className="h-4 w-4 mr-2" />
-                        Scanner
-                      </Button>
-                    </div>
-                    <div className="p-4">
-                      {showLinenScanner && govLinenTaskId && (
-                        <LinenQuickInventory taskId={govLinenTaskId} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {activeTab === 'staff' && (
                   <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
                     <div className="p-4 border-b">
-                      <h2 className="font-semibold">Personnel</h2>
-                      <p className="text-xs text-muted-foreground">Suivez l'activité des femmes de chambre</p>
+                      <h2 className="font-semibold">Femmes de chambre</h2>
+                      <p className="text-xs text-muted-foreground">Suivez l'activité de votre équipe</p>
                     </div>
                     <div className="p-4">
                       <GovernessStaffPanel hotelId={selectedHotel.id} />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'validate' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b">
-                      <h2 className="font-semibold">Validation des inventaires</h2>
-                      <p className="text-xs text-muted-foreground">Vérifiez les comptages de linge</p>
-                    </div>
-                    <div className="p-4">
-                      <AdminLinenInventory hotelId={selectedHotel.id} hotelName={selectedHotel.name} />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'logs' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b">
-                      <h2 className="font-semibold">Journal d'actions</h2>
-                      <p className="text-xs text-muted-foreground">Historique du personnel</p>
-                    </div>
-                    <div className="p-4">
-                      <GovernessActionLog hotelId={selectedHotel.id} />
                     </div>
                   </div>
                 )}
@@ -719,8 +594,8 @@ function GovernessDashboardContent() {
                           <ClipboardList className="h-5 w-5" />
                         </div>
                         <div>
-                          <h2 className="font-semibold">Tâches du jour</h2>
-                          <p className="text-xs text-muted-foreground">Vos missions assignées</p>
+                          <h2 className="font-semibold">Tâches</h2>
+                          <p className="text-xs text-muted-foreground">Créez et suivez les tâches</p>
                         </div>
                       </div>
                     </div>
@@ -730,20 +605,92 @@ function GovernessDashboardContent() {
                   </div>
                 )}
 
-                {activeTab === 'plan' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b">
-                      <h2 className="font-semibold">Plan des étages</h2>
-                      <p className="text-xs text-muted-foreground">Visualisez la disposition des chambres</p>
+                {activeTab === 'declare' && (
+                  <div className="space-y-4">
+                    {/* Sélecteur de type de déclaration */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {declareSections.map(({ key, label, icon: Icon, badge }) => {
+                        const isActive = declareSection === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setDeclareSection(key)}
+                            className={cn(
+                              "relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border transition-all",
+                              isActive
+                                ? "bg-amber-500 text-white border-amber-500 shadow-md"
+                                : "bg-card text-foreground border-border hover:bg-muted/50"
+                            )}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="text-xs font-medium text-center leading-tight">{label}</span>
+                            {badge && badge > 0 && (
+                              <span className={cn(
+                                "absolute top-1.5 right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1",
+                                isActive ? "bg-white text-amber-600" : "bg-destructive text-destructive-foreground"
+                              )}>
+                                {badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="p-4">
-                      <ReadOnlyFloorPlan hotelId={selectedHotel.id} />
-                    </div>
-                  </div>
-                )}
 
-                {activeTab === 'instructions' && (
-                  <DailyInstructionsBanner hotelId={selectedHotel.id} />
+                    {declareSection === 'incident' && (
+                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                        <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <h2 className="font-semibold">Incidents</h2>
+                            <p className="text-xs text-muted-foreground">Déclaration assistée par IA</p>
+                          </div>
+                          <IncidentReportWizard hotelId={selectedHotel.id} userType="governess" userName={profile.name} userId={profile.id} onSuccess={loadStats} />
+                        </div>
+                        <div className="p-4">
+                          <IncidentList hotelId={selectedHotel.id} />
+                        </div>
+                      </div>
+                    )}
+
+                    {declareSection === 'lost' && (
+                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                        <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <h2 className="font-semibold">Objets trouvés</h2>
+                            <p className="text-xs text-muted-foreground">Déclaration assistée par IA</p>
+                          </div>
+                          <LostItemReportWizard hotelId={selectedHotel.id} reporterName={profile.name} reporterType="governess" onSuccess={loadStats} />
+                        </div>
+                        <div className="p-4">
+                          <LostAndFoundList hotelId={selectedHotel.id} />
+                        </div>
+                      </div>
+                    )}
+
+                    {declareSection === 'linen' && (
+                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                        <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <h2 className="font-semibold">Inventaire du linge</h2>
+                            <p className="text-xs text-muted-foreground">Scan et comptage assistés par IA</p>
+                          </div>
+                          <Button onClick={() => { setGovLinenTaskId(`temp-governess-${Date.now()}`); setShowLinenScanner(true); }} className="rounded-xl">
+                            <Shirt className="h-4 w-4 mr-2" />
+                            Scanner
+                          </Button>
+                        </div>
+                        <div className="p-4">
+                          {showLinenScanner && govLinenTaskId ? (
+                            <LinenQuickInventory taskId={govLinenTaskId} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-6">
+                              Touchez « Scanner » pour démarrer le comptage du linge.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -763,7 +710,7 @@ function GovernessDashboardContent() {
       {/* Bottom Nav */}
       <div className="flex-none z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
 
-        <div className="grid grid-cols-5 px-2 py-1">
+        <div className="grid grid-cols-4 px-2 py-1">
           {bottomTabs.map(({ key, label, icon: Icon, badge }) => {
             const isActive = activeTab === key;
             return (
