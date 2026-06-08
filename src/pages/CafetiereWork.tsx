@@ -760,6 +760,80 @@ export default function CafetiereWork() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Coordonnées du personnel point de vente (visibles par l'établissement) */}
+      <Dialog open={contactOpen} onOpenChange={(o) => { if (!savingContact) setContactOpen(o); }}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <User className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-center">Mes coordonnées</DialogTitle>
+            <DialogDescription className="text-center">
+              Ces informations sont visibles par l'établissement pour vous contacter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Nom *</label>
+                <Input
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Nom"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+                <Input
+                  value={contactForm.first_name}
+                  onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))}
+                  placeholder="Prénom"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" /> Téléphone
+              </label>
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="06 12 34 56 78"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" /> Adresse e-mail
+              </label>
+              <Input
+                type="email"
+                value={contactForm.email}
+                disabled
+                className="bg-muted/50"
+              />
+              <p className="text-[11px] text-muted-foreground">L'e-mail est lié à votre compte et ne peut pas être modifié ici.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="w-full bg-amber-700 hover:bg-amber-800"
+              onClick={saveContact}
+              disabled={savingContact}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {savingContact ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
