@@ -1,0 +1,1 @@
+ALTER TABLE public.cafetiere_profiles ADD COLUMN IF NOT EXISTS first_name text;

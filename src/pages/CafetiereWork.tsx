@@ -6,15 +6,19 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle } from 'lucide-react';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle, User, Phone, Mail, Save } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
+import { useCafetiereAuth } from '@/contexts/CafetiereAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -42,6 +46,47 @@ interface SimpleRoom {
 export default function CafetiereWork() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { profile, updateProfile } = useCafetiereAuth();
+
+  // Coordonnées du personnel point de vente (visibles par l'établissement).
+  const [contactOpen, setContactOpen] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', first_name: '', phone: '', email: '' });
+
+  useEffect(() => {
+    if (profile) {
+      setContactForm({
+        name: profile.name || '',
+        first_name: profile.first_name || '',
+        phone: profile.phone || '',
+        email: profile.email || '',
+      });
+    }
+  }, [profile]);
+
+  const saveContact = async () => {
+    if (!profile) {
+      toast.error('Profil indisponible');
+      return;
+    }
+    if (!contactForm.name.trim()) {
+      toast.error('Le nom est obligatoire');
+      return;
+    }
+    setSavingContact(true);
+    const { error } = await updateProfile({
+      name: contactForm.name.trim(),
+      first_name: contactForm.first_name.trim() || null,
+      phone: contactForm.phone.trim() || null,
+    } as any);
+    setSavingContact(false);
+    if (error) {
+      toast.error('Échec de l’enregistrement des coordonnées');
+      return;
+    }
+    toast.success('Coordonnées enregistrées');
+    setContactOpen(false);
+  };
 
   const hotelId = useMemo(() => {
     const fromUrl = params.get('hotel');
@@ -344,30 +389,44 @@ export default function CafetiereWork() {
   return (
     <div className="min-h-screen bg-background pb-28">
       {/* Header — amber/coffee identity for cafetière */}
-      <header className="sticky top-0 z-10 bg-amber-700 text-white px-4 py-3 flex items-center gap-3 shadow">
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <Coffee className="h-5 w-5" />
-        <div className="flex-1">
-          <h1 className="font-semibold leading-tight">Personnel point de vente</h1>
-          <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
+      <header className="sticky top-0 z-10 bg-gradient-to-br from-amber-600 to-amber-800 text-white px-4 pt-4 pb-5 rounded-b-[28px] shadow-lg">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-white/15 shadow-inner">
+            <Coffee className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold leading-tight truncate">Personnel point de vente</h1>
+            <p className="text-xs text-white/80 truncate">Touchez une chambre pour déclarer</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95"
+            onClick={() => setContactOpen(true)}
+            title="Mes coordonnées"
+          >
+            <User className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95"
+            onClick={handleSync}
+            disabled={syncing}
+            title="Synchroniser avec le PMS"
+          >
+            <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white hover:bg-white/20"
-          onClick={handleSync}
-          disabled={syncing}
-          title="Synchroniser avec le PMS"
-        >
-          <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
-        </Button>
-        <div className="text-right">
-          <p className="text-xs text-white/80">Total du jour</p>
-          <p className="font-bold">{totalBillable.toFixed(2)} {currency}</p>
+        <div className="mt-4 flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2.5 shadow-inner">
+          <span className="text-sm text-white/85">Total du jour</span>
+          <span className="text-xl font-bold tabular-nums">{totalBillable.toFixed(2)} {currency}</span>
         </div>
       </header>
+
 
       {/* État de la synchronisation PMS */}
       {pmsConfigured && (
@@ -396,10 +455,22 @@ export default function CafetiereWork() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher une chambre ou un client…"
-            className="pl-9"
+            placeholder="Tapez les premiers chiffres de la chambre…"
+            className="pl-9 rounded-xl"
+            autoComplete="off"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Effacer la recherche"
+            >
+              ✕
+            </button>
+          )}
         </div>
+
         <div className="flex gap-2 overflow-x-auto pb-1">
           {([
             { key: 'all', label: 'Toutes' },
@@ -701,6 +772,80 @@ export default function CafetiereWork() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Coordonnées du personnel point de vente (visibles par l'établissement) */}
+      <Dialog open={contactOpen} onOpenChange={(o) => { if (!savingContact) setContactOpen(o); }}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <User className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-center">Mes coordonnées</DialogTitle>
+            <DialogDescription className="text-center">
+              Ces informations sont visibles par l'établissement pour vous contacter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Nom *</label>
+                <Input
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Nom"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Prénom</label>
+                <Input
+                  value={contactForm.first_name}
+                  onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))}
+                  placeholder="Prénom"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" /> Téléphone
+              </label>
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="06 12 34 56 78"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" /> Adresse e-mail
+              </label>
+              <Input
+                type="email"
+                value={contactForm.email}
+                disabled
+                className="bg-muted/50"
+              />
+              <p className="text-[11px] text-muted-foreground">L'e-mail est lié à votre compte et ne peut pas être modifié ici.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="w-full bg-amber-700 hover:bg-amber-800"
+              onClick={saveContact}
+              disabled={savingContact}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {savingContact ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
