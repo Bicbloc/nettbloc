@@ -53,6 +53,7 @@ export function TechnicianProfileEditor() {
         setProfile(data);
         setFormData({
           name: data.name || '',
+          first_name: (data as any).first_name || '',
           phone: data.phone || ''
         });
       }
