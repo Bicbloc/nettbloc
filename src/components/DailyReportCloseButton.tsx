@@ -47,7 +47,12 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
 
   const handleCloseDay = async () => {
     setIsClosing(true);
-    const today = new Date().toISOString().split('T')[0];
+    // Date réelle (où sont stockés les journaux d'actions du jour)
+    const actualToday = new Date().toISOString().split('T')[0];
+    // Date opérationnelle = basée sur les clôtures, pas l'agenda
+    const today = operationalDate;
+
+
 
     try {
 
