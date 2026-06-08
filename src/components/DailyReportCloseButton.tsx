@@ -73,7 +73,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
         .from('daily_action_logs')
         .select('*')
         .eq('hotel_id', hotelId)
-        .eq('log_date', today);
+        .eq('log_date', actualToday);
 
       const { data: hotelData } = await supabase
         .from('hotels')
