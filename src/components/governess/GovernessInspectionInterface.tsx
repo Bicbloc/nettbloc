@@ -766,6 +766,80 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
 
 
+      {/* Bulk assignment config dialog */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assignation en masse</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Configuration</label>
+              <RadioGroup value={assignMode} onValueChange={(v) => setAssignMode(v as 'saved' | 'even')} className="space-y-2">
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                  <RadioGroupItem value="saved" id="mode-saved" disabled={!hasSavedConfig} className="mt-0.5" />
+                  <label htmlFor="mode-saved" className="cursor-pointer">
+                    <div className="text-sm font-medium">Config actuelle</div>
+                    <p className="text-xs text-muted-foreground">
+                      {hasSavedConfig
+                        ? 'Réutilise la configuration enregistrée (étage / femme de chambre / type).'
+                        : 'Aucune configuration enregistrée.'}
+                    </p>
+                  </label>
+                </div>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                  <RadioGroupItem value="even" id="mode-even" className="mt-0.5" />
+                  <label htmlFor="mode-even" className="cursor-pointer">
+                    <div className="text-sm font-medium">Nouvelle config — répartition équitable</div>
+                    <p className="text-xs text-muted-foreground">
+                      Répartit toutes les chambres équitablement entre les gouvernantes sélectionnées.
+                    </p>
+                  </label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                Dans tous les cas, aucune chambre ne reste « non attribuée ».
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Gouvernantes disponibles</label>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {availableGovs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Aucune gouvernante disponible aujourd'hui.</p>
+                ) : (
+                  availableGovs.map((g) => (
+                    <div key={g.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`gov-${g.id}`}
+                        checked={selectedGovIds.includes(g.id)}
+                        onCheckedChange={(c) =>
+                          setSelectedGovIds((prev) =>
+                            c ? [...new Set([...prev, g.id])] : prev.filter((id) => id !== g.id),
+                          )
+                        }
+                      />
+                      <label htmlFor={`gov-${g.id}`} className="text-sm cursor-pointer">{g.name}</label>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)} disabled={isBulkAssigning}>
+              Annuler
+            </Button>
+            <Button onClick={runAssignment} disabled={isBulkAssigning || selectedGovIds.length === 0} className="gap-2">
+              {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              Attribuer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Inspection Dialog */}
       <Dialog open={inspectionDialog} onOpenChange={setInspectionDialog}>
         <DialogContent className="max-w-md">
