@@ -9,6 +9,7 @@ import { validateEmailForUserType } from '@/services/userTypeValidationService';
 interface CafetiereProfile {
   id: string;
   name: string;
+  first_name: string | null;
   email: string;
   phone: string | null;
   is_active: boolean;
@@ -113,6 +114,7 @@ export const CafetiereAuthProvider = ({ children }: { children: React.ReactNode 
       const mappedProfile: CafetiereProfile = {
         id: profileData.id,
         name: profileData.name,
+        first_name: (profileData as any).first_name ?? null,
         email: profileData.email,
         phone: profileData.phone,
         is_active: profileData.is_active,
