@@ -159,7 +159,7 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
 
       const { data: existingRows } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_profile_id, assigned_floors, assigned_housekeepers, assigned_rooms')
+        .select('id, governess_profile_id, governess_name, assigned_floors, assigned_housekeepers, assigned_rooms')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', todayDate());
 
