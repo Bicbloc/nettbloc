@@ -723,7 +723,7 @@ function GovernessDashboardContent() {
       {/* Bottom Nav */}
       <div className="flex-none z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
 
-        <div className="grid grid-cols-5 px-2 py-1">
+        <div className="grid grid-cols-4 px-2 py-1">
           {bottomTabs.map(({ key, label, icon: Icon, badge }) => {
             const isActive = activeTab === key;
             return (
