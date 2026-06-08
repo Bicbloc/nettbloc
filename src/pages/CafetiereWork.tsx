@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare } from 'lucide-react';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
 import { Button } from '@/components/ui/button';
@@ -59,6 +59,9 @@ export default function CafetiereWork() {
   const [confirmBillIncluded, setConfirmBillIncluded] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'arrival' | 'departure'>('all');
+  const [syncing, setSyncing] = useState(false);
+  const [pmsError, setPmsError] = useState<string | null>(null);
+  const [pmsRoomCount, setPmsRoomCount] = useState<number | null>(null);
 
   // Quantité par prestation (clé = nom du type) + inclus dans le séjour
   const [draftItems, setDraftItems] = useState<Record<string, number>>({});
@@ -99,12 +102,22 @@ export default function CafetiereWork() {
     let hasPmsRooms = false;
     if (pmsOk) {
       const pmsRooms = await fetchPmsRooms(hotelId);
-      if (pmsRooms.ok && pmsRooms.rooms.length > 0) {
-        hasPmsRooms = true;
-        pmsMap = Object.fromEntries(
-          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
-        );
+      if (pmsRooms.ok) {
+        setPmsError(null);
+        setPmsRoomCount(pmsRooms.rooms.length);
+        if (pmsRooms.rooms.length > 0) {
+          hasPmsRooms = true;
+          pmsMap = Object.fromEntries(
+            pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
+          );
+        }
+      } else {
+        setPmsError(pmsRooms.error || 'Synchronisation PMS impossible');
+        setPmsRoomCount(null);
       }
+    } else {
+      setPmsError(null);
+      setPmsRoomCount(null);
     }
 
     const roomNumbers = Array.from(new Set([
@@ -140,6 +153,21 @@ export default function CafetiereWork() {
   }, [hotelId, refreshLogs]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Synchronisation manuelle : recharge les chambres + clients depuis le PMS.
+  const handleSync = useCallback(async () => {
+    if (!hotelId || syncing) return;
+    setSyncing(true);
+    try {
+      await loadAll();
+      toast.success('Synchronisation terminée');
+    } finally {
+      setSyncing(false);
+    }
+  }, [hotelId, syncing, loadAll]);
+
+
+
 
   // Realtime sync of breakfast logs + room sources
   useEffect(() => {
@@ -325,11 +353,41 @@ export default function CafetiereWork() {
           <h1 className="font-semibold leading-tight">Personnel point de vente</h1>
           <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white hover:bg-white/20"
+          onClick={handleSync}
+          disabled={syncing}
+          title="Synchroniser avec le PMS"
+        >
+          <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+        </Button>
         <div className="text-right">
           <p className="text-xs text-white/80">Total du jour</p>
           <p className="font-bold">{totalBillable.toFixed(2)} {currency}</p>
         </div>
       </header>
+
+      {/* État de la synchronisation PMS */}
+      {pmsConfigured && (
+        <div className="px-3 pt-2">
+          {pmsError ? (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="flex-1">Synchronisation PMS impossible : {pmsError}</span>
+              <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleSync} disabled={syncing}>
+                Réessayer
+              </Button>
+            </div>
+          ) : pmsRoomCount !== null ? (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              <Check className="h-4 w-4 shrink-0" />
+              <span>{pmsRoomCount} chambre{pmsRoomCount !== 1 ? 's' : ''} en séjour synchronisée{pmsRoomCount !== 1 ? 's' : ''} depuis le PMS</span>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Recherche + filtres par statut de séjour */}
       <div className="px-3 pt-3 space-y-2">
@@ -345,22 +403,38 @@ export default function CafetiereWork() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {([
             { key: 'all', label: 'Toutes' },
-            { key: 'current', label: 'En cours' },
+            { key: 'current', label: 'Séjour en cours' },
             { key: 'arrival', label: 'Arrivée' },
             { key: 'departure', label: 'Départ' },
-          ] as const).map((f) => (
-            <Button
-              key={f.key}
-              size="sm"
-              variant={statusFilter === f.key ? 'default' : 'outline'}
-              className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0' : 'shrink-0'}
-              onClick={() => setStatusFilter(f.key)}
-            >
-              {f.label}
-            </Button>
-          ))}
+          ] as const).map((f) => {
+            const count = f.key === 'all'
+              ? rooms.length
+              : rooms.filter((room) => {
+                  const s = (room.status || '').toLowerCase();
+                  const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+                  const isArrival = s.includes('arriv') || s.includes('reserved');
+                  const isCurrent = !isDeparture && !isArrival && (room.occupied || s.length > 0);
+                  if (f.key === 'departure') return isDeparture;
+                  if (f.key === 'arrival') return isArrival;
+                  return isCurrent;
+                }).length;
+            return (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={statusFilter === f.key ? 'default' : 'outline'}
+                className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0 gap-1.5' : 'shrink-0 gap-1.5'}
+                onClick={() => setStatusFilter(f.key)}
+              >
+                {f.key === 'current' && <BedDouble className="h-3.5 w-3.5" />}
+                {f.label}
+                <span className="text-[10px] opacity-70">{count}</span>
+              </Button>
+            );
+          })}
         </div>
       </div>
+
 
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
