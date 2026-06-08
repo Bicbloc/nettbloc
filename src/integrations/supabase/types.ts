@@ -994,6 +994,36 @@ export type Database = {
           },
         ]
       }
+      device_push_tokens: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          id: string
+          platform: string
+          token: string
+          updated_at: string
+          user_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          id?: string
+          platform?: string
+          token: string
+          updated_at?: string
+          user_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_type?: string | null
+        }
+        Relationships: []
+      }
       email_logs: {
         Row: {
           created_at: string
