@@ -315,6 +315,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       if ((a.assigned_housekeepers || []).length > 0) {
         scopeParts.push(`Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ')}`);
       }
+      if ((a.assigned_rooms || []).length > 0) {
+        scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
+      }
       const scope = scopeParts.join(' • ') || '—';
       result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
     }
