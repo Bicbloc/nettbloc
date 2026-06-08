@@ -252,11 +252,11 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Gouvernantes disponibles</Label>
+          <Label>Gouvernantes disponibles <span className="text-destructive">*</span></Label>
           {loading ? (
             <p className="text-sm text-muted-foreground">Chargement…</p>
           ) : governesses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée. (Étape facultative)</p>
+            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {governesses.map((g) => (
