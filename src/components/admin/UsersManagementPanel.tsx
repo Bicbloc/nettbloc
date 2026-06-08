@@ -758,9 +758,21 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           
-                          <DropdownMenuItem onClick={() => {
+                          <DropdownMenuItem onClick={async () => {
                             setSelectedUser(user);
+                            setSelectedUserContact(null);
                             setShowUserDetails(true);
+                            const { data: contact } = await supabase
+                              .from('profiles')
+                              .select('billing_phone, billing_contact_name')
+                              .eq('id', user.id)
+                              .maybeSingle();
+                            if (contact) {
+                              setSelectedUserContact({
+                                phone: (contact as any).billing_phone,
+                                name: (contact as any).billing_contact_name,
+                              });
+                            }
                           }}>
                             <Eye className="h-4 w-4 mr-2" />
                             Voir détails
