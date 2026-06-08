@@ -542,22 +542,10 @@ function GovernessDashboardContent() {
               ))}
             </div>
 
-            {/* Hotel selector */}
-            {hotels.length > 1 && (
-              <div className="flex overflow-x-auto gap-2 pb-1">
-                {hotels.map(hotel => (
-                  <Button
-                    key={hotel.id}
-                    variant={selectedHotel?.id === hotel.id ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-xl whitespace-nowrap"
-                    onClick={() => { setSelectedHotel(hotel); localStorage.setItem('governess_selected_hotel', JSON.stringify(hotel)); }}
-                  >
-                    {hotel.name}
-                  </Button>
-                ))}
-              </div>
-            )}
+            {/* Pour changer d'établissement : utiliser l'icône bâtiment dans
+                l'en-tête (retour au hub des hôtels). Pas de sélecteur inline ici
+                pour éviter de mélanger les établissements. */}
+
 
             {/* Tab Content */}
             {selectedHotel && (
