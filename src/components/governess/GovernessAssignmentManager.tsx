@@ -107,20 +107,16 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
     );
 
     const mergedRows = registryRows.length > 0
-      ? [
-          ...registryRows.map((room) => {
-            const roomNumber = (room.room_number || '').trim();
-            const daily = dailyByRoomNumber.get(roomNumber);
+      ? registryRows.map((room) => {
+          const roomNumber = (room.room_number || '').trim();
+          const daily = dailyByRoomNumber.get(roomNumber);
 
-            return {
-              room_number: roomNumber,
-              floor: room.floor ?? daily?.floor ?? null,
-              room_type: (room.room_type || '').trim() || daily?.room_type || null,
-            };
-          }),
-          ...dailyRows
-            .filter((room) => !dailyByRoomNumber.has('') && false)
-        ]
+          return {
+            room_number: roomNumber,
+            floor: room.floor ?? daily?.floor ?? null,
+            room_type: (room.room_type || '').trim() || daily?.room_type || null,
+          };
+        })
       : dailyRows.map((room) => ({
           room_number: (room.room_number || '').trim(),
           floor: room.floor ?? null,
