@@ -683,13 +683,10 @@ function GovernessDashboardContent() {
               </>
             )}
 
-            {/* Add hotel button */}
-            <div className="text-center pt-2">
-              <Button variant="outline" onClick={openHotelAccessDialog} className="rounded-xl">
-                <Building2 className="h-4 w-4 mr-2" />
-                Demander accès à un autre hôtel
-              </Button>
-            </div>
+            {/* Le bouton "Demander accès à un autre hôtel" est volontairement
+                retiré ici : on est déjà dans un établissement. Pour en ajouter
+                un autre, l'utilisateur revient au hub via l'icône bâtiment. */}
+
           </>
         )}
       </main>
