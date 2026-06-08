@@ -102,12 +102,22 @@ export default function CafetiereWork() {
     let hasPmsRooms = false;
     if (pmsOk) {
       const pmsRooms = await fetchPmsRooms(hotelId);
-      if (pmsRooms.ok && pmsRooms.rooms.length > 0) {
-        hasPmsRooms = true;
-        pmsMap = Object.fromEntries(
-          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
-        );
+      if (pmsRooms.ok) {
+        setPmsError(null);
+        setPmsRoomCount(pmsRooms.rooms.length);
+        if (pmsRooms.rooms.length > 0) {
+          hasPmsRooms = true;
+          pmsMap = Object.fromEntries(
+            pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
+          );
+        }
+      } else {
+        setPmsError(pmsRooms.error || 'Synchronisation PMS impossible');
+        setPmsRoomCount(null);
       }
+    } else {
+      setPmsError(null);
+      setPmsRoomCount(null);
     }
 
     const roomNumbers = Array.from(new Set([
