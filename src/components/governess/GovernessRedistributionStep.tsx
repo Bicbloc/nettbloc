@@ -235,9 +235,8 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
           ) : (
             <div className="flex flex-wrap gap-2">
               {governesses.map((g) => (
-                <button
+                <label
                   key={g.id}
-                  type="button"
                   onClick={() => toggle(setSelectedGovernesses, g.id)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                     selectedGovernesses.includes(g.id) ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted'
@@ -245,7 +244,7 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
                 >
                   <Checkbox checked={selectedGovernesses.includes(g.id)} className="pointer-events-none" />
                   {g.name}
-                </button>
+                </label>
               ))}
             </div>
           )}
