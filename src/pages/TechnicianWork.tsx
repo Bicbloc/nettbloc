@@ -86,6 +86,49 @@ function TechnicianWorkContent() {
   const [showDueDateDialog, setShowDueDateDialog] = useState(false);
   const [selectedDueDate, setSelectedDueDate] = useState('');
 
+  // Contact / coordonnées dialog
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', first_name: '', phone: '' });
+
+  const openContactDialog = () => {
+    setContactForm({
+      name: profile?.name || '',
+      first_name: profile?.first_name || '',
+      phone: profile?.phone || ''
+    });
+    setShowContactDialog(true);
+  };
+
+  const handleSaveContact = async () => {
+    if (!profile) return;
+    if (!contactForm.name.trim()) {
+      toast({ variant: 'destructive', title: 'Nom requis', description: 'Veuillez entrer votre nom' });
+      return;
+    }
+    setIsSavingContact(true);
+    try {
+      const { error } = await supabase
+        .from('technician_profiles')
+        .update({
+          name: contactForm.name.trim(),
+          first_name: contactForm.first_name.trim() || null,
+          phone: contactForm.phone.trim() || null,
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('id', profile.id);
+      if (error) throw error;
+      setProfile((prev: any) => ({ ...prev, name: contactForm.name, first_name: contactForm.first_name, phone: contactForm.phone }));
+      toast({ title: 'Coordonnées mises à jour ✅', description: 'Vos informations sont visibles par l\'établissement' });
+      setShowContactDialog(false);
+    } catch (e) {
+      console.error('Error saving contact:', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer' });
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
   // Load profile and hotel
   useEffect(() => {
     const init = async () => {
