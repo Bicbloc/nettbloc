@@ -377,7 +377,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
       }
       const scope = scopeParts.join(' • ') || '—';
-      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
+      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms, assignment: a });
     }
 
     const unassigned = rooms.filter((r) => !claimed.has(r.id));
