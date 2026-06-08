@@ -47,6 +47,8 @@ function balancedSplit<T>(items: T[], n: number): T[][] {
   return buckets;
 }
 
+const normalizeGovName = (name: string) => name.trim().toLocaleLowerCase();
+
 const cleaningLabel = (t: string) => {
   const v = t.toLowerCase();
   if (v === 'full' || v === 'a_blanc' || v === 'à blanc') return 'À blanc';
@@ -136,7 +138,13 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
 
     const apply = useCallback(async (): Promise<boolean> => {
       if (selectedGovernesses.length === 0) return true; // étape facultative
-      const selectedGovs = governesses.filter((g) => selectedGovernesses.includes(g.id));
+      const selectedGovs = Array.from(
+        new Map(
+          governesses
+            .filter((g) => selectedGovernesses.includes(g.id))
+            .map((g) => [normalizeGovName(g.name || 'Gouvernante'), { ...g, name: g.name.trim() || 'Gouvernante' }])
+        ).values()
+      );
       if (selectedGovs.length === 0) return true;
       const n = selectedGovs.length;
 
@@ -159,18 +167,26 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
 
       const { data: existingRows } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_profile_id, governess_name, assigned_floors, assigned_housekeepers, assigned_rooms')
+        .select('id, governess_profile_id, governess_name, assigned_floors, assigned_housekeepers, assigned_rooms, notes')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', todayDate());
+
+      const existingById = new Map(
+        ((existingRows as any[]) || [])
+          .filter((row) => row.governess_profile_id)
+          .map((row) => [row.governess_profile_id, row])
+      );
+      const existingByName = new Map(
+        ((existingRows as any[]) || []).map((row) => [normalizeGovName(row.governess_name || ''), row])
+      );
 
       let ok = true;
       for (let i = 0; i < selectedGovs.length; i++) {
         const b = buckets[i];
         if (b.floors.length === 0 && b.housekeepers.length === 0 && b.rooms.length === 0) continue;
         const gov = selectedGovs[i];
-        const existing = (existingRows as any[] | null)?.find(
-          (e) => e.governess_profile_id === gov.id || e.governess_name === gov.name
-        );
+        const governessName = gov.name.trim() || 'Gouvernante';
+        const existing = existingById.get(gov.id) || existingByName.get(normalizeGovName(governessName));
 
         const mergedFloors = [...new Set([...(existing?.assigned_floors || []), ...b.floors])].sort((a, b) => a - b);
         const mergedHk = [...new Set([...(existing?.assigned_housekeepers || []), ...b.housekeepers])];
@@ -178,15 +194,25 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
         const typesUsed = [mergedFloors.length > 0, mergedHk.length > 0, mergedRooms.length > 0].filter(Boolean).length;
         const newType = typesUsed > 1 ? 'mixed' : mergedRooms.length > 0 ? 'rooms' : mergedHk.length > 0 ? 'housekeeper' : 'floor';
 
-        const res = existing
-          ? await supabase.from('daily_governess_assignments').update({
-              assignment_type: newType, assigned_floors: mergedFloors, assigned_housekeepers: mergedHk, assigned_rooms: mergedRooms,
-            }).eq('id', existing.id)
-          : await supabase.from('daily_governess_assignments').insert({
-              hotel_id: hotelId, assignment_date: todayDate(), governess_profile_id: gov.id, governess_name: gov.name,
-              assignment_type: newType, assigned_floors: mergedFloors, assigned_housekeepers: mergedHk, assigned_rooms: mergedRooms,
-              created_by: userId,
-            });
+        const payload = {
+          hotel_id: hotelId,
+          assignment_date: todayDate(),
+          governess_profile_id: gov.id,
+          governess_name: governessName,
+          assignment_type: newType,
+          assigned_floors: mergedFloors,
+          assigned_housekeepers: mergedHk,
+          assigned_rooms: mergedRooms,
+          created_by: existing?.created_by || userId,
+          notes: existing?.notes ?? null,
+        };
+
+        const res = await supabase
+          .from('daily_governess_assignments')
+          .upsert(payload, { onConflict: 'hotel_id,assignment_date,governess_name' });
+
+        existingById.set(gov.id, { ...(existing || {}), ...payload });
+        existingByName.set(normalizeGovName(governessName), { ...(existing || {}), ...payload });
         if (res.error) { console.error('[gov step] error', res.error); ok = false; }
       }
       if (!ok) toast.error("Échec de l'attribution des gouvernantes");
