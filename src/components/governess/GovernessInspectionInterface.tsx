@@ -6,9 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck, UserPlus } from 'lucide-react';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
   governessName: string;
@@ -57,6 +58,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [govAssignments, setGovAssignments] = useState<DailyGovAssignment[]>([]);
+  const [governesses, setGovernesses] = useState<{ id: string; name: string }[]>([]);
   const [inspections, setInspections] = useState<Map<string, Inspection>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -112,6 +114,19 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         .eq('hotel_id', hotelId)
         .eq('assignment_date', today);
       setGovAssignments((govData as DailyGovAssignment[]) || []);
+
+      // Charger les gouvernantes approuvées (pour l'attribution directe des chambres)
+      const { data: govApproved } = await supabase
+        .from('governess_access_requests')
+        .select('governess_profile_id, governess_profiles(id, name)')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'approved');
+      setGovernesses(
+        ((govApproved as any[]) || []).map((g) => ({
+          id: g.governess_profile_id,
+          name: g.governess_profiles?.name || 'Gouvernante',
+        }))
+      );
 
       // Charger les inspections du jour
       const { data: inspectionsData, error: inspectionsError } = await supabase
@@ -274,6 +289,68 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return inspections.get(roomId);
   };
 
+  // Attribuer directement une chambre à une gouvernante pour inspection.
+  const assignRoomToGoverness = async (room: Room, govProfileId: string) => {
+    const gov = governesses.find((g) => g.id === govProfileId);
+    if (!gov) return;
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const { data: existing } = await supabase
+        .from('daily_governess_assignments')
+        .select('id, assigned_rooms')
+        .eq('hotel_id', hotelId)
+        .eq('assignment_date', today)
+        .eq('governess_profile_id', gov.id)
+        .maybeSingle();
+
+      if (existing) {
+        const merged = [...new Set([...((existing as any).assigned_rooms || []), room.room_number])];
+        await supabase
+          .from('daily_governess_assignments')
+          .update({ assigned_rooms: merged })
+          .eq('id', existing.id);
+      } else {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from('daily_governess_assignments').insert({
+          hotel_id: hotelId,
+          assignment_date: today,
+          governess_profile_id: gov.id,
+          governess_name: gov.name,
+          assignment_type: 'rooms',
+          assigned_floors: [],
+          assigned_housekeepers: [],
+          assigned_rooms: [room.room_number],
+          created_by: userData.user?.id ?? null,
+        });
+      }
+      toast({ title: 'Chambre attribuée', description: `Chambre ${room.room_number} → ${gov.name}` });
+      loadData();
+    } catch (e) {
+      console.error('assignRoomToGoverness error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer la chambre" });
+    }
+  };
+
+  // Glisser-déposer : attribuer une chambre à une attribution de gouvernante existante.
+  const handleDropOnAssignment = async (assignment: DailyGovAssignment, roomNumber: string) => {
+    if (!roomNumber) return;
+    const merged = [...new Set([...(assignment.assigned_rooms || []), roomNumber])];
+    try {
+      await supabase
+        .from('daily_governess_assignments')
+        .update({ assigned_rooms: merged })
+        .eq('id', assignment.id);
+      toast({ title: 'Chambre attribuée', description: `Chambre ${roomNumber} → ${assignment.governess_name}` });
+      loadData();
+    } catch (e) {
+      console.error('handleDropOnAssignment error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer la chambre" });
+    }
+  };
+
+
+
+
   const stats = {
     total: rooms.length,
     inspected: Array.from(inspections.values()).filter(i => i.status !== 'pending').length,
@@ -302,7 +379,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
   const sections = useMemo(() => {
-    const result: { key: string; name: string; scope: string; rooms: Room[] }[] = [];
+    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean; assignment?: DailyGovAssignment }[] = [];
     const claimed = new Set<string>();
 
     for (const a of govAssignments) {
@@ -319,31 +396,32 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
       }
       const scope = scopeParts.join(' • ') || '—';
-      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
+      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms, assignment: a });
     }
 
     const unassigned = rooms.filter((r) => !claimed.has(r.id));
     if (unassigned.length > 0) {
-      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'Aucune gouvernante', rooms: unassigned });
+      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
     }
     return result;
   }, [rooms, govAssignments]);
 
-  const renderRoomCard = (room: Room) => {
+  const renderRoomCard = (room: Room, allowAssign = false) => {
     const inspection = getInspectionStatus(room.id);
     const StatusIcon = inspection ? statusConfig[inspection.status].icon : Eye;
     return (
       <Card
         key={room.id}
+        draggable={allowAssign}
+        onDragStart={allowAssign ? (e) => e.dataTransfer.setData('text/room-number', room.room_number) : undefined}
         className={`cursor-pointer transition-all hover:shadow-lg ${
           inspection?.status === 'passed' ? 'border-green-200 bg-green-50/50' :
           inspection?.status === 'failed' ? 'border-red-200 bg-red-50/50' :
           inspection?.status === 'needs_rework' ? 'border-orange-200 bg-orange-50/50' :
           ''
         }`}
-        onClick={() => openInspectionDialog(room)}
       >
-        <CardContent className="p-4">
+        <CardContent className="p-4" onClick={() => openInspectionDialog(room)}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Home className="h-5 w-5 text-muted-foreground" />
@@ -379,9 +457,30 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             </div>
           )}
         </CardContent>
+
+        {allowAssign && (
+          <div className="px-4 pb-3" onClick={(e) => e.stopPropagation()}>
+            <Select onValueChange={(govId) => assignRoomToGoverness(room, govId)}>
+              <SelectTrigger className="h-8 text-xs">
+                <UserPlus className="h-3.5 w-3.5 mr-1" />
+                <SelectValue placeholder="Attribuer à une gouvernante" />
+              </SelectTrigger>
+              <SelectContent>
+                {governesses.length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Aucune gouvernante approuvée</div>
+                ) : (
+                  governesses.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </Card>
     );
   };
+
 
   if (isLoading) {
     return (
@@ -422,7 +521,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       </div>
 
       {/* Room list grouped by governess */}
-      {rooms.length === 0 ? (
+      {sections.length === 0 ? (
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold text-lg mb-2">Aucune chambre à inspecter</h3>
@@ -436,8 +535,20 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             const doneCount = section.rooms.filter(
               r => getInspectionStatus(r.id)?.status === 'passed'
             ).length;
+            const isDropTarget = !section.isUnassigned && !!section.assignment;
             return (
-              <div key={section.key} className="space-y-3">
+              <div
+                key={section.key}
+                className={`space-y-3 rounded-lg ${isDropTarget ? 'border border-dashed border-transparent hover:border-primary/40 p-2 transition-colors' : ''}`}
+                onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5'); } : undefined}
+                onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('border-primary', 'bg-primary/5') : undefined}
+                onDrop={isDropTarget ? (e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                  const roomNumber = e.dataTransfer.getData('text/room-number');
+                  if (roomNumber && section.assignment) handleDropOnAssignment(section.assignment, roomNumber);
+                } : undefined}
+              >
                 <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2">
                     <UserCheck className="h-5 w-5 text-primary" />
@@ -448,14 +559,21 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
                     {doneCount}/{section.rooms.length} validée(s)
                   </Badge>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {section.rooms.map(renderRoomCard)}
-                </div>
+                {section.rooms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
+                  </p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
+
 
 
       {/* Inspection Dialog */}
