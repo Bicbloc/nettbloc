@@ -331,6 +331,20 @@ export async function distributeRoomNumbers(
 }
 
 /**
+ * Supprime toutes les attributions de gouvernantes du jour pour l'hôtel.
+ * Utilisé avant une assignation en masse afin de repartir d'une base propre
+ * (ex. quand on choisit une seule gouvernante, toutes les chambres doivent lui
+ * revenir sans rester collées à une attribution précédente).
+ */
+export async function clearTodayGovAssignments(hotelId: string): Promise<void> {
+  await supabase
+    .from('daily_governess_assignments')
+    .delete()
+    .eq('hotel_id', hotelId)
+    .eq('assignment_date', todayDate());
+}
+
+/**
  * Garantit qu'AUCUNE chambre propre ne reste "non attribuée" : détecte les
  * chambres propres non couvertes par les attributions du jour et les répartit
  * équitablement entre les gouvernantes fournies.
