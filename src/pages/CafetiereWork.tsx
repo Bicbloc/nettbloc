@@ -160,10 +160,12 @@ export default function CafetiereWork() {
     setSyncing(true);
     try {
       await loadAll();
+      toast.success('Synchronisation terminée');
     } finally {
       setSyncing(false);
     }
   }, [hotelId, syncing, loadAll]);
+
 
 
 
