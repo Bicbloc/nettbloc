@@ -686,6 +686,7 @@ function TechnicianWorkContent() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
