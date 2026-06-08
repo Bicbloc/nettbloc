@@ -11,43 +11,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
-  Crown, 
   LogOut, 
   Building2, 
   CheckCircle, 
   AlertTriangle, 
-  Eye, 
   Loader2, 
-  RefreshCw, 
   Clock, 
   XCircle, 
   Home, 
   Users, 
-  FileText,
   Package,
   Shirt,
-  ClipboardCheck,
-  ArrowLeft,
-  Info,
   ClipboardList
 } from 'lucide-react';
-import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
 import { GovernessStaffPanel } from '@/components/governess/GovernessStaffPanel';
-import { GovernessActionLog } from '@/components/governess/GovernessActionLog';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReportWizard';
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
-import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
-import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { OccupancyBanner } from '@/components/occupancy/OccupancyBanner';
-import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { LayoutGrid } from 'lucide-react';
 
 type GovTab = 'rooms' | 'staff' | 'tasks' | 'declare';
 type DeclareSection = 'incident' | 'lost' | 'linen';
