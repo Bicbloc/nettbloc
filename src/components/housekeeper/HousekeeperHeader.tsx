@@ -34,11 +34,11 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
   return (
-    <div className="sticky top-0 z-40 bg-gradient-to-r from-violet-600 to-indigo-600 text-white safe-area-top">
-      <div className="px-4 py-3">
+    <div className="sticky top-0 z-40 bg-gradient-to-br from-violet-600 to-indigo-700 text-white safe-area-top rounded-b-[32px] shadow-lg shadow-violet-900/20">
+      <div className="px-4 pt-4 pb-5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
               <span className="font-bold text-base">{initials}</span>
             </div>
             <div className="min-w-0">
@@ -53,17 +53,17 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
 
           <div className="flex items-center gap-1.5">
             {/* Connection status */}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
+            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium ${
               isConnected 
-                ? 'bg-green-400/20 text-green-100' 
-                : 'bg-red-400/20 text-red-100'
+                ? 'bg-emerald-400/20 text-emerald-50' 
+                : 'bg-red-400/20 text-red-50'
             }`}>
               {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
               <span className="hidden sm:inline">{isConnected ? 'En ligne' : 'Hors ligne'}</span>
             </div>
 
             {newRoomsCount > 0 && (
-              <Badge className="bg-green-400/20 text-green-100 border-0 animate-pulse text-[10px]">
+              <Badge className="bg-emerald-400/20 text-emerald-50 border-0 animate-pulse text-[10px]">
                 +{newRoomsCount}
               </Badge>
             )}
@@ -71,8 +71,9 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+              className="h-9 w-9 rounded-xl bg-white/10 text-white/90 hover:text-white hover:bg-white/20 active:scale-95"
               onClick={() => navigate('/housekeeper/hotels')}
+              title="Changer d'établissement"
             >
               <Building2 className="h-4 w-4" />
             </Button>
@@ -80,8 +81,9 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+              className="h-9 w-9 rounded-xl bg-white/10 text-white/90 hover:text-white hover:bg-white/20 active:scale-95"
               onClick={onToggleActivityLog}
+              title="Journal d'activité"
             >
               <ScrollText className="h-4 w-4" />
             </Button>
@@ -89,8 +91,9 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+              className="h-9 w-9 rounded-xl bg-white/10 text-white/90 hover:text-white hover:bg-white/20 active:scale-95"
               onClick={onLogout}
+              title="Se déconnecter"
             >
               <LogOut className="h-4 w-4" />
             </Button>
