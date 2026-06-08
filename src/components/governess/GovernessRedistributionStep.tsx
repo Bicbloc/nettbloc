@@ -108,13 +108,23 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
         cleaningByNumber.set((r.room_number || '').trim(), r.cleaning_type ?? null);
       });
       const registryRows = ((registry.data as any[]) || []) as RoomRow[];
+      // Étage de référence par numéro de chambre, issu du registre.
+      const floorByNumber = new Map<string, number | null>();
+      registryRows.forEach((r) => {
+        floorByNumber.set((r.room_number || '').trim(), r.floor ?? null);
+      });
       const merged: RoomRow[] = registryRows.length > 0
         ? registryRows.map((r) => ({
             ...r,
             cleaning_type: cleaningByNumber.get((r.room_number || '').trim()) ?? null,
           }))
-        : (((daily.data as any[]) || []) as RoomRow[]);
+        : (((daily.data as any[]) || []) as RoomRow[]).map((r) => ({
+            ...r,
+            // Repli : si l'étage du jour est nul, prendre celui du registre.
+            floor: r.floor ?? floorByNumber.get((r.room_number || '').trim()) ?? null,
+          }));
       setRooms(merged);
+
 
       setAssignedHousekeepers([...new Set(
         ((asg.data as any[]) || []).map((a) => (a.housekeeper_name || '').trim()).filter(Boolean)
