@@ -12,6 +12,7 @@ import { RoomArchiveService } from '@/services/roomArchiveService';
 import { generateAndUploadDailyReportPdf } from '@/services/dailyReportPdfService';
 import { supabase } from '@/integrations/supabase/client';
 import { createNotification } from '@/services/notificationService';
+import { useOperationalDate } from '@/hooks/useOperationalDate';
 
 interface DailyReportCloseButtonProps {
   hotelId: string;
