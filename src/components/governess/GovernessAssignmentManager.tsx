@@ -62,7 +62,7 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
       supabase.from('rooms').select('floor').eq('hotel_id', hotelId),
       supabase.from('assignments').select('housekeeper_name').eq('hotel_id', hotelId),
       supabase.from('daily_governess_assignments')
-        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, notes')
+        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms, notes')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', todayDate()),
     ]);
