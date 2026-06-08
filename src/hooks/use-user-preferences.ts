@@ -8,6 +8,13 @@ interface UserPreferences {
     email: boolean;
     push: boolean;
     sound: boolean;
+    email_address: string;
+  };
+  emails: {
+    closureRecap: boolean;
+    dailyReports: boolean;
+    incidents: boolean;
+    accessRequests: boolean;
   };
   dashboard: {
     layout: 'grid' | 'list';
@@ -29,6 +36,13 @@ const defaultPreferences: UserPreferences = {
     email: true,
     push: true,
     sound: false,
+    email_address: '',
+  },
+  emails: {
+    closureRecap: true,
+    dailyReports: true,
+    incidents: true,
+    accessRequests: true,
   },
   dashboard: {
     layout: 'grid',
