@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare } from 'lucide-react';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
 import { Button } from '@/components/ui/button';
