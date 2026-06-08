@@ -31,6 +31,9 @@ interface UserProfile {
   subscription_type: string | null;
   created_at: string;
   updated_at: string;
+  billing_phone?: string | null;
+  billing_contact_name?: string | null;
+  billing_email?: string | null;
 }
 
 const Profile = () => {
