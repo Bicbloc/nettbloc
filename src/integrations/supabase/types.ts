@@ -6279,6 +6279,7 @@ export type Database = {
           certifications: Json | null
           created_at: string
           email: string
+          first_name: string | null
           id: string
           is_active: boolean
           name: string
@@ -6291,6 +6292,7 @@ export type Database = {
           certifications?: Json | null
           created_at?: string
           email: string
+          first_name?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -6303,6 +6305,7 @@ export type Database = {
           certifications?: Json | null
           created_at?: string
           email?: string
+          first_name?: string | null
           id?: string
           is_active?: boolean
           name?: string
