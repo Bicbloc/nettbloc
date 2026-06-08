@@ -87,9 +87,10 @@ export function TechnicianProfileEditor() {
         .from('technician_profiles')
         .update({
           name: formData.name.trim(),
+          first_name: formData.first_name.trim() || null,
           phone: formData.phone.trim() || null,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', profile.id);
 
       if (error) throw error;
