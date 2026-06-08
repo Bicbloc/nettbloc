@@ -98,7 +98,7 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
       </div>
 
       {/* Pointage - compact */}
-      <div className="bg-card rounded-2xl p-3 shadow-sm border">
+      <div className="bg-card rounded-3xl p-3 shadow-sm border border-border/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
