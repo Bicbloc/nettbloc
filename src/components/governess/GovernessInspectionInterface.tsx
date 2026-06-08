@@ -331,6 +331,22 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     }
   };
 
+  // Glisser-déposer : attribuer une chambre à une attribution de gouvernante existante.
+  const handleDropOnAssignment = async (assignment: DailyGovAssignment, roomNumber: string) => {
+    if (!roomNumber) return;
+    const merged = [...new Set([...(assignment.assigned_rooms || []), roomNumber])];
+    try {
+      await supabase
+        .from('daily_governess_assignments')
+        .update({ assigned_rooms: merged })
+        .eq('id', assignment.id);
+      toast({ title: 'Chambre attribuée', description: `Chambre ${roomNumber} → ${assignment.governess_name}` });
+      loadData();
+    } catch (e) {
+      console.error('handleDropOnAssignment error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer la chambre" });
+    }
+
 
   const stats = {
     total: rooms.length,
