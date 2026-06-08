@@ -403,22 +403,38 @@ export default function CafetiereWork() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {([
             { key: 'all', label: 'Toutes' },
-            { key: 'current', label: 'En cours' },
+            { key: 'current', label: 'Séjour en cours' },
             { key: 'arrival', label: 'Arrivée' },
             { key: 'departure', label: 'Départ' },
-          ] as const).map((f) => (
-            <Button
-              key={f.key}
-              size="sm"
-              variant={statusFilter === f.key ? 'default' : 'outline'}
-              className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0' : 'shrink-0'}
-              onClick={() => setStatusFilter(f.key)}
-            >
-              {f.label}
-            </Button>
-          ))}
+          ] as const).map((f) => {
+            const count = f.key === 'all'
+              ? rooms.length
+              : rooms.filter((room) => {
+                  const s = (room.status || '').toLowerCase();
+                  const isDeparture = s.includes('depart') || s.includes('checkout') || s.includes('check-out');
+                  const isArrival = s.includes('arriv') || s.includes('reserved');
+                  const isCurrent = !isDeparture && !isArrival && (room.occupied || s.length > 0);
+                  if (f.key === 'departure') return isDeparture;
+                  if (f.key === 'arrival') return isArrival;
+                  return isCurrent;
+                }).length;
+            return (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={statusFilter === f.key ? 'default' : 'outline'}
+                className={statusFilter === f.key ? 'bg-amber-700 hover:bg-amber-800 shrink-0 gap-1.5' : 'shrink-0 gap-1.5'}
+                onClick={() => setStatusFilter(f.key)}
+              >
+                {f.key === 'current' && <BedDouble className="h-3.5 w-3.5" />}
+                {f.label}
+                <span className="text-[10px] opacity-70">{count}</span>
+              </Button>
+            );
+          })}
         </div>
       </div>
+
 
       {loading ? (
         <p className="p-6 text-muted-foreground">Chargement…</p>
