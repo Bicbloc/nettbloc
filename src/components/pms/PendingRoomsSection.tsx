@@ -25,6 +25,8 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const PAGE_SIZE = 20;
 
   const load = useCallback(async () => {
     if (!hotelId) return;
