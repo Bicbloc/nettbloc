@@ -232,6 +232,19 @@ class StorageService {
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_PORTAL);
   }
 
+  // ============ STAFF MODE (APK) ============
+
+  /** Persist staff-only mode (mobile APK) so it survives refresh & navigation */
+  setStaffMode(enabled: boolean): void {
+    if (enabled) {
+      localStorage.setItem('nettobloc_staff_mode', 'true');
+    }
+  }
+
+  isStaffMode(): boolean {
+    return localStorage.getItem('nettobloc_staff_mode') === 'true';
+  }
+
   // ============ USER PREFERENCES ============
 
   savePreferences(prefs: UserPreferences): void {
