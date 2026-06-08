@@ -98,7 +98,7 @@ const Index = () => {
   const isGuestMode = searchParams.get('mode') === 'guest';
 
   // Vérifier le type d'utilisateur pour les utilisateurs authentifiés (pas en mode invité)
-  const { isLoading: typeCheckLoading, isVerified } = useUserTypeGuard('establishment');
+  const { isLoading: typeCheckLoading, isVerified, matchingTypes } = useUserTypeGuard('establishment');
 
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
