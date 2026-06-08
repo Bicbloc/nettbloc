@@ -274,7 +274,8 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
         </CardHeader>
         
         <CardContent className="p-0">
-          <ScrollArea className="h-[500px] w-full">
+          <div className="h-[60vh] max-h-[600px] w-full overflow-y-scroll overscroll-contain">
+
             {filteredLogs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-center p-4">
                 <FileText className="h-8 w-8 text-muted-foreground mb-2" />
