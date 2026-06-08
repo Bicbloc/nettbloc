@@ -124,6 +124,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       const mappedProfile: TechnicianProfile = {
         id: profileData.id,
         name: profileData.name,
+        first_name: (profileData as any).first_name ?? null,
         email: profileData.email,
         phone: profileData.phone,
         is_active: profileData.is_active,
