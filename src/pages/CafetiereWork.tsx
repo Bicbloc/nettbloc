@@ -353,11 +353,41 @@ export default function CafetiereWork() {
           <h1 className="font-semibold leading-tight">Personnel point de vente</h1>
           <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white hover:bg-white/20"
+          onClick={handleSync}
+          disabled={syncing}
+          title="Synchroniser avec le PMS"
+        >
+          <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+        </Button>
         <div className="text-right">
           <p className="text-xs text-white/80">Total du jour</p>
           <p className="font-bold">{totalBillable.toFixed(2)} {currency}</p>
         </div>
       </header>
+
+      {/* État de la synchronisation PMS */}
+      {pmsConfigured && (
+        <div className="px-3 pt-2">
+          {pmsError ? (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="flex-1">Synchronisation PMS impossible : {pmsError}</span>
+              <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleSync} disabled={syncing}>
+                Réessayer
+              </Button>
+            </div>
+          ) : pmsRoomCount !== null ? (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              <Check className="h-4 w-4 shrink-0" />
+              <span>{pmsRoomCount} chambre{pmsRoomCount !== 1 ? 's' : ''} en séjour synchronisée{pmsRoomCount !== 1 ? 's' : ''} depuis le PMS</span>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Recherche + filtres par statut de séjour */}
       <div className="px-3 pt-3 space-y-2">
