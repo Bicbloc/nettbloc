@@ -95,7 +95,7 @@ export function TechnicianProfileEditor() {
 
       if (error) throw error;
 
-      setProfile(prev => prev ? { ...prev, name: formData.name, phone: formData.phone } : null);
+      setProfile(prev => prev ? { ...prev, name: formData.name, first_name: formData.first_name, phone: formData.phone } : null);
       
       toast({
         title: "Profil mis à jour ✅",
