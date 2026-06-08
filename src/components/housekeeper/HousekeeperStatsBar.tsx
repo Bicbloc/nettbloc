@@ -39,9 +39,8 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
   return (
     <div className="space-y-3">
       {/* Progress ring + stats */}
-      <div className="bg-card rounded-2xl p-4 shadow-sm border">
+      <div className="bg-card rounded-3xl p-4 shadow-sm border border-border/60">
         <div className="flex items-center gap-4">
-          {/* Circular progress */}
           <div className="relative w-16 h-16 flex-shrink-0">
             <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
               <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="5" />
