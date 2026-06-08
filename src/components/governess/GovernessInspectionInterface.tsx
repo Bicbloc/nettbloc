@@ -309,6 +309,45 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return inspections.get(roomId);
   };
 
+  // Assignation en masse : applique la configuration enregistrée et répartit
+  // automatiquement les chambres entre les gouvernantes disponibles aujourd'hui.
+  const handleBulkAssign = async () => {
+    setIsBulkAssigning(true);
+    try {
+      const config = loadSavedGovConfig(hotelId);
+      if (!config) {
+        toast({
+          variant: 'destructive',
+          title: 'Aucune configuration',
+          description: "Enregistrez d'abord une configuration depuis la redistribution des chambres.",
+        });
+        return;
+      }
+      const available = await getAvailableGovernesses(hotelId);
+      if (available.length === 0) {
+        toast({ variant: 'destructive', title: 'Aucune gouvernante', description: "Aucune gouvernante disponible aujourd'hui." });
+        return;
+      }
+      const { ok, assignedCount, error } = await applyGovernessAssignment(hotelId, config, available);
+      if (!ok) {
+        toast({ variant: 'destructive', title: 'Erreur', description: error || "Échec de l'attribution" });
+        return;
+      }
+      toast({
+        title: '✅ Attribution effectuée',
+        description: `Chambres réparties sur ${assignedCount} gouvernante(s) disponible(s).`,
+      });
+      loadData();
+    } catch (e) {
+      console.error('handleBulkAssign error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'effectuer l'attribution en masse" });
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
+
+
   // Attribuer directement une chambre à une gouvernante pour inspection.
   const assignRoomToGoverness = async (room: Room, govProfileId: string) => {
     const gov = governesses.find((g) => g.id === govProfileId);
