@@ -1,22 +1,25 @@
-# Corriger le spam de notifications « Chambre nettoyée »
+# Ajouter les permissions Inspection et Petit-déjeuner
 
-## Cause
-Deux gestionnaires Realtime affichent un toast dès que le nouveau statut d'une chambre est `clean`, sans comparer avec l'ancien statut. Toute mise à jour d'une chambre déjà propre (re-synchro PMS, note, do_not_disturb, etc.) refait apparaître le toast, d'où la rafale au changement de page.
+## Contexte
+La liste des permissions de la section « Rôle et permissions » est définie dans le tableau `ALL_PERMISSIONS` de `src/components/SubAccountsManager.tsx`. Elle est rendue automatiquement par catégorie (`permissionsByCategory`), donc ajouter des entrées suffit à les faire apparaître dans le formulaire de création **et** d'édition d'un sous-compte.
 
-## Correction
+## Modifications
 
-### 1. `src/pages/Index.tsx` (~ligne 514)
-Ne déclencher le toast que sur une vraie transition vers `clean` :
-- exiger `oldRecord?.status !== 'clean'`
-- ne notifier que sur `eventType === 'UPDATE'` (pas sur INSERT/chargement initial)
+### `src/components/SubAccountsManager.tsx` — tableau `ALL_PERMISSIONS`
+Ajouter trois nouvelles catégories avec leurs permissions :
 
-### 2. `src/hooks/use-dashboard-state.ts` (~ligne 199)
-Même correction : ajouter la condition `oldRecord?.status !== 'clean'` et limiter à `UPDATE`.
+**Catégorie « Inspection »**
+- `inspection.view` — Voir les inspections
+- `inspection.manage` — Gérer les inspections
 
-### 3. Garde-fou supplémentaire (robustesse)
-Pour les cas où l'ancien enregistrement serait incomplet, comparer aussi avec l'état local connu de la chambre (la valeur `prev` dans `setRooms`) : ne notifier que si la chambre n'était pas déjà `clean` côté interface. Cela évite tout faux positif même si `oldRecord` venait à manquer.
+**Catégorie « Petit-déjeuner »**
+- `breakfast.view` — Voir le petit-déjeuner
+- `breakfast.manage` — Gérer le petit-déjeuner
 
-`src/hooks/use-realtime-rooms.ts` fait déjà la bonne vérification et ne sera pas modifié (au besoin, aligné sur la même logique pour cohérence).
+**Catégorie « Configuration petit-déjeuner »**
+- `breakfast.config` — Configurer le petit-déjeuner
 
-## Résultat attendu
-Le toast « ✅ Chambre nettoyée » n'apparaîtra qu'au moment réel où une chambre passe d'un autre statut à « propre », et plus à chaque changement de page ou re-synchronisation PMS.
+Les clés suivent la convention existante (`ressource.action`). Comme le rendu se fait dynamiquement via `permissionsByCategory`, aucune autre modification d'affichage n'est nécessaire — les nouvelles cases à cocher apparaîtront automatiquement, sélectionnables et enregistrées dans `sub_account_permissions` comme les autres.
+
+## Hors périmètre
+Cette tâche ajoute uniquement les permissions dans l'écran « Rôle et permissions » (création/édition). L'application effective de ces permissions pour masquer/afficher réellement les pages Inspection et Petit-déjeuner dans la navigation pourra être faite dans un second temps si souhaité.
