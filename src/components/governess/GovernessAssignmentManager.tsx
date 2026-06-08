@@ -33,6 +33,7 @@ interface DailyAssignment {
   assignment_type: string;
   assigned_floors: number[] | null;
   assigned_housekeepers: string[] | null;
+  assigned_rooms: string[] | null;
   notes: string | null;
 }
 
@@ -61,7 +62,7 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
       supabase.from('rooms').select('floor').eq('hotel_id', hotelId),
       supabase.from('assignments').select('housekeeper_name').eq('hotel_id', hotelId),
       supabase.from('daily_governess_assignments')
-        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, notes')
+        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms, notes')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', todayDate()),
     ]);
@@ -194,12 +195,14 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
   };
 
   const scopeLabel = (a: DailyAssignment) => {
-    if (a.assignment_type === 'floor') {
-      const fl = a.assigned_floors || [];
-      return fl.length ? `Étages : ${fl.map((f) => (f === 0 ? 'RDC' : f)).join(', ')}` : 'Aucun étage';
-    }
+    const parts: string[] = [];
+    const fl = a.assigned_floors || [];
+    if (fl.length) parts.push(`Étages : ${fl.map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
     const hk = a.assigned_housekeepers || [];
-    return hk.length ? `Femmes de chambre : ${hk.join(', ')}` : 'Aucune femme de chambre';
+    if (hk.length) parts.push(`Femmes de chambre : ${hk.join(', ')}`);
+    const rm = a.assigned_rooms || [];
+    if (rm.length) parts.push(`Chambres : ${rm.join(', ')}`);
+    return parts.join(' • ') || 'Aucune attribution';
   };
 
   return (

@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardCheck, Layers } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClipboardCheck, Layers, UserCheck } from "lucide-react";
 import { Room } from "@/services/pdfService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,9 +18,35 @@ interface InspectionRequestDialogProps {
   hotelId: string;
 }
 
+interface Governess {
+  id: string;
+  name: string;
+}
+
+const todayDate = () => new Date().toISOString().split("T")[0];
+
 export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: InspectionRequestDialogProps) {
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [governesses, setGovernesses] = useState<Governess[]>([]);
+  const [selectedGoverness, setSelectedGoverness] = useState<string>("");
+
+  // Load approved governesses for this hotel
+  useEffect(() => {
+    if (!open || !hotelId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("governess_access_requests")
+        .select("governess_profile_id, status, governess_profiles(id, name)")
+        .eq("hotel_id", hotelId)
+        .eq("status", "approved");
+      const list: Governess[] = ((data as any[]) || []).map((g) => ({
+        id: g.governess_profile_id,
+        name: g.governess_profiles?.name || "Gouvernante",
+      }));
+      setGovernesses(list);
+    })();
+  }, [open, hotelId]);
 
   // Only show rooms that have been cleaned (status clean) or assigned
   const eligibleRooms = useMemo(() => {
@@ -63,6 +91,10 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
 
   const handleSubmit = async () => {
     if (selectedRooms.size === 0) return;
+    if (!selectedGoverness) {
+      toast.error("Choisissez une gouvernante à qui attribuer les chambres");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -93,8 +125,42 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
         if (error) throw error;
       }
 
-      toast.success(`${selectedRooms.size} chambre(s) marquée(s) pour inspection`);
+      // Attribuer les chambres précises à la gouvernante (daily_governess_assignments)
+      const gov = governesses.find((g) => g.id === selectedGoverness);
+      if (gov) {
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: existing } = await supabase
+          .from("daily_governess_assignments")
+          .select("id, assigned_rooms, assigned_floors, assigned_housekeepers, assignment_type")
+          .eq("hotel_id", hotelId)
+          .eq("assignment_date", todayDate())
+          .eq("governess_profile_id", gov.id)
+          .maybeSingle();
+
+        if (existing) {
+          const mergedRooms = [...new Set([...(existing.assigned_rooms || []), ...roomNumbers])];
+          await supabase
+            .from("daily_governess_assignments")
+            .update({ assigned_rooms: mergedRooms, assignment_type: "rooms" })
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("daily_governess_assignments").insert({
+            hotel_id: hotelId,
+            assignment_date: todayDate(),
+            governess_profile_id: gov.id,
+            governess_name: gov.name,
+            assignment_type: "rooms",
+            assigned_floors: [],
+            assigned_housekeepers: [],
+            assigned_rooms: roomNumbers,
+            created_by: userData.user?.id ?? null,
+          });
+        }
+      }
+
+      toast.success(`${selectedRooms.size} chambre(s) attribuée(s) à ${gov?.name ?? "la gouvernante"} pour inspection`);
       setSelectedRooms(new Set());
+      setSelectedGoverness("");
       onOpenChange(false);
     } catch (error: any) {
       console.error("Erreur:", error);
@@ -113,11 +179,31 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
             Demander une inspection
           </DialogTitle>
           <DialogDescription>
-            Sélectionnez les chambres à marquer pour inspection par la gouvernante
+            Choisissez une gouvernante et sélectionnez les chambres à lui attribuer pour inspection
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[400px] pr-2">
+        {/* Choix de la gouvernante */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-primary" />
+            Gouvernante
+          </Label>
+          <Select value={selectedGoverness} onValueChange={setSelectedGoverness}>
+            <SelectTrigger>
+              <SelectValue placeholder={
+                governesses.length === 0 ? "Aucune gouvernante approuvée" : "Sélectionner une gouvernante"
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              {governesses.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <ScrollArea className="max-h-[360px] pr-2">
           <div className="space-y-4">
             {roomsByFloor.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -178,10 +264,10 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={selectedRooms.size === 0 || isSubmitting}
+              disabled={selectedRooms.size === 0 || !selectedGoverness || isSubmitting}
             >
               <ClipboardCheck className="h-4 w-4 mr-2" />
-              Demander l'inspection
+              Attribuer l'inspection
             </Button>
           </div>
         </DialogFooter>

@@ -31,6 +31,7 @@ interface DailyGovAssignment {
   assignment_type: string;
   assigned_floors: number[] | null;
   assigned_housekeepers: string[] | null;
+  assigned_rooms: string[] | null;
 }
 
 interface Inspection {
@@ -107,7 +108,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       // Charger les attributions de gouvernantes du jour (par étage / femme de chambre)
       const { data: govData } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers')
+        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', today);
       setGovAssignments((govData as DailyGovAssignment[]) || []);
@@ -292,7 +293,11 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       !!room.housekeeper_name &&
       hks.includes(room.housekeeper_name.trim().toLowerCase());
 
-    return matchFloor || matchHk;
+    const roomNums = (a.assigned_rooms || []).map((r) => (r || '').trim().toLowerCase());
+    const matchRoom =
+      roomNums.length > 0 && roomNums.includes(room.room_number.trim().toLowerCase());
+
+    return matchFloor || matchHk || matchRoom;
   };
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
@@ -309,6 +314,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       }
       if ((a.assigned_housekeepers || []).length > 0) {
         scopeParts.push(`Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ')}`);
+      }
+      if ((a.assigned_rooms || []).length > 0) {
+        scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
       }
       const scope = scopeParts.join(' • ') || '—';
       result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms });
