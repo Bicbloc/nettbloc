@@ -98,7 +98,7 @@ const Index = () => {
   const isGuestMode = searchParams.get('mode') === 'guest';
 
   // Vérifier le type d'utilisateur pour les utilisateurs authentifiés (pas en mode invité)
-  const { isLoading: typeCheckLoading, isVerified } = useUserTypeGuard('establishment');
+  const { isLoading: typeCheckLoading, isVerified, matchingTypes } = useUserTypeGuard('establishment');
 
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
@@ -133,6 +133,19 @@ const Index = () => {
     }
 
     if (!isVerified) {
+      // SÉCURITÉ: une session staff (femme de chambre, gouvernante, technicien,
+      // cafetière) ne doit JAMAIS rester sur l'établissement. On la redirige vers
+      // son propre portail au lieu d'afficher l'établissement.
+      const staffPortalUrls: Record<string, string> = {
+        housekeeper: '/housekeeper/auth',
+        governess: '/governess/auth',
+        technician: '/technician/login',
+        cafetiere: '/cafetiere/login',
+      };
+      const staffType = matchingTypes.find((type) => type !== 'establishment');
+      if (staffType && staffPortalUrls[staffType]) {
+        return <Navigate to={staffPortalUrls[staffType]} replace />;
+      }
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-destructive/5 via-background to-destructive/10">
           <div className="text-center space-y-4">

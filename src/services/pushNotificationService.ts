@@ -19,13 +19,11 @@ class PushNotificationService {
     return Capacitor.isNativePlatform();
   }
 
-  /** Déduit le type d'utilisateur courant à partir du stockage local. */
+  /** Déduit le type d'utilisateur courant à partir du portail actif. */
   private getUserType(): string {
     try {
-      if (localStorage.getItem('housekeeper_profile')) return 'housekeeper';
-      if (localStorage.getItem('governess_profile')) return 'governess';
-      if (localStorage.getItem('technician_profile')) return 'technician';
-      if (localStorage.getItem('cafetiere_profile')) return 'cafetiere';
+      const portal = storageService.getActivePortal();
+      if (portal) return portal;
     } catch { /* ignore */ }
     return 'staff';
   }
