@@ -501,8 +501,10 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   // Détermine si une chambre relève d'une attribution de gouvernante donnée.
   const roomMatchesAssignment = (room: Room, a: DailyGovAssignment): boolean => {
     const floors = (a.assigned_floors || []).map(Number);
+    const roomFloor =
+      room.floor != null ? Number(room.floor) : deduceFloorFromRoomNumber(room.room_number);
     const matchFloor =
-      floors.length > 0 && room.floor != null && floors.includes(Number(room.floor));
+      floors.length > 0 && roomFloor != null && floors.includes(roomFloor);
 
     const hks = (a.assigned_housekeepers || []).map((h) => (h || '').trim().toLowerCase());
     const matchHk =
