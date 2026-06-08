@@ -344,7 +344,7 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
                 ))}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </div>
