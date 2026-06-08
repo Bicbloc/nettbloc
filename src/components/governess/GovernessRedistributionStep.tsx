@@ -142,7 +142,12 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     }, [availableHousekeepers, assignedHousekeepers]);
 
     const floors = useMemo(
-      () => [...new Set(rooms.map((r) => Number(r.floor)).filter((n) => !Number.isNaN(n)))].sort((a, b) => a - b),
+      () => [...new Set(
+        rooms
+          .filter((r) => r.floor !== null && r.floor !== undefined && `${r.floor}`.trim() !== '')
+          .map((r) => Number(r.floor))
+          .filter((n) => Number.isFinite(n))
+      )].sort((a, b) => a - b),
       [rooms]
     );
     const roomTypes = useMemo(() => {
