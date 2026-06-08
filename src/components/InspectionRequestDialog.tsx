@@ -159,9 +159,10 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
       }
 
       toast.success(`${selectedRooms.size} chambre(s) attribuée(s) à ${gov?.name ?? "la gouvernante"} pour inspection`);
+      // On garde le formulaire ouvert pour permettre d'autres attributions ;
+      // on réinitialise seulement la sélection courante.
       setSelectedRooms(new Set());
       setSelectedGoverness("");
-      onOpenChange(false);
     } catch (error: any) {
       console.error("Erreur:", error);
       toast.error("Erreur lors de la demande d'inspection");
