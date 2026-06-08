@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
     const serviceAccount = JSON.parse(serviceAccountRaw);
 
     const supabase = createClient(
