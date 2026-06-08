@@ -25,6 +25,8 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const PAGE_SIZE = 20;
 
   const load = useCallback(async () => {
     if (!hotelId) return;
@@ -139,7 +141,26 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     }
   };
 
+  const ignoreAll = async () => {
+    if (!hotelId || rooms.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await supabase
+        .from('pms_pending_rooms')
+        .update({ status: 'ignored', resolved_at: new Date().toISOString() })
+        .in('id', rooms.map(r => r.id));
+
+      toast({ title: 'Chambres ignorées', description: `${rooms.length} chambres non validées.` });
+      setRooms([]);
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || "Impossible d'ignorer les chambres.", variant: 'destructive' });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!hotelId || (!loading && rooms.length === 0)) return null;
+
 
   return (
     <>
@@ -151,10 +172,16 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
             Nouvelles chambres détectées ({rooms.length})
           </div>
           {rooms.length > 0 && (
-            <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
-              {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-              Tout ajouter
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="outline" disabled={bulkBusy || loading} onClick={ignoreAll}>
+                <X className="h-4 w-4 mr-1" />
+                Ne pas valider
+              </Button>
+              <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
+                {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                Tout valider
+              </Button>
+            </div>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
@@ -166,7 +193,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           </div>
         ) : expanded ? (
           <div className="space-y-2">
-            {rooms.map(room => (
+            {rooms.slice(0, visibleCount).map(room => (
               <div key={room.id} className="flex items-center justify-between gap-2 rounded-md border bg-background p-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-sm">{room.room_number}</span>
@@ -184,6 +211,17 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
                 </div>
               </div>
             ))}
+            {visibleCount < rooms.length && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+              >
+                <ChevronDown className="h-4 w-4" />
+                Afficher {Math.min(PAGE_SIZE, rooms.length - visibleCount)} de plus ({rooms.length - visibleCount} restantes)
+              </Button>
+            )}
           </div>
         ) : null}
 
@@ -191,10 +229,13 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           <Button
             variant="ghost"
             className="w-full gap-2"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={() => {
+              setExpanded((prev) => !prev);
+              setVisibleCount(PAGE_SIZE);
+            }}
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? 'Voir moins' : 'Voir plus'}
+            {expanded ? 'Voir moins' : 'Voir la liste'}
           </Button>
         )}
       </div>
