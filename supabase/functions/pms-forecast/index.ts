@@ -158,7 +158,7 @@ async function fetchApaleo(credentials: PmsCredentials, start: string, end: stri
   // Apaleo expects the `status` query param to be repeated (NOT comma-separated).
   const collect = async (statuses: string[], dateFilter?: string) => {
     const statusParam = statuses.map((s) => `&status=${s}`).join('');
-    const dateParam = dateFilter ? `&dateFilter=${dateFilter}&from=${start}&to=${end}` : '';
+    const dateParam = dateFilter ? `&dateFilter=${dateFilter}&from=${start}T00:00:00Z&to=${end}T00:00:00Z` : '';
     let offset = 0;
     for (let page = 0; page < 20; page++) {
       const data = await getJson(
