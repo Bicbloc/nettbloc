@@ -18,14 +18,16 @@ import { supabase } from '@/integrations/supabase/client';
 interface CafetiereProfile {
   id: string;
   name: string | null;
+  first_name: string | null;
   email: string;
+  phone: string | null;
 }
 
 interface SharedAccess {
   id: string;
   cafetiere_profile_id: string;
   status: string;
-  cafetiere_profiles: { name: string | null; email: string } | null;
+  cafetiere_profiles: { name: string | null; first_name: string | null; email: string; phone: string | null } | null;
 }
 
 export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
