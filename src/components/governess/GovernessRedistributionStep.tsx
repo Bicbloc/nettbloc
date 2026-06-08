@@ -69,10 +69,12 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     const [housekeepers, setHousekeepers] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [selectedGovernesses, setSelectedGovernesses] = useState<string[]>(initialConfig?.selectedGovernesses || []);
+    // Gouvernantes et femmes de chambre : toujours désélectionnées au départ,
+    // l'utilisateur doit faire son choix (champs obligatoires).
+    const [selectedGovernesses, setSelectedGovernesses] = useState<string[]>([]);
     const [mode, setMode] = useState<GovMode>(initialConfig?.mode || 'housekeeper');
     const [pickedFloors, setPickedFloors] = useState<number[]>(initialConfig?.pickedFloors || []);
-    const [pickedHousekeepers, setPickedHousekeepers] = useState<string[]>(initialConfig?.pickedHousekeepers || []);
+    const [pickedHousekeepers, setPickedHousekeepers] = useState<string[]>([]);
     const [pickedRoomTypes, setPickedRoomTypes] = useState<string[]>(initialConfig?.pickedRoomTypes || []);
     const [pickedCleaningTypes, setPickedCleaningTypes] = useState<string[]>(initialConfig?.pickedCleaningTypes || []);
 
