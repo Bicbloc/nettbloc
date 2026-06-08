@@ -1282,7 +1282,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     userType="housekeeper"
                     userName={housekeeperName}
                     trigger={
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 rounded-xl active:scale-95">
                         <AlertCircle className="h-4 w-4" />
                         Incident
                       </Button>
@@ -1293,7 +1293,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     reporterName={housekeeperName}
                     reporterType="housekeeper"
                     trigger={
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 rounded-xl active:scale-95">
                         <Package className="h-4 w-4" />
                         Objet trouvé
                       </Button>
