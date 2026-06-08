@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck, UserPlus } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck, UserPlus, Wand2 } from 'lucide-react';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { applyGovernessAssignment, getAvailableGovernesses, loadSavedGovConfig } from '@/utils/governessAssignment';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
   governessName: string;
@@ -70,6 +71,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     issues: [] as string[]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
+
 
   const loadData = useCallback(async () => {
     try {
@@ -168,6 +172,23 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Attribution automatique : dès que des chambres propres ne sont attribuées à
+  // aucune gouvernante, on applique la configuration enregistrée (une seule fois
+  // par session) en répartissant sur les gouvernantes disponibles du jour.
+  const autoAssignedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || autoAssignedRef.current) return;
+    if (rooms.length === 0) return;
+    if (!loadSavedGovConfig(hotelId)) return;
+    // Y a-t-il des chambres propres non encore rattachées à une attribution ?
+    const hasAssignments = govAssignments.length > 0;
+    if (hasAssignments) { autoAssignedRef.current = true; return; }
+    autoAssignedRef.current = true;
+    handleBulkAssign();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, rooms, govAssignments, hotelId]);
+
 
   // Realtime sync
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
@@ -304,6 +325,45 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   const getInspectionStatus = (roomId: string): Inspection | undefined => {
     return inspections.get(roomId);
   };
+
+  // Assignation en masse : applique la configuration enregistrée et répartit
+  // automatiquement les chambres entre les gouvernantes disponibles aujourd'hui.
+  const handleBulkAssign = async () => {
+    setIsBulkAssigning(true);
+    try {
+      const config = loadSavedGovConfig(hotelId);
+      if (!config) {
+        toast({
+          variant: 'destructive',
+          title: 'Aucune configuration',
+          description: "Enregistrez d'abord une configuration depuis la redistribution des chambres.",
+        });
+        return;
+      }
+      const available = await getAvailableGovernesses(hotelId);
+      if (available.length === 0) {
+        toast({ variant: 'destructive', title: 'Aucune gouvernante', description: "Aucune gouvernante disponible aujourd'hui." });
+        return;
+      }
+      const { ok, assignedCount, error } = await applyGovernessAssignment(hotelId, config, available);
+      if (!ok) {
+        toast({ variant: 'destructive', title: 'Erreur', description: error || "Échec de l'attribution" });
+        return;
+      }
+      toast({
+        title: '✅ Attribution effectuée',
+        description: `Chambres réparties sur ${assignedCount} gouvernante(s) disponible(s).`,
+      });
+      loadData();
+    } catch (e) {
+      console.error('handleBulkAssign error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'effectuer l'attribution en masse" });
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
+
 
   // Attribuer directement une chambre à une gouvernante pour inspection.
   const assignRoomToGoverness = async (room: Room, govProfileId: string) => {
@@ -564,13 +624,18 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Card>
       </div>
 
-      {/* Refresh button */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button onClick={handleBulkAssign} disabled={isBulkAssigning} className="gap-2">
+          {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          Assignation en masse (selon config)
+        </Button>
         <Button variant="outline" onClick={loadData} className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Actualiser
         </Button>
       </div>
+
 
       {/* Room list grouped by governess */}
       {sections.length === 0 ? (
