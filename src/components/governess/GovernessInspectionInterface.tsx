@@ -171,14 +171,14 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Realtime sync
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    if (table === 'rooms' || table === 'room_inspections' || table === 'daily_governess_assignments') {
+    if (table === 'rooms' || table === 'room_inspections' || table === 'daily_governess_assignments' || table === 'assignments') {
       loadData();
     }
   }, [loadData]);
 
   useRealtimeSync({
     hotelId,
-    tables: ['rooms', 'room_inspections', 'daily_governess_assignments'],
+    tables: ['rooms', 'room_inspections', 'daily_governess_assignments', 'assignments'],
     onUpdate: handleRealtimeUpdate
   });
 
