@@ -130,6 +130,8 @@ export function useEquipment(hotelId: string | null) {
         supabase.from('room_type_templates').select('*').eq('hotel_id', hotelId).order('name'),
         supabase.from('room_characteristics').select('*').eq('hotel_id', hotelId),
       ]);
+      const firstError = [b, s, c, e, i, t, rc].find((r) => r.error)?.error;
+      if (firstError) throw firstError;
       setBuildings((b.data as any) || []);
       setSpaces((s.data as any) || []);
       setCategories((c.data as any) || []);
