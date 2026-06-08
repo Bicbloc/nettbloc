@@ -1195,7 +1195,7 @@ const HousekeeperWorkContent: React.FC = () => {
         <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
       )}
 
-      <div className="container mx-auto px-4 py-4 space-y-4">
+      <div className="container mx-auto px-4 pt-4 pb-28 space-y-4">
         {/* Consignes du jour */}
         {hotelId && <DailyInstructionsBanner hotelId={hotelId} />}
 
@@ -1268,7 +1268,7 @@ const HousekeeperWorkContent: React.FC = () => {
             <div className="flex gap-2 flex-wrap">
               <Button 
                 variant="outline" 
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 rounded-xl active:scale-95"
                 onClick={() => loadWorkData()}
                 disabled={isRefreshing}
               >
@@ -1282,7 +1282,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     userType="housekeeper"
                     userName={housekeeperName}
                     trigger={
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 rounded-xl active:scale-95">
                         <AlertCircle className="h-4 w-4" />
                         Incident
                       </Button>
@@ -1293,7 +1293,7 @@ const HousekeeperWorkContent: React.FC = () => {
                     reporterName={housekeeperName}
                     reporterType="housekeeper"
                     trigger={
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 rounded-xl active:scale-95">
                         <Package className="h-4 w-4" />
                         Objet trouvé
                       </Button>

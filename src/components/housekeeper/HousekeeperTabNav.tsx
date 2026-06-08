@@ -47,8 +47,8 @@ export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
-      <div className="grid grid-cols-5 px-2 py-1">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.15)]">
+      <div className="grid grid-cols-5 px-2 py-1.5">
         {tabs.map(({ key, label, icon: Icon }) => {
           const isActive = activeTab === key;
           const badge = getBadge(key);
@@ -60,17 +60,17 @@ export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
               key={key}
               onClick={() => handleTabClick(key)}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-200",
+                "relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all duration-200 active:scale-90",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground"
               )}
             >
               <div className={cn(
-                "relative p-1.5 rounded-xl transition-all duration-200",
-                isActive && "bg-primary/10"
+                "relative p-2 rounded-2xl transition-all duration-200",
+                isActive && "bg-primary/10 shadow-sm"
               )}>
-                <Icon className={cn("h-5 w-5", isActive && "scale-110")} />
+                <Icon className={cn("h-5 w-5 transition-transform", isActive && "scale-110")} />
                 
                 {badge && (
                   <span className={cn(

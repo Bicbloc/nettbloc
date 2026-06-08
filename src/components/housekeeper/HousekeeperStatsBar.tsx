@@ -39,9 +39,8 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
   return (
     <div className="space-y-3">
       {/* Progress ring + stats */}
-      <div className="bg-card rounded-2xl p-4 shadow-sm border">
+      <div className="bg-card rounded-3xl p-4 shadow-sm border border-border/60">
         <div className="flex items-center gap-4">
-          {/* Circular progress */}
           <div className="relative w-16 h-16 flex-shrink-0">
             <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
               <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="5" />
@@ -99,7 +98,7 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
       </div>
 
       {/* Pointage - compact */}
-      <div className="bg-card rounded-2xl p-3 shadow-sm border">
+      <div className="bg-card rounded-3xl p-3 shadow-sm border border-border/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -119,13 +118,13 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
           </div>
           
           {!startTime && (
-            <Button size="sm" onClick={onStartPointage} className="rounded-xl gap-1.5 h-9 bg-green-500 hover:bg-green-600">
+            <Button size="sm" onClick={onStartPointage} className="rounded-xl gap-1.5 h-9 bg-emerald-500 hover:bg-emerald-600 active:scale-95">
               <Play className="h-3.5 w-3.5" />
               Commencer
             </Button>
           )}
           {startTime && !endTime && (
-            <Button size="sm" variant="secondary" onClick={onEndPointage} className="rounded-xl gap-1.5 h-9">
+            <Button size="sm" variant="secondary" onClick={onEndPointage} className="rounded-xl gap-1.5 h-9 active:scale-95">
               <Square className="h-3.5 w-3.5" />
               Terminer
             </Button>
