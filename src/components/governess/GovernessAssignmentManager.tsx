@@ -69,11 +69,15 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [gov, reg, asg, dga] = await Promise.all([
+    const [gov, registry, dailyRooms, asg, dga] = await Promise.all([
       supabase.from('governess_access_requests')
         .select('governess_profile_id, status, governess_profiles(id, name, email)')
         .eq('hotel_id', hotelId)
         .eq('status', 'approved'),
+      supabase.from('hotel_rooms_registry')
+        .select('room_number, floor, room_type')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true),
       supabase.from('rooms').select('floor, room_number, room_type').eq('hotel_id', hotelId),
       supabase.from('assignments').select('housekeeper_name').eq('hotel_id', hotelId),
       supabase.from('daily_governess_assignments')
@@ -89,18 +93,59 @@ export function GovernessAssignmentManager({ hotelId }: { hotelId: string }) {
     }));
     setGovernesses(govList);
 
-    const regRows = (reg.data as any[]) || [];
+    const registryRows = (registry.data as any[]) || [];
+    const dailyRows = (dailyRooms.data as any[]) || [];
+
+    const dailyByRoomNumber = new Map(
+      dailyRows.map((room) => [
+        (room.room_number || '').trim(),
+        {
+          floor: room.floor ?? null,
+          room_type: (room.room_type || '').trim() || null,
+        },
+      ])
+    );
+
+    const mergedRows = registryRows.length > 0
+      ? registryRows.map((room) => {
+          const roomNumber = (room.room_number || '').trim();
+          const daily = dailyByRoomNumber.get(roomNumber);
+
+          return {
+            room_number: roomNumber,
+            floor: room.floor ?? daily?.floor ?? null,
+            room_type: (room.room_type || '').trim() || daily?.room_type || null,
+          };
+        })
+      : dailyRows.map((room) => ({
+          room_number: (room.room_number || '').trim(),
+          floor: room.floor ?? null,
+          room_type: (room.room_type || '').trim() || null,
+        }));
+
+    const extraDailyRows = registryRows.length > 0
+      ? dailyRows
+          .filter((room) => !registryRows.some((registryRoom) => (registryRoom.room_number || '').trim() === (room.room_number || '').trim()))
+          .map((room) => ({
+            room_number: (room.room_number || '').trim(),
+            floor: room.floor ?? null,
+            room_type: (room.room_type || '').trim() || null,
+          }))
+      : [];
+
+    const roomRows = registryRows.length > 0 ? [...mergedRows.slice(0, registryRows.length), ...extraDailyRows] : mergedRows;
 
     const floorSet = [...new Set(
-      regRows
+      roomRows
+        .filter((r) => r.floor !== null && r.floor !== undefined && `${r.floor}`.trim() !== '')
         .map((r) => Number(r.floor))
-        .filter((n) => !Number.isNaN(n))
+        .filter((n) => Number.isFinite(n))
     )].sort((a, b) => a - b);
     setFloors(floorSet);
 
     // Regrouper les chambres par type de chambre
     const typeMap: Record<string, string[]> = {};
-    regRows.forEach((r) => {
+    roomRows.forEach((r) => {
       const t = (r.room_type || '').trim();
       const num = (r.room_number || '').trim();
       if (!t || !num) return;
