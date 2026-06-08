@@ -254,7 +254,7 @@ const TechnicianAccessPage = () => {
                     <TableBody>
                       {requests.map((request) => (
                         <TableRow key={request.id}>
-                          <TableCell className="font-medium">{request.technician_profiles?.name || '-'}</TableCell>
+                          <TableCell className="font-medium">{[request.technician_profiles?.first_name, request.technician_profiles?.name].filter(Boolean).join(' ') || '-'}</TableCell>
                           <TableCell>{request.technician_profiles?.email || '-'}</TableCell>
                           <TableCell>{request.technician_profiles?.phone || '-'}</TableCell>
                           <TableCell>{(request as any).hotels?.name || request.hotel_code}</TableCell>
