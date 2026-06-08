@@ -409,19 +409,15 @@ function GovernessDashboardContent() {
 
   const bottomTabs: { key: GovTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'rooms', label: 'Chambres', icon: Home },
-    { key: 'inspection', label: 'Contrôle', icon: Eye },
-    { key: 'incidents', label: 'Incidents', icon: AlertTriangle, badge: stats.pendingIncidents },
     { key: 'staff', label: 'Personnel', icon: Users },
     { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+    { key: 'declare', label: 'Déclarations', icon: AlertTriangle, badge: stats.pendingIncidents + stats.lostItems },
   ];
 
-  const secondaryTabs: { key: GovTab; label: string; icon: React.ElementType }[] = [
-    { key: 'lost', label: 'Objets trouvés', icon: Package },
-    { key: 'linen', label: 'Linge', icon: Shirt },
-    { key: 'validate', label: 'Validation', icon: ClipboardCheck },
-    { key: 'plan', label: 'Plan', icon: LayoutGrid },
-    { key: 'instructions', label: 'Consignes', icon: Info },
-    { key: 'logs', label: 'Journal', icon: FileText },
+  const declareSections: { key: DeclareSection; label: string; icon: React.ElementType; badge?: number }[] = [
+    { key: 'incident', label: 'Incident IA', icon: AlertTriangle, badge: stats.pendingIncidents },
+    { key: 'lost', label: 'Objet IA', icon: Package, badge: stats.lostItems },
+    { key: 'linen', label: 'Linge IA', icon: Shirt },
   ];
 
   return (
