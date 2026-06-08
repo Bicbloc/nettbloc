@@ -33,6 +33,7 @@ interface DailyAssignment {
   assignment_type: string;
   assigned_floors: number[] | null;
   assigned_housekeepers: string[] | null;
+  assigned_rooms: string[] | null;
   notes: string | null;
 }
 
