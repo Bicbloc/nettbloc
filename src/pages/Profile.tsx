@@ -125,6 +125,9 @@ const Profile = () => {
 
       setProfile({ ...data, company_name: resolvedName || data.company_name });
       setEditedCompanyName(resolvedName);
+      setBillingContactName((data as any).billing_contact_name || '');
+      setBillingPhone((data as any).billing_phone || '');
+      setBillingEmail((data as any).billing_email || '');
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
