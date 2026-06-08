@@ -12,6 +12,7 @@ import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItem
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { applyGovernessAssignment, getAvailableGovernesses, loadSavedGovConfig, ensureAllRoomsAssigned, distributeRoomNumbers, type GovLite } from '@/utils/governessAssignment';
 import { Checkbox } from '@/components/ui/checkbox';
+import { deduceFloorFromRoomNumber } from '@/utils/floorUtils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
