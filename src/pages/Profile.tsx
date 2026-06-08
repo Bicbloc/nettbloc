@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert } from 'lucide-react';
+import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHotel } from '@/contexts/HotelContext';
