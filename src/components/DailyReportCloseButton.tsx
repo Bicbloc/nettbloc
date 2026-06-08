@@ -262,6 +262,26 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Clôturer la journée ?</AlertDialogTitle>
+          {/* Date opérationnelle (basée sur les clôtures, pas l'agenda) en grand */}
+          <div className="my-2 rounded-xl border bg-primary/5 p-4 text-center">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Journée à clôturer
+            </p>
+            <p className="text-2xl font-bold text-primary sm:text-3xl">
+              {new Date(operationalDate).toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </p>
+            {isBehind && (
+              <p className="mt-1 text-sm font-medium text-amber-600">
+                ⚠️ {missedDaysCount} journée(s) non clôturée(s) — clôture de la plus ancienne.
+              </p>
+            )}
+          </div>
+
           <AlertDialogDescription asChild>
             <div>
               <p className="mb-3">Cette action va archiver toutes les données du jour :</p>
