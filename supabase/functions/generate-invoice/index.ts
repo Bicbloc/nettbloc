@@ -650,10 +650,86 @@ serve(async (req) => {
 
     logStep("Invoice created", { invoiceId: invoice.id, invoiceNumber });
 
+    // ---- Generate PDF, store it, and email it to the billing address ----
+    let emailSent = false;
+    try {
+      const enrichedInvoice = {
+        ...invoice,
+        _hotel_name: hotel?.name || profile.company_name || '',
+        _hotel_address: hotel?.address || profile.billing_address || '',
+        _hotel_siret: profile.billing_siret || '',
+        _language: ((profile as any).preferred_language === 'en' ? 'en' : 'fr'),
+        _reverse_charge: vatInfo.reverseCharge,
+        _customer_vat_number: (profile as any).vat_number || '',
+      };
+
+      const pdfBytes = buildInvoicePdf(enrichedInvoice);
+      const storagePath = `${invoice.user_id}/${invoice.invoice_number}.pdf`;
+
+      await supabaseAdmin.storage
+        .from('invoices')
+        .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
+      await supabaseAdmin
+        .from('invoices')
+        .update({ pdf_url: storagePath })
+        .eq('id', invoice.id);
+
+      const recipient = (profile.billing_email && profile.billing_email.trim())
+        || profile.email;
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+
+      if (recipient && resendKey) {
+        // base64-encode the PDF for the attachment
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...pdfBytes.subarray(i, i + chunkSize));
+        }
+        const pdfBase64 = btoa(binary);
+
+        const isEn = (profile as any).preferred_language === 'en';
+        const subject = isEn
+          ? `Your Nettobloc invoice ${invoiceNumber}`
+          : `Votre facture Nettobloc ${invoiceNumber}`;
+        const html = isEn
+          ? `<p>Hello,</p><p>Please find attached your invoice <strong>${invoiceNumber}</strong> for ${PLAN_NAMES[plan_type] || plan_type}.</p><p>Best regards,<br/>The Nettobloc team</p>`
+          : `<p>Bonjour,</p><p>Veuillez trouver ci-joint votre facture <strong>${invoiceNumber}</strong> concernant ${PLAN_NAMES[plan_type] || plan_type}.</p><p>Cordialement,<br/>L'équipe Nettobloc</p>`;
+
+        const emailRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Nettobloc <support@bicbloc.eu>",
+            to: [recipient],
+            subject,
+            html,
+            attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdfBase64 }],
+          }),
+        });
+
+        if (emailRes.ok) {
+          emailSent = true;
+          logStep("Invoice email sent", { recipient });
+        } else {
+          const errTxt = await emailRes.text();
+          logStep("Invoice email failed", { status: emailRes.status, errTxt });
+        }
+      } else {
+        logStep("Invoice email skipped", { hasRecipient: !!recipient, hasKey: !!resendKey });
+      }
+    } catch (mailErr) {
+      // Never fail invoice creation because of email/PDF issues
+      logStep("Invoice email/PDF error", { message: mailErr instanceof Error ? mailErr.message : String(mailErr) });
+    }
+
     return new Response(JSON.stringify({
       success: true,
       invoice_id: invoice.id,
       invoice_number: invoiceNumber,
+      email_sent: emailSent,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
