@@ -10,6 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import UserMenu from "@/components/UserMenu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DayClosureControl } from "@/components/DayClosureControl";
 import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
 import { cn } from "@/lib/utils";
@@ -138,6 +139,7 @@ export function DashboardHeader({
               />
             </div>
 
+            <ThemeToggle />
             <NotificationBell />
             <UserMenu />
           </div>
