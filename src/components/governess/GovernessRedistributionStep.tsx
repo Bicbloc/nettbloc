@@ -139,7 +139,27 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
       setter((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
     const apply = useCallback(async (): Promise<boolean> => {
-      if (selectedGovernesses.length === 0) return true; // étape facultative
+      // Champs obligatoires : au moins une gouvernante doit être choisie.
+      if (selectedGovernesses.length === 0) {
+        toast.error('Veuillez sélectionner au moins une gouvernante');
+        return false;
+      }
+      // Et au moins un élément doit être choisi selon le mode actif.
+      const modePicks =
+        mode === 'floor' ? pickedFloors.length
+        : mode === 'housekeeper' ? pickedHousekeepers.length
+        : mode === 'roomtype' ? pickedRoomTypes.length
+        : pickedCleaningTypes.length;
+      if (modePicks === 0) {
+        const labels: Record<GovMode, string> = {
+          floor: 'au moins un étage',
+          housekeeper: 'au moins une femme de chambre',
+          roomtype: 'au moins un type de chambre',
+          cleaningtype: 'au moins un type de nettoyage',
+        };
+        toast.error(`Veuillez sélectionner ${labels[mode]}`);
+        return false;
+      }
       const selectedGovs = Array.from(
         new Map(
           governesses
@@ -147,7 +167,10 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
             .map((g) => [normalizeGovName(g.name || 'Gouvernante'), { ...g, name: g.name.trim() || 'Gouvernante' }])
         ).values()
       );
-      if (selectedGovs.length === 0) return true;
+      if (selectedGovs.length === 0) {
+        toast.error('Veuillez sélectionner au moins une gouvernante');
+        return false;
+      }
       const n = selectedGovs.length;
 
       const buckets = selectedGovs.map(() => ({ floors: [] as number[], housekeepers: [] as string[], rooms: [] as string[] }));
