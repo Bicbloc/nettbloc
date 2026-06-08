@@ -70,3 +70,5 @@ project_id = "rarhqnvvbjzfdevnghnz"
     verify_jwt = false
   [functions.suggest-annotations]
     verify_jwt = true
+  [functions.send-push]
+    verify_jwt = false
