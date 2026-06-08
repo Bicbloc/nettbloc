@@ -498,8 +498,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                         Aucun plan tarifaire trouvé dans le PMS.
                       </p>
                     ) : (
-                      <ScrollArea className="max-h-72 pr-2">
-                        <div className="space-y-2">
+                      <div className="max-h-72 overflow-y-auto overscroll-contain pr-2 rounded-lg border">
+                        <div className="space-y-2 p-2">
                           {ratePlans.map((rp) => {
                             const checked =
                               config.included_rate_plan_ids?.includes(rp.id) ||
@@ -525,7 +525,7 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                             );
                           })}
                         </div>
-                      </ScrollArea>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
