@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Coffee, Share2, Trash2, Check } from 'lucide-react';
+import { Coffee, Share2, Trash2, Check, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
