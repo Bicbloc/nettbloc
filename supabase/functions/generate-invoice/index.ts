@@ -702,7 +702,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Nettobloc <support@bicbloc.eu>",
+            from: "NettoBloc <support@bicbloc.eu>",
             to: [recipient],
             subject,
             html,
