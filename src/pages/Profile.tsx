@@ -46,6 +46,11 @@ const Profile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedCompanyName, setEditedCompanyName] = useState('');
+  const [billingContactName, setBillingContactName] = useState('');
+  const [billingPhone, setBillingPhone] = useState('');
+  const [billingEmail, setBillingEmail] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isSavingBilling, setIsSavingBilling] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubAccount, setIsSubAccount] = useState(false);
