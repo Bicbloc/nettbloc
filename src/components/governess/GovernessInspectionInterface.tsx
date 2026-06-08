@@ -92,14 +92,29 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       if (roomsError) throw roomsError;
 
-      // Charger les assignations pour avoir le nom de la femme de chambre
+      // Charger les assignations pour connaître la femme de chambre responsable de chaque chambre.
+      // Une chambre "propre" a été terminée par la femme de chambre à qui elle est attribuée :
+      // on ne filtre donc PAS sur le statut 'completed' (qui n'est pas toujours renseigné),
+      // mais on privilégie l'assignation la plus avancée (completed > in_progress > assigned).
       const { data: assignments } = await supabase
         .from('assignments')
-        .select('room_id, housekeeper_name')
+        .select('room_id, housekeeper_name, status, assigned_at')
         .eq('hotel_id', hotelId)
-        .eq('status', 'completed');
+        .order('assigned_at', { ascending: false });
 
-      const assignmentMap = new Map(assignments?.map(a => [a.room_id, a.housekeeper_name]) || []);
+      const statusRank: Record<string, number> = { completed: 3, in_progress: 2, assigned: 1 };
+      const bestAssignment = new Map<string, { name: string; rank: number }>();
+      (assignments || []).forEach((a) => {
+        if (!a.room_id || !a.housekeeper_name) return;
+        const rank = statusRank[a.status as string] ?? 0;
+        const current = bestAssignment.get(a.room_id);
+        if (!current || rank > current.rank) {
+          bestAssignment.set(a.room_id, { name: a.housekeeper_name, rank });
+        }
+      });
+      const assignmentMap = new Map(
+        Array.from(bestAssignment.entries()).map(([roomId, v]) => [roomId, v.name]),
+      );
 
       const roomsWithHousekeeper = (roomsData || []).map(room => ({
         ...room,
