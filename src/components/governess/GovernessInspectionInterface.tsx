@@ -530,16 +530,16 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           </p>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 items-start">
+        <div className="space-y-6">
           {sections.map(section => {
             const doneCount = section.rooms.filter(
               r => getInspectionStatus(r.id)?.status === 'passed'
             ).length;
             const isDropTarget = !section.isUnassigned && !!section.assignment;
             return (
-              <Card
+              <div
                 key={section.key}
-                className={`min-w-0 w-full transition-colors ${section.isUnassigned ? 'border-dashed bg-muted/20' : ''} ${isDropTarget ? 'hover:border-primary/40' : ''}`}
+                className={`space-y-3 rounded-lg ${isDropTarget ? 'border border-dashed border-transparent hover:border-primary/40 p-2 transition-colors' : ''}`}
                 onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5'); } : undefined}
                 onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('border-primary', 'bg-primary/5') : undefined}
                 onDrop={isDropTarget ? (e) => {
@@ -549,33 +549,30 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
                   if (roomNumber && section.assignment) handleDropOnAssignment(section.assignment, roomNumber);
                 } : undefined}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <UserCheck className="h-5 w-5 text-primary shrink-0" />
-                      <CardTitle className="text-base truncate">{section.name}</CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0">
-                      {doneCount}/{section.rooms.length}
-                    </Badge>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-base">{section.name}</h3>
+                    <span className="text-xs text-muted-foreground">{section.scope}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{section.scope}</p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {section.rooms.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-6 text-center">
-                      {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
-                    </p>
-                  ) : (
-                    section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))
-                  )}
-                </CardContent>
-              </Card>
+                  <Badge variant="secondary">
+                    {doneCount}/{section.rooms.length} validée(s)
+                  </Badge>
+                </div>
+                {section.rooms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
+                  </p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       )}
-
 
 
 
