@@ -511,7 +511,12 @@ const IndexDashboard = () => {
         return prev;
       });
 
-      if (newRecord.status === 'clean') {
+      // Ne notifier que lors d'une vraie transition vers "propre"
+      if (
+        eventType === 'UPDATE' &&
+        newRecord.status === 'clean' &&
+        oldRecord?.status !== 'clean'
+      ) {
         toast({
           title: "✅ Chambre nettoyée",
           description: `Chambre ${newRecord.room_number} marquée propre`,

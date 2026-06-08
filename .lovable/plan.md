@@ -1,47 +1,22 @@
-# Plan
+# Corriger le spam de notifications « Chambre nettoyée »
 
-Five distinct chunks. I'll confirm scope here, then implement in order.
+## Cause
+Deux gestionnaires Realtime affichent un toast dès que le nouveau statut d'une chambre est `clean`, sans comparer avec l'ancien statut. Toute mise à jour d'une chambre déjà propre (re-synchro PMS, note, do_not_disturb, etc.) refait apparaître le toast, d'où la rafale au changement de page.
 
-## 1. Logo APK = logo plateforme
-- The web/plateforme logo is `Nettobloc.png` (already used in auth and headers).
-- Important: the **APK launcher icon** lives in native Android files (`android/app/src/main/res/mipmap-*`). These are **not in this Lovable repo** — they only exist on your machine after `npx cap add android`. So I cannot change the installed app icon from here.
-- What I CAN do in the repo: make sure the splash / in-app branding and the PWA/favicon all use `Nettobloc.png` consistently.
-- What YOU must do once, on your machine: replace the icons in `android/app/src/main/res/mipmap-*` with the Nettobloc logo (or run an icon generator), then rebuild the APK. I'll give you the exact steps.
+## Correction
 
-## 2. Auth: only staff roles, persisted after refresh
-- Today `mode=staff` (from the Capacitor start URL) hides "Établissement" and shows Équipe / Gouvernante / Technicien / Cafetière.
-- Problem: the `mode=staff` URL param is lost on internal navigation/refresh.
-- Fix: when `mode=staff` is detected once, persist a flag in `localStorage` and read staff-mode from URL **or** that flag. This keeps the staff-only auth after refresh and across pages.
+### 1. `src/pages/Index.tsx` (~ligne 514)
+Ne déclencher le toast que sur une vraie transition vers `clean` :
+- exiger `oldRecord?.status !== 'clean'`
+- ne notifier que sur `eventType === 'UPDATE'` (pas sur INSERT/chargement initial)
 
-## 3. Language from the phone configuration
-- `detectBrowserLanguage()` already reads `navigator.language` (EN → English, else French).
-- Fix for APK reliability: prefer the device locale (Capacitor `Device.getLanguageCode()` when running natively) and only fall back to a saved choice if the user explicitly switched language in-app. This guarantees: phone in English → auth in English; phone in French → auth in French.
+### 2. `src/hooks/use-dashboard-state.ts` (~ligne 199)
+Même correction : ajouter la condition `oldRecord?.status !== 'clean'` et limiter à `UPDATE`.
 
-## 4. Governess hotel switching logic
-- On the dashboard, when a hotel is already selected (inside an establishment):
-  - Hide "Demander l'accès à un autre hôtel".
-  - Hide the list of other hotels.
-- To change hotel, the governess uses "Retour" or a building icon that returns to the hotels hub (`/governess/hotels`), where the add-hotel and other-hotels options live.
-- Net effect: add/other-hotels only appear on the hub page, never while working inside an establishment.
+### 3. Garde-fou supplémentaire (robustesse)
+Pour les cas où l'ancien enregistrement serait incomplet, comparer aussi avec l'état local connu de la chambre (la valeur `prev` dans `setRooms`) : ne notifier que si la chambre n'était pas déjà `clean` côté interface. Cela évite tout faux positif même si `oldRecord` venait à manquer.
 
-## 5. App-style redesign of the 4 staff pages
-Target pages: Gouvernante, Équipe (femme de chambre), Cafetière, Technicien.
-- Goal: a clean native-app feel — consistent header with logo + role color, large tap-friendly buttons, card-based feature tiles, bottom-safe spacing, role identity colors already defined (Gouvernante=Amber, Équipe=Violet, Technicien=Blue, Cafetière + Établissement=Emerald).
-- This is the biggest and most subjective chunk. I'll do it page by page so you can review each.
+`src/hooks/use-realtime-rooms.ts` fait déjà la bonne vérification et ne sera pas modifié (au besoin, aligné sur la même logique pour cohérence).
 
-```text
-[ Logo + role color header ]
-[ Hotel name / status ]
-[  feature tile  ][  feature tile  ]
-[  feature tile  ][  feature tile  ]
-[ primary action button ]
-```
-
-## Suggested order
-1. Auth persistence (#2) + language (#3) — quick, high impact.
-2. Governess hotel logic (#4).
-3. Logo consistency in-repo (#1) + instructions for the native icon.
-4. Redesign the 4 pages (#5), one at a time.
-
-## Question
-For #5, do you want me to redesign all 4 pages directly in your existing color system (faster), or generate visual design directions for you to pick from first (slower, but you choose the look)?
+## Résultat attendu
+Le toast « ✅ Chambre nettoyée » n'apparaîtra qu'au moment réel où une chambre passe d'un autre statut à « propre », et plus à chaque changement de page ou re-synchronisation PMS.
