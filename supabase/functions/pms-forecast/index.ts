@@ -152,24 +152,43 @@ async function fetchApaleo(credentials: PmsCredentials, start: string, end: stri
   const totalRooms = (unitsData.units || []).length;
 
   const stays: Stay[] = [];
-  let offset = 0;
-  for (let page = 0; page < 10; page++) {
-    const data = await getJson(
-      `https://api.apaleo.com/booking/v1/reservations?propertyIds=${propertyId}&dateFilter=Stay&from=${start}T00:00:00Z&to=${end}T00:00:00Z&status=Confirmed,InHouse&pageSize=200&offset=${offset}`,
-      token,
-    );
-    const reservations = data.reservations || [];
-    for (const r of reservations) {
-      const s = (r.arrival || '').split('T')[0];
-      const e = (r.departure || '').split('T')[0];
-      if (s && e) stays.push({ start: s, end: e });
-    }
-    if (reservations.length < 200) break;
-    offset += 200;
-  }
+  const seen = new Set<string>();
 
+  // Collect reservations matching the given statuses, optionally filtered by a date window.
+  // Apaleo expects the `status` query param to be repeated (NOT comma-separated).
+  const collect = async (statuses: string[], dateFilter?: string) => {
+    const statusParam = statuses.map((s) => `&status=${s}`).join('');
+    const dateParam = dateFilter ? `&dateFilter=${dateFilter}&from=${start}&to=${end}` : '';
+    let offset = 0;
+    for (let page = 0; page < 20; page++) {
+      const data = await getJson(
+        `https://api.apaleo.com/booking/v1/reservations?propertyId=${propertyId}${dateParam}${statusParam}&pageSize=200&offset=${offset}`,
+        token,
+      );
+      const reservations = data.reservations || [];
+      for (const r of reservations) {
+        const id = r.id || `${r.arrival}-${r.departure}-${r.unit?.id}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const s = (r.arrival || '').split('T')[0];
+        const e = (r.departure || '').split('T')[0];
+        if (s && e) stays.push({ start: s, end: e });
+      }
+      console.log(`[forecast/apaleo] statuses=${statuses.join(',')} offset=${offset}: ${reservations.length} reservations`);
+      if (reservations.length < 200) break;
+      offset += 200;
+    }
+  };
+
+  // In-house guests (currently checked in — may have arrived before the window start).
+  await collect(['InHouse']);
+  // Upcoming confirmed reservations across the forecast horizon.
+  await collect(['Confirmed'], 'Stay');
+
+  console.log(`[forecast/apaleo] total unique stays: ${stays.length}, totalRooms: ${totalRooms}`);
   return { stays, totalRooms };
 }
+
 
 // ─── Forecast computation ──────────────────────────────────────────
 function computeForecast(stays: Stay[], totalRooms: number, startDate: Date, days: number) {
