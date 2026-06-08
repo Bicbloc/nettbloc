@@ -49,7 +49,8 @@ import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LayoutGrid } from 'lucide-react';
 
-type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions' | 'plan';
+type GovTab = 'rooms' | 'staff' | 'tasks' | 'declare';
+type DeclareSection = 'incident' | 'lost' | 'linen';
 
 interface GovernessProfile {
   id: string;
