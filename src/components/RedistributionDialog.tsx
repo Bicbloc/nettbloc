@@ -58,7 +58,8 @@ export function RedistributionDialog({
   useEffect(() => {
     if (!isOpen) return;
     setStep(1);
-    setSelectedHousekeepers([...housekeeperNames]);
+    // Laisser désélectionné : l'utilisateur choisit les femmes de chambre.
+    setSelectedHousekeepers([]);
     try {
       const raw = localStorage.getItem(configKey(hotelId));
       if (raw) {
@@ -227,6 +228,7 @@ export function RedistributionDialog({
               <GovernessRedistributionStep
                 ref={govStepRef}
                 hotelId={hotelId}
+                availableHousekeepers={selectedHousekeepers}
                 initialConfig={initialGovConfig}
                 onConfigChange={(c) => { govConfigRef.current = c; }}
               />
