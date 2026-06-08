@@ -8,6 +8,13 @@ interface UserPreferences {
     email: boolean;
     push: boolean;
     sound: boolean;
+    email_address: string;
+  };
+  emails: {
+    closureRecap: boolean;
+    dailyReports: boolean;
+    incidents: boolean;
+    accessRequests: boolean;
   };
   dashboard: {
     layout: 'grid' | 'list';

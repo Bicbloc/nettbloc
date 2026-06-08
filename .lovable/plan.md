@@ -1,15 +1,42 @@
-# Ajustements interface établissement
+# Améliorer l'onglet « Paramètres » du compte (Notifications & Préférences)
 
-## 1. Bannière hero uniquement sur « Vue d'ensemble »
-`src/pages/Index.tsx` (ligne 897) : la bannière `<HeroHeader>` (Premium / nom hôtel / « Gérez votre établissement… » / Temps réel / Solution complète) est actuellement affichée sur tous les onglets. La conditionner pour qu'elle ne s'affiche que lorsque `activeTab === 'overview'`.
+Refonte de l'onglet `settings` dans `src/pages/Profile.tsx`. Aujourd'hui il n'y a que deux cartes quasi vides (un `NotificationBell` et un texte « accessibles depuis le tableau de bord »). On le remplace par de vrais réglages, en réutilisant les briques existantes.
 
-## 2. Nom de l'établissement et code hôtel plus visibles
-`src/components/layout/DashboardHeader.tsx` (lignes 85-89) : actuellement le nom de l'hôtel et le code apparaissent en tout petit (`text-[10px]`, masqués hors grand écran) à côté du badge.
-- Agrandir le **nom de l'établissement** sous le logo (taille lisible, ex. `text-sm`/`text-base` semi-gras), visible aussi sur écrans plus petits.
-- Afficher le **code hôtel** plus grand, **en gras** et bien visible (style mis en avant, ex. badge/texte `font-bold`).
+## 1. Carte « Notifications »
+Basée sur le hook existant `useUserPreferences` (persisté par utilisateur).
+- Interrupteur **Activer les notifications** (in-app / push) → `notifications.push`
+- Interrupteur **Notifications par e-mail** → `notifications.email`
+- Interrupteur **Son des notifications** → `notifications.sound`
+- Champ **Adresse e-mail de réception des notifications** (nouveau champ `notifications.email_address` ajouté au hook) avec validation du format.
 
-## 3. Élargir la page Petit-déjeuner
-`src/components/dashboard/BreakfastTab.tsx` (ligne 316) : le conteneur principal est limité par `max-w-2xl`, ce qui laisse beaucoup d'espace vide à droite. Élargir (retirer la contrainte `max-w-2xl` ou la passer à pleine largeur) pour occuper l'espace disponible. Le panneau de configuration étant dans un `Sheet` latéral, il n'est pas impacté.
+## 2. Carte « Types d'e-mails »
+Sélection des catégories d'e-mails à recevoir, stockées dans `useUserPreferences` (nouvel objet `emails`) avec interrupteurs :
+- Récapitulatif de clôture
+- Rapports quotidiens
+- Incidents
+- Demandes d'accès du personnel
+Désactivés/grisés si « Notifications par e-mail » est coupé.
+
+## 3. Carte « Clôture & archives »
+Réutiliser le composant **`AutoCloseSettingsDialog`** (déjà fonctionnel, écrit dans la table `hotels`) via un bouton « Configurer la clôture automatique », en lui passant `hotelId` depuis `useHotel()`. Cette carte regroupe :
+- activation de la clôture automatique, heure et jours,
+- **adresse e-mail de réception des archives** (`auto_close_recap_email`).
+Un court texte explique que le récapitulatif d'archivage est envoyé à cette adresse à chaque clôture.
+
+## 4. Carte « Préférences générales »
+Réglages issus de `useUserPreferences`, déjà appliqués dans l'app :
+- Rafraîchissement automatique (on/off) + intervalle
+- Disposition (grille / liste)
+- Taille de police, animations, contraste élevé
+
+## 5. Carte « Déconnexion »
+Conservée telle quelle en bas.
+
+## Détails techniques
+- Étendre l'interface `UserPreferences` et `defaultPreferences` dans `src/hooks/use-user-preferences.ts` : ajouter `notifications.email_address: string` et un bloc `emails: { closureRecap, dailyReports, incidents, accessRequests: boolean }`.
+- Les interrupteurs utilisent le composant `Switch` et `updatePreference(section, updates)` (sauvegarde immédiate + toast).
+- La clôture/archives reste pilotée par `AutoCloseSettingsDialog` (source de vérité backend), aucune duplication de logique.
+- Design cohérent avec les `Card` existantes, icônes lucide, espacement `space-y-6`.
 
 ## Hors périmètre
-Aucune modification de logique métier ni de base de données — uniquement de l'affichage.
+Les types d'e-mails et l'adresse de notification sont des préférences stockées côté utilisateur ; l'application effective lors de l'envoi des e-mails côté serveur n'est pas modifiée dans cette tâche. La clôture et l'e-mail d'archives, eux, sont pleinement fonctionnels (déjà branchés au backend).
