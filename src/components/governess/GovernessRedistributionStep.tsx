@@ -159,7 +159,7 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
 
       const { data: existingRows } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_profile_id, assigned_floors, assigned_housekeepers, assigned_rooms')
+        .select('id, governess_profile_id, governess_name, assigned_floors, assigned_housekeepers, assigned_rooms')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', todayDate());
 
@@ -168,7 +168,9 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
         const b = buckets[i];
         if (b.floors.length === 0 && b.housekeepers.length === 0 && b.rooms.length === 0) continue;
         const gov = selectedGovs[i];
-        const existing = (existingRows as any[] | null)?.find((e) => e.governess_profile_id === gov.id);
+        const existing = (existingRows as any[] | null)?.find(
+          (e) => e.governess_profile_id === gov.id || e.governess_name === gov.name
+        );
 
         const mergedFloors = [...new Set([...(existing?.assigned_floors || []), ...b.floors])].sort((a, b) => a - b);
         const mergedHk = [...new Set([...(existing?.assigned_housekeepers || []), ...b.housekeepers])];
