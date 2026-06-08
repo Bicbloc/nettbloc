@@ -104,7 +104,10 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
       </div>
       
       {/* Content */}
-      <ScrollArea className="max-h-[calc(70vh-60px)]">
+      <ScrollArea
+        type="always"
+        className="h-[60vh] max-h-[600px] [&_[data-radix-scroll-area-thumb]]:bg-foreground/40 [&_[data-radix-scroll-area-scrollbar]]:w-3 [&_[data-radix-scroll-area-scrollbar]]:bg-muted/40"
+      >
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center p-4">
             <BellOff className="h-8 w-8 text-muted-foreground mb-2" />
