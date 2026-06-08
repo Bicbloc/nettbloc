@@ -19,6 +19,10 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { NotificationBell } from '@/components/NotificationBell';
 import { PremiumLimitGuard } from '@/components/PremiumLimitGuard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/hooks/use-user-preferences';
+import { AutoCloseSettingsDialog } from '@/components/AutoCloseSettingsDialog';
 
 interface UserProfile {
   id: string;
