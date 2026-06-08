@@ -536,23 +536,59 @@ const Profile = () => {
                 </AlertDescription>
               </Alert>
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Facturation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Gérez vos informations de facturation et consultez vos factures.
-                  </p>
-                  <Button onClick={() => navigate('/invoices')}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Voir mes factures
-                  </Button>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      E-mail de facturation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Adresse e-mail de votre service comptabilité. Chaque facture émise sera
+                      automatiquement envoyée à cette adresse.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="billing-email">Adresse e-mail (comptabilité)</Label>
+                      <Input
+                        id="billing-email"
+                        type="email"
+                        value={billingEmail}
+                        onChange={(e) => setBillingEmail(e.target.value)}
+                        placeholder="comptabilite@hotel.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Laissez vide pour utiliser l'e-mail de votre compte ({profile.email}).
+                      </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveBilling} disabled={isSavingBilling}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSavingBilling ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Facturation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Gérez vos informations de facturation et consultez vos factures.
+                    </p>
+                    <Button onClick={() => navigate('/invoices')}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Voir mes factures
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </TabsContent>
 
