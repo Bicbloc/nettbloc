@@ -68,6 +68,14 @@ class PushNotificationService {
     if (!this.isNative || this.initialized) return;
     this.initialized = true;
 
+    // Quand un hôtel est sélectionné, (re)lier le token à cet hôtel
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hotel:ready', () => {
+        this.refreshHotelBinding();
+      });
+    }
+
+
     try {
       let perm = await PushNotifications.checkPermissions();
       if (perm.receive !== 'granted') {
