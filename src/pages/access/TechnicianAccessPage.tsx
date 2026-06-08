@@ -56,7 +56,7 @@ const TechnicianAccessPage = () => {
         .from('technician_access_requests')
         .select(`
           id, technician_profile_id, hotel_id, hotel_code, status, requested_at,
-          technician_profiles(name, email, phone),
+          technician_profiles(name, first_name, email, phone),
           hotels(name)
         `)
         .in('hotel_id', hotelIds)
