@@ -389,30 +389,44 @@ export default function CafetiereWork() {
   return (
     <div className="min-h-screen bg-background pb-28">
       {/* Header — amber/coffee identity for cafetière */}
-      <header className="sticky top-0 z-10 bg-amber-700 text-white px-4 py-3 flex items-center gap-3 shadow">
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <Coffee className="h-5 w-5" />
-        <div className="flex-1">
-          <h1 className="font-semibold leading-tight">Personnel point de vente</h1>
-          <p className="text-xs text-white/80">Touchez une chambre pour déclarer</p>
+      <header className="sticky top-0 z-10 bg-gradient-to-br from-amber-600 to-amber-800 text-white px-4 pt-4 pb-5 rounded-b-[28px] shadow-lg">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-white/15 shadow-inner">
+            <Coffee className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold leading-tight truncate">Personnel point de vente</h1>
+            <p className="text-xs text-white/80 truncate">Touchez une chambre pour déclarer</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95"
+            onClick={() => setContactOpen(true)}
+            title="Mes coordonnées"
+          >
+            <User className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white rounded-xl bg-white/10 hover:bg-white/20 active:scale-95"
+            onClick={handleSync}
+            disabled={syncing}
+            title="Synchroniser avec le PMS"
+          >
+            <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white hover:bg-white/20"
-          onClick={handleSync}
-          disabled={syncing}
-          title="Synchroniser avec le PMS"
-        >
-          <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
-        </Button>
-        <div className="text-right">
-          <p className="text-xs text-white/80">Total du jour</p>
-          <p className="font-bold">{totalBillable.toFixed(2)} {currency}</p>
+        <div className="mt-4 flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2.5 shadow-inner">
+          <span className="text-sm text-white/85">Total du jour</span>
+          <span className="text-xl font-bold tabular-nums">{totalBillable.toFixed(2)} {currency}</span>
         </div>
       </header>
+
 
       {/* État de la synchronisation PMS */}
       {pmsConfigured && (
