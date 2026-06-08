@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Calendar, Key, UserPlus, RefreshCw, ClipboardCheck } from "lucide-react";
+import { Plus, Calendar, Key, UserPlus, RefreshCw } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
@@ -15,7 +15,7 @@ import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { CleanRoomsSection } from "@/components/CleanRoomsSection";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
-import { InspectionRequestDialog } from "@/components/InspectionRequestDialog";
+
 import { CreateColumnDialog } from "@/components/CreateColumnDialog";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -87,7 +87,7 @@ export function AssignmentTab({
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
-  const [showInspectionDialog, setShowInspectionDialog] = useState(false);
+  
   const [activeColumns, setActiveColumns] = useState<string[]>([]);
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const queryClient = useQueryClient();
@@ -190,17 +190,9 @@ export function AssignmentTab({
             <Calendar className="mr-2 h-4 w-4" />
             Redistribuer
           </Button>
-          <Button
-            onClick={() => setShowInspectionDialog(true)}
-            variant="outline"
-            disabled={rooms.length === 0}
-            className="border-primary/50 text-primary"
-          >
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-            Inspection gouv.
-          </Button>
         </div>
       </div>
+
 
       <RedistributionDialog
         isOpen={isRedistributionDialogOpen}
@@ -210,7 +202,7 @@ export function AssignmentTab({
         roomCount={rooms.length}
         housekeeperNames={housekeeperNames}
         hotelId={currentHotelId}
-        onRequestInspection={() => setShowInspectionDialog(true)}
+        
         onAddHousekeeper={() => {
           setIsRedistributionDialogOpen(false);
           setShowInviteDialog(true);
@@ -396,14 +388,8 @@ export function AssignmentTab({
               });
             }}
           />
-          
-          <InspectionRequestDialog
-            open={showInspectionDialog}
-            onOpenChange={setShowInspectionDialog}
-            rooms={rooms}
-            hotelId={currentHotelId || ''}
-          />
         </div>
+
         )
       )}
     </div>

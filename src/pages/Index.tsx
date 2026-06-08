@@ -1136,6 +1136,7 @@ const IndexDashboard = () => {
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
         housekeeperNames={housekeeperNames}
+        hotelId={currentHotelId}
         onAddHousekeeper={() => {
           setIsRedistributionDialogOpen(false);
           setActiveTab('access-codes');
