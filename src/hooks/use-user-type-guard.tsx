@@ -278,7 +278,17 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
       } catch (error) {
         console.error('❌ Error checking user type:', error);
         setRequiresPortalChoice(false);
-        setIsVerified(true);
+        // SÉCURITÉ: en cas d'erreur/timeout RPC (fréquent en APK sur réseau
+        // instable), on n'accorde JAMAIS l'accès établissement sans confirmation.
+        // Pour les portails staff déjà choisis explicitement, on reste tolérant.
+        const rememberedOnError = storageService.getActivePortal();
+        if (rememberedOnError === expectedType && expectedType !== 'establishment') {
+          setUserType(expectedType);
+          setIsVerified(true);
+        } else {
+          setUserType(null);
+          setIsVerified(false);
+        }
       } finally {
         setIsLoading(false);
         isCheckingRef.current = false;
