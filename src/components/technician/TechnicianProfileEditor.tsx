@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 interface TechnicianProfile {
   id: string;
   name: string;
+  first_name: string | null;
   email: string;
   phone: string | null;
   is_active: boolean;
@@ -22,6 +23,7 @@ export function TechnicianProfileEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    first_name: '',
     phone: ''
   });
   const { toast } = useToast();
@@ -51,6 +53,7 @@ export function TechnicianProfileEditor() {
         setProfile(data);
         setFormData({
           name: data.name || '',
+          first_name: (data as any).first_name || '',
           phone: data.phone || ''
         });
       }
@@ -84,14 +87,15 @@ export function TechnicianProfileEditor() {
         .from('technician_profiles')
         .update({
           name: formData.name.trim(),
+          first_name: formData.first_name.trim() || null,
           phone: formData.phone.trim() || null,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', profile.id);
 
       if (error) throw error;
 
-      setProfile(prev => prev ? { ...prev, name: formData.name, phone: formData.phone } : null);
+      setProfile(prev => prev ? { ...prev, name: formData.name, first_name: formData.first_name, phone: formData.phone } : null);
       
       toast({
         title: "Profil mis à jour ✅",
@@ -159,17 +163,31 @@ export function TechnicianProfileEditor() {
               </p>
             </div>
 
+            {/* Prénom */}
+            <div className="space-y-2">
+              <Label htmlFor="first_name" className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                Prénom
+              </Label>
+              <Input
+                id="first_name"
+                value={formData.first_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="Votre prénom"
+              />
+            </div>
+
             {/* Nom */}
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                Nom complet *
+                Nom *
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Votre nom complet"
+                placeholder="Votre nom"
               />
             </div>
 

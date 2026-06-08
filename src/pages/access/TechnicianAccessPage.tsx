@@ -21,6 +21,7 @@ interface TechnicianRequest {
   requested_at: string;
   technician_profiles: {
     name: string;
+    first_name?: string;
     email: string;
     phone?: string;
   } | null;
@@ -55,7 +56,7 @@ const TechnicianAccessPage = () => {
         .from('technician_access_requests')
         .select(`
           id, technician_profile_id, hotel_id, hotel_code, status, requested_at,
-          technician_profiles(name, email, phone),
+          technician_profiles(name, first_name, email, phone),
           hotels(name)
         `)
         .in('hotel_id', hotelIds)
@@ -253,7 +254,7 @@ const TechnicianAccessPage = () => {
                     <TableBody>
                       {requests.map((request) => (
                         <TableRow key={request.id}>
-                          <TableCell className="font-medium">{request.technician_profiles?.name || '-'}</TableCell>
+                          <TableCell className="font-medium">{[request.technician_profiles?.first_name, request.technician_profiles?.name].filter(Boolean).join(' ') || '-'}</TableCell>
                           <TableCell>{request.technician_profiles?.email || '-'}</TableCell>
                           <TableCell>{request.technician_profiles?.phone || '-'}</TableCell>
                           <TableCell>{(request as any).hotels?.name || request.hotel_code}</TableCell>
