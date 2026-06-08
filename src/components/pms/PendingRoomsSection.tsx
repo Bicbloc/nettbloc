@@ -193,7 +193,7 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           </div>
         ) : expanded ? (
           <div className="space-y-2">
-            {rooms.map(room => (
+            {rooms.slice(0, visibleCount).map(room => (
               <div key={room.id} className="flex items-center justify-between gap-2 rounded-md border bg-background p-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-sm">{room.room_number}</span>
@@ -211,6 +211,17 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
                 </div>
               </div>
             ))}
+            {visibleCount < rooms.length && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+              >
+                <ChevronDown className="h-4 w-4" />
+                Afficher {Math.min(PAGE_SIZE, rooms.length - visibleCount)} de plus ({rooms.length - visibleCount} restantes)
+              </Button>
+            )}
           </div>
         ) : null}
 
@@ -218,10 +229,13 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
           <Button
             variant="ghost"
             className="w-full gap-2"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={() => {
+              setExpanded((prev) => !prev);
+              setVisibleCount(PAGE_SIZE);
+            }}
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? 'Voir moins' : 'Voir plus'}
+            {expanded ? 'Voir moins' : 'Voir la liste'}
           </Button>
         )}
       </div>
