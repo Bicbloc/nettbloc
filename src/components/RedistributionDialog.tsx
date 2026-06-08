@@ -228,6 +228,7 @@ export function RedistributionDialog({
               <GovernessRedistributionStep
                 ref={govStepRef}
                 hotelId={hotelId}
+                availableHousekeepers={selectedHousekeepers}
                 initialConfig={initialGovConfig}
                 onConfigChange={(c) => { govConfigRef.current = c; }}
               />
