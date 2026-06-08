@@ -6,15 +6,19 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle } from 'lucide-react';
+import { Coffee, Minus, Plus, ArrowLeft, Check, Search, MessageSquare, RefreshCw, BedDouble, AlertTriangle, User, Phone, Mail, Save } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
+import { useCafetiereAuth } from '@/contexts/CafetiereAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
