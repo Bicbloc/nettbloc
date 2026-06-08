@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert } from 'lucide-react';
+import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHotel } from '@/contexts/HotelContext';
@@ -31,6 +31,9 @@ interface UserProfile {
   subscription_type: string | null;
   created_at: string;
   updated_at: string;
+  billing_phone?: string | null;
+  billing_contact_name?: string | null;
+  billing_email?: string | null;
 }
 
 const Profile = () => {
@@ -43,6 +46,11 @@ const Profile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedCompanyName, setEditedCompanyName] = useState('');
+  const [billingContactName, setBillingContactName] = useState('');
+  const [billingPhone, setBillingPhone] = useState('');
+  const [billingEmail, setBillingEmail] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isSavingBilling, setIsSavingBilling] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubAccount, setIsSubAccount] = useState(false);
@@ -117,6 +125,9 @@ const Profile = () => {
 
       setProfile({ ...data, company_name: resolvedName || data.company_name });
       setEditedCompanyName(resolvedName);
+      setBillingContactName((data as any).billing_contact_name || '');
+      setBillingPhone((data as any).billing_phone || '');
+      setBillingEmail((data as any).billing_email || '');
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
@@ -179,6 +190,58 @@ const Profile = () => {
   const handleCancel = () => {
     setEditedCompanyName(profile?.company_name || '');
     setIsEditing(false);
+  };
+
+  const emailIsValid = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+  const handleSaveContact = async () => {
+    if (!user) return;
+    setIsSavingContact(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          billing_contact_name: billingContactName.trim() || null,
+          billing_phone: billingPhone.trim() || null,
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+      setProfile(prev => prev ? {
+        ...prev,
+        billing_contact_name: billingContactName.trim() || null,
+        billing_phone: billingPhone.trim() || null,
+      } : null);
+      toast({ title: 'Contact enregistré', description: 'Le contact de référence a été mis à jour.' });
+    } catch (e) {
+      console.error('Erreur contact:', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer le contact.' });
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
+  const handleSaveBilling = async () => {
+    if (!user) return;
+    const trimmed = billingEmail.trim();
+    if (trimmed && !emailIsValid(trimmed)) {
+      toast({ variant: 'destructive', title: 'Email invalide', description: 'Saisissez une adresse e-mail valide.' });
+      return;
+    }
+    setIsSavingBilling(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ billing_email: trimmed || null })
+        .eq('id', user.id);
+      if (error) throw error;
+      setProfile(prev => prev ? { ...prev, billing_email: trimmed || null } : null);
+      toast({ title: 'E-mail de facturation enregistré', description: 'Chaque facture sera envoyée à cette adresse.' });
+    } catch (e) {
+      console.error('Erreur facturation:', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer l\'e-mail de facturation.' });
+    } finally {
+      setIsSavingBilling(false);
+    }
   };
 
   if (isLoading) {
@@ -367,6 +430,50 @@ const Profile = () => {
                   </CardContent>
                 </Card>
 
+                {/* Contact de référence */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      Contact de référence
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Personne à contacter et numéro de téléphone de votre établissement.
+                      Ces informations sont visibles par l'administration.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-name">Nom du contact</Label>
+                        <Input
+                          id="contact-name"
+                          value={billingContactName}
+                          onChange={(e) => setBillingContactName(e.target.value)}
+                          placeholder="Ex. Jean Dupont"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-phone">Numéro de téléphone</Label>
+                        <Input
+                          id="contact-phone"
+                          type="tel"
+                          value={billingPhone}
+                          onChange={(e) => setBillingPhone(e.target.value)}
+                          placeholder="Ex. +33 6 12 34 56 78"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveContact} disabled={isSavingContact}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSavingContact ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+
                 {/* Limites */}
                 <Card>
                   <CardHeader>
@@ -429,23 +536,59 @@ const Profile = () => {
                 </AlertDescription>
               </Alert>
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Facturation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Gérez vos informations de facturation et consultez vos factures.
-                  </p>
-                  <Button onClick={() => navigate('/invoices')}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Voir mes factures
-                  </Button>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      E-mail de facturation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Adresse e-mail de votre service comptabilité. Chaque facture émise sera
+                      automatiquement envoyée à cette adresse.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="billing-email">Adresse e-mail (comptabilité)</Label>
+                      <Input
+                        id="billing-email"
+                        type="email"
+                        value={billingEmail}
+                        onChange={(e) => setBillingEmail(e.target.value)}
+                        placeholder="comptabilite@hotel.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Laissez vide pour utiliser l'e-mail de votre compte ({profile.email}).
+                      </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveBilling} disabled={isSavingBilling}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSavingBilling ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Facturation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Gérez vos informations de facturation et consultez vos factures.
+                    </p>
+                    <Button onClick={() => navigate('/invoices')}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Voir mes factures
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </TabsContent>
 

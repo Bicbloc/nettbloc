@@ -86,6 +86,7 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
   const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'name'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedUser, setSelectedUser] = useState<AllUser | null>(null);
+  const [selectedUserContact, setSelectedUserContact] = useState<{ phone?: string | null; name?: string | null } | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -757,9 +758,21 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           
-                          <DropdownMenuItem onClick={() => {
+                          <DropdownMenuItem onClick={async () => {
                             setSelectedUser(user);
+                            setSelectedUserContact(null);
                             setShowUserDetails(true);
+                            const { data: contact } = await supabase
+                              .from('profiles')
+                              .select('billing_phone, billing_contact_name')
+                              .eq('id', user.id)
+                              .maybeSingle();
+                            if (contact) {
+                              setSelectedUserContact({
+                                phone: (contact as any).billing_phone,
+                                name: (contact as any).billing_contact_name,
+                              });
+                            }
                           }}>
                             <Eye className="h-4 w-4 mr-2" />
                             Voir détails
@@ -899,7 +912,22 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                     <div>{format(new Date(selectedUser.trial_end_date), 'dd MMMM yyyy', { locale: fr })}</div>
                   </div>
                 )}
+                <div>
+                  <Label className="text-muted-foreground">Contact de référence</Label>
+                  <div className="font-medium">{selectedUserContact?.name || 'Non défini'}</div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Téléphone</Label>
+                  <div className="font-medium">
+                    {selectedUserContact?.phone ? (
+                      <a href={`tel:${selectedUserContact.phone}`} className="text-primary hover:underline">
+                        {selectedUserContact.phone}
+                      </a>
+                    ) : 'Non défini'}
+                  </div>
+                </div>
               </div>
+
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowUserDetails(false)}>
