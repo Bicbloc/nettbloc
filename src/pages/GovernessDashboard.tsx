@@ -98,6 +98,7 @@ function GovernessDashboardContent() {
   // Identifiant de session stable pour éviter de créer une tâche à chaque rendu
   const [govLinenTaskId, setGovLinenTaskId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<GovTab>('rooms');
+  const [declareSection, setDeclareSection] = useState<DeclareSection>('incident');
   
   const navigate = useNavigate();
   const { toast } = useToast();
