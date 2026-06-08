@@ -111,7 +111,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       // Charger les attributions de gouvernantes du jour (par étage / femme de chambre)
       const { data: govData } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms')
+        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', today);
       setGovAssignments((govData as DailyGovAssignment[]) || []);
