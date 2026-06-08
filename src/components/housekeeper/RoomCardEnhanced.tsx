@@ -228,16 +228,16 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
 
   return (
     <div
-      className={`relative overflow-hidden transition-all duration-300 rounded-2xl ${
+      className={`relative overflow-hidden transition-all duration-300 rounded-3xl active:scale-[0.99] ${
         showSuccess 
           ? 'bg-gradient-to-br from-green-400 to-emerald-500 scale-95'
           : room.status === 'clean' 
-          ? 'bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-400'
+          ? 'bg-gradient-to-br from-green-50 to-emerald-100 border border-green-300'
           : room.status === 'in_progress'
-          ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-400 shadow-lg shadow-blue-200/50'
+          ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-300 shadow-lg shadow-blue-200/40'
           : isUrgent 
-          ? 'bg-gradient-to-br from-red-50 to-orange-100 border-2 border-red-400 shadow-lg shadow-red-200/50 animate-pulse'
-          : 'bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-slate-300'
+          ? 'bg-gradient-to-br from-red-50 to-orange-100 border border-red-300 shadow-lg shadow-red-200/40 animate-pulse'
+          : 'bg-card border border-border/70 shadow-sm'
       }`}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
