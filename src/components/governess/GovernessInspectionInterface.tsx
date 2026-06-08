@@ -329,42 +329,88 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return inspections.get(roomId);
   };
 
-  // Assignation en masse : applique la configuration enregistrée et répartit
-  // automatiquement les chambres entre les gouvernantes disponibles aujourd'hui.
-  const handleBulkAssign = async () => {
+  // Attribution automatique silencieuse : applique la config enregistrée (si elle
+  // existe) puis garantit qu'aucune chambre propre ne reste non attribuée.
+  const autoAssign = async () => {
+    try {
+      const available = await getAvailableGovernesses(hotelId);
+      if (available.length === 0) return;
+      const config = loadSavedGovConfig(hotelId);
+      if (config) {
+        await applyGovernessAssignment(hotelId, config, available);
+      }
+      await ensureAllRoomsAssigned(hotelId, available);
+      loadData();
+    } catch (e) {
+      console.error('autoAssign error', e);
+    }
+  };
+
+  // Ouvre la boîte de dialogue de choix de configuration pour l'assignation en masse.
+  const openAssignDialog = async () => {
     setIsBulkAssigning(true);
     try {
-      const config = loadSavedGovConfig(hotelId);
-      if (!config) {
-        toast({
-          variant: 'destructive',
-          title: 'Aucune configuration',
-          description: "Enregistrez d'abord une configuration depuis la redistribution des chambres.",
-        });
-        return;
-      }
       const available = await getAvailableGovernesses(hotelId);
       if (available.length === 0) {
         toast({ variant: 'destructive', title: 'Aucune gouvernante', description: "Aucune gouvernante disponible aujourd'hui." });
         return;
       }
-      const { ok, assignedCount, error } = await applyGovernessAssignment(hotelId, config, available);
-      if (!ok) {
-        toast({ variant: 'destructive', title: 'Erreur', description: error || "Échec de l'attribution" });
-        return;
+      const savedExists = !!loadSavedGovConfig(hotelId);
+      setAvailableGovs(available);
+      setSelectedGovIds(available.map((g) => g.id));
+      setHasSavedConfig(savedExists);
+      setAssignMode(savedExists ? 'saved' : 'even');
+      setConfigDialogOpen(true);
+    } catch (e) {
+      console.error('openAssignDialog error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de préparer l'attribution" });
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
+  // Exécute l'assignation en masse selon le mode choisi, en garantissant qu'aucune
+  // chambre propre ne reste non attribuée.
+  const runAssignment = async () => {
+    const chosen = availableGovs.filter((g) => selectedGovIds.includes(g.id));
+    if (chosen.length === 0) {
+      toast({ variant: 'destructive', title: 'Aucune gouvernante', description: 'Sélectionnez au moins une gouvernante.' });
+      return;
+    }
+    setIsBulkAssigning(true);
+    try {
+      if (assignMode === 'saved') {
+        const config = loadSavedGovConfig(hotelId);
+        if (!config) {
+          toast({ variant: 'destructive', title: 'Aucune configuration', description: "Aucune configuration enregistrée. Choisissez la répartition équitable." });
+          return;
+        }
+        const res = await applyGovernessAssignment(hotelId, config, chosen);
+        if (!res.ok) {
+          toast({ variant: 'destructive', title: 'Erreur', description: res.error || "Échec de l'attribution" });
+          return;
+        }
+      } else {
+        const roomNumbers = rooms.map((r) => r.room_number);
+        const res = await distributeRoomNumbers(hotelId, chosen, roomNumbers);
+        if (!res.ok) {
+          toast({ variant: 'destructive', title: 'Erreur', description: res.error || "Échec de l'attribution" });
+          return;
+        }
       }
-      toast({
-        title: '✅ Attribution effectuée',
-        description: `Chambres réparties sur ${assignedCount} gouvernante(s) disponible(s).`,
-      });
+      // Garantir qu'aucune chambre propre ne reste non attribuée.
+      await ensureAllRoomsAssigned(hotelId, chosen);
+      toast({ title: '✅ Attribution effectuée', description: 'Toutes les chambres ont été attribuées aux gouvernantes.' });
+      setConfigDialogOpen(false);
       loadData();
     } catch (e) {
-      console.error('handleBulkAssign error', e);
+      console.error('runAssignment error', e);
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'effectuer l'attribution en masse" });
     } finally {
       setIsBulkAssigning(false);
     }
   };
+
 
 
 
