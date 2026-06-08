@@ -686,6 +686,74 @@ function TechnicianWorkContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Contact / Coordonnées Dialog */}
+      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-blue-600" />
+              Mes coordonnées
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Ces informations seront visibles par l'établissement.
+            </p>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" /> Email
+              </Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="c-first" className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" /> Prénom
+              </Label>
+              <Input
+                id="c-first"
+                value={contactForm.first_name}
+                onChange={(e) => setContactForm(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="Votre prénom"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="c-name" className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" /> Nom *
+              </Label>
+              <Input
+                id="c-name"
+                value={contactForm.name}
+                onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Votre nom"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="c-phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" /> Téléphone
+              </Label>
+              <Input
+                id="c-phone"
+                type="tel"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="+33 6 12 34 56 78"
+              />
+            </div>
+            <Button
+              onClick={handleSaveContact}
+              disabled={isSavingContact}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            >
+              {isSavingContact ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enregistrement...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-2" /> Enregistrer</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
