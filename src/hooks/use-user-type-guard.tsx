@@ -69,8 +69,11 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
 
     // Fast-path: si l'utilisateur a déjà choisi ce portail lors d'une session
     // précédente, on le débloque immédiatement et on valide en arrière-plan.
+    // SÉCURITÉ: jamais de fast-path pour l'établissement — il doit TOUJOURS être
+    // confirmé par la vérification DB du rôle, pour éviter qu'une session staff
+    // (femme de chambre, gouvernante, technicien...) n'atterrisse sur l'établissement.
     const remembered = storageService.getActivePortal();
-    if (remembered === expectedType && !hasCheckedRef.current) {
+    if (remembered === expectedType && expectedType !== 'establishment' && !hasCheckedRef.current) {
       setUserType(expectedType);
       setIsVerified(true);
       setRequiresPortalChoice(false);
