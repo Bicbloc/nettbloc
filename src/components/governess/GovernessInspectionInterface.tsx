@@ -289,6 +289,49 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return inspections.get(roomId);
   };
 
+  // Attribuer directement une chambre à une gouvernante pour inspection.
+  const assignRoomToGoverness = async (room: Room, govProfileId: string) => {
+    const gov = governesses.find((g) => g.id === govProfileId);
+    if (!gov) return;
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const { data: existing } = await supabase
+        .from('daily_governess_assignments')
+        .select('id, assigned_rooms')
+        .eq('hotel_id', hotelId)
+        .eq('assignment_date', today)
+        .eq('governess_profile_id', gov.id)
+        .maybeSingle();
+
+      if (existing) {
+        const merged = [...new Set([...((existing as any).assigned_rooms || []), room.room_number])];
+        await supabase
+          .from('daily_governess_assignments')
+          .update({ assigned_rooms: merged })
+          .eq('id', existing.id);
+      } else {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from('daily_governess_assignments').insert({
+          hotel_id: hotelId,
+          assignment_date: today,
+          governess_profile_id: gov.id,
+          governess_name: gov.name,
+          assignment_type: 'rooms',
+          assigned_floors: [],
+          assigned_housekeepers: [],
+          assigned_rooms: [room.room_number],
+          created_by: userData.user?.id ?? null,
+        });
+      }
+      toast({ title: 'Chambre attribuée', description: `Chambre ${room.room_number} → ${gov.name}` });
+      loadData();
+    } catch (e) {
+      console.error('assignRoomToGoverness error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer la chambre" });
+    }
+  };
+
+
   const stats = {
     total: rooms.length,
     inspected: Array.from(inspections.values()).filter(i => i.status !== 'pending').length,
