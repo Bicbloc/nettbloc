@@ -573,7 +573,7 @@ serve(async (req) => {
     // Get user hotel
     const { data: hotel } = await supabaseAdmin
       .from('hotels')
-      .select('id')
+      .select('id, name, address')
       .eq('user_id', user_id)
       .maybeSingle();
 
