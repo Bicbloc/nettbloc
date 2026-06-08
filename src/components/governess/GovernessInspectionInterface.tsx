@@ -74,6 +74,11 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [availableGovs, setAvailableGovs] = useState<GovLite[]>([]);
+  const [selectedGovIds, setSelectedGovIds] = useState<string[]>([]);
+  const [assignMode, setAssignMode] = useState<'saved' | 'even'>('saved');
+  const [hasSavedConfig, setHasSavedConfig] = useState(false);
 
 
 
