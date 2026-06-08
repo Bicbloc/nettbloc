@@ -521,7 +521,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       </div>
 
       {/* Room list grouped by governess */}
-      {rooms.length === 0 ? (
+      {sections.length === 0 ? (
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold text-lg mb-2">Aucune chambre à inspecter</h3>
@@ -535,8 +535,20 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             const doneCount = section.rooms.filter(
               r => getInspectionStatus(r.id)?.status === 'passed'
             ).length;
+            const isDropTarget = !section.isUnassigned && !!section.assignment;
             return (
-              <div key={section.key} className="space-y-3">
+              <div
+                key={section.key}
+                className={`space-y-3 rounded-lg ${isDropTarget ? 'border border-dashed border-transparent hover:border-primary/40 p-2 transition-colors' : ''}`}
+                onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5'); } : undefined}
+                onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('border-primary', 'bg-primary/5') : undefined}
+                onDrop={isDropTarget ? (e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                  const roomNumber = e.dataTransfer.getData('text/room-number');
+                  if (roomNumber && section.assignment) handleDropOnAssignment(section.assignment, roomNumber);
+                } : undefined}
+              >
                 <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2">
                     <UserCheck className="h-5 w-5 text-primary" />
@@ -547,14 +559,21 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
                     {doneCount}/{section.rooms.length} validée(s)
                   </Badge>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {section.rooms.map(renderRoomCard)}
-                </div>
+                {section.rooms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
+                  </p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
+
 
 
       {/* Inspection Dialog */}
