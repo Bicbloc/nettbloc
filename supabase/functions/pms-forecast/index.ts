@@ -94,11 +94,13 @@ async function fetchMews(credentials: PmsCredentials, startUtc: string, endUtc: 
       };
       const res = await mewsFetch(`${baseUrl}/reservations/getAll`, body);
       if (!res.ok) {
-        await res.text().catch(() => {});
+        const errTxt = await res.text().catch(() => '');
+        console.error(`[forecast] chunk ${dateStr(chunkStart)} reservations/getAll [${res.status}]: ${errTxt}`);
         break;
       }
       const data = await res.json();
       const reservations = data.Reservations || [];
+      console.log(`[forecast] chunk ${dateStr(chunkStart)}→${dateStr(chunkEnd)} page ${page}: ${reservations.length} reservations`);
       for (const r of reservations) {
         const id = r.Id || `${r.ScheduledStartUtc}-${r.ScheduledEndUtc}-${r.AssignedResourceId}`;
         if (seen.has(id)) continue;
@@ -111,6 +113,9 @@ async function fetchMews(credentials: PmsCredentials, startUtc: string, endUtc: 
       if (!cursor || reservations.length === 0) break;
     }
   }
+
+  console.log(`[forecast] total unique stays: ${stays.length}, totalRooms: ${totalRooms}`);
+
 
   return { stays, totalRooms };
 }
