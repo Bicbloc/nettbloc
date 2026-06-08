@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 interface TechnicianProfile {
   id: string;
   name: string;
+  first_name: string | null;
   email: string;
   phone: string | null;
   is_active: boolean;
@@ -22,6 +23,7 @@ export function TechnicianProfileEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    first_name: '',
     phone: ''
   });
   const { toast } = useToast();
