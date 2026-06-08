@@ -456,7 +456,7 @@ function GovernessDashboardContent() {
         </div>
       </div>
 
-      </div>
+
 
       <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
       <StaffNotificationBanner hotelId={selectedHotel?.id} />
