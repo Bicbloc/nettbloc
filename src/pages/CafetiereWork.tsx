@@ -455,10 +455,22 @@ export default function CafetiereWork() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher une chambre ou un client…"
-            className="pl-9"
+            placeholder="Tapez les premiers chiffres de la chambre…"
+            className="pl-9 rounded-xl"
+            autoComplete="off"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Effacer la recherche"
+            >
+              ✕
+            </button>
+          )}
         </div>
+
         <div className="flex gap-2 overflow-x-auto pb-1">
           {([
             { key: 'all', label: 'Toutes' },
