@@ -1,25 +1,15 @@
-# Ajouter les permissions Inspection et Petit-déjeuner
+# Ajustements interface établissement
 
-## Contexte
-La liste des permissions de la section « Rôle et permissions » est définie dans le tableau `ALL_PERMISSIONS` de `src/components/SubAccountsManager.tsx`. Elle est rendue automatiquement par catégorie (`permissionsByCategory`), donc ajouter des entrées suffit à les faire apparaître dans le formulaire de création **et** d'édition d'un sous-compte.
+## 1. Bannière hero uniquement sur « Vue d'ensemble »
+`src/pages/Index.tsx` (ligne 897) : la bannière `<HeroHeader>` (Premium / nom hôtel / « Gérez votre établissement… » / Temps réel / Solution complète) est actuellement affichée sur tous les onglets. La conditionner pour qu'elle ne s'affiche que lorsque `activeTab === 'overview'`.
 
-## Modifications
+## 2. Nom de l'établissement et code hôtel plus visibles
+`src/components/layout/DashboardHeader.tsx` (lignes 85-89) : actuellement le nom de l'hôtel et le code apparaissent en tout petit (`text-[10px]`, masqués hors grand écran) à côté du badge.
+- Agrandir le **nom de l'établissement** sous le logo (taille lisible, ex. `text-sm`/`text-base` semi-gras), visible aussi sur écrans plus petits.
+- Afficher le **code hôtel** plus grand, **en gras** et bien visible (style mis en avant, ex. badge/texte `font-bold`).
 
-### `src/components/SubAccountsManager.tsx` — tableau `ALL_PERMISSIONS`
-Ajouter trois nouvelles catégories avec leurs permissions :
-
-**Catégorie « Inspection »**
-- `inspection.view` — Voir les inspections
-- `inspection.manage` — Gérer les inspections
-
-**Catégorie « Petit-déjeuner »**
-- `breakfast.view` — Voir le petit-déjeuner
-- `breakfast.manage` — Gérer le petit-déjeuner
-
-**Catégorie « Configuration petit-déjeuner »**
-- `breakfast.config` — Configurer le petit-déjeuner
-
-Les clés suivent la convention existante (`ressource.action`). Comme le rendu se fait dynamiquement via `permissionsByCategory`, aucune autre modification d'affichage n'est nécessaire — les nouvelles cases à cocher apparaîtront automatiquement, sélectionnables et enregistrées dans `sub_account_permissions` comme les autres.
+## 3. Élargir la page Petit-déjeuner
+`src/components/dashboard/BreakfastTab.tsx` (ligne 316) : le conteneur principal est limité par `max-w-2xl`, ce qui laisse beaucoup d'espace vide à droite. Élargir (retirer la contrainte `max-w-2xl` ou la passer à pleine largeur) pour occuper l'espace disponible. Le panneau de configuration étant dans un `Sheet` latéral, il n'est pas impacté.
 
 ## Hors périmètre
-Cette tâche ajoute uniquement les permissions dans l'écran « Rôle et permissions » (création/édition). L'application effective de ces permissions pour masquer/afficher réellement les pages Inspection et Petit-déjeuner dans la navigation pourra être faite dans un second temps si souhaité.
+Aucune modification de logique métier ni de base de données — uniquement de l'affichage.

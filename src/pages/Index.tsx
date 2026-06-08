@@ -894,7 +894,9 @@ const IndexDashboard = () => {
           </div>
         )}
         
-        <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
+        {activeTab === 'overview' && (
+          <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
+        )}
 
         {!isGuestMode && currentHotelId && (
           <div className="mt-6">
