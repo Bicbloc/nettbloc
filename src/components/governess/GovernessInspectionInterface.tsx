@@ -28,6 +28,7 @@ interface Room {
 
 interface DailyGovAssignment {
   id: string;
+  governess_profile_id: string | null;
   governess_name: string;
   assignment_type: string;
   assigned_floors: number[] | null;
