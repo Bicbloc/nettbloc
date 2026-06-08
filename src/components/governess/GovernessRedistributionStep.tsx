@@ -69,10 +69,12 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     const [housekeepers, setHousekeepers] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [selectedGovernesses, setSelectedGovernesses] = useState<string[]>(initialConfig?.selectedGovernesses || []);
+    // Gouvernantes et femmes de chambre : toujours désélectionnées au départ,
+    // l'utilisateur doit faire son choix (champs obligatoires).
+    const [selectedGovernesses, setSelectedGovernesses] = useState<string[]>([]);
     const [mode, setMode] = useState<GovMode>(initialConfig?.mode || 'housekeeper');
     const [pickedFloors, setPickedFloors] = useState<number[]>(initialConfig?.pickedFloors || []);
-    const [pickedHousekeepers, setPickedHousekeepers] = useState<string[]>(initialConfig?.pickedHousekeepers || []);
+    const [pickedHousekeepers, setPickedHousekeepers] = useState<string[]>([]);
     const [pickedRoomTypes, setPickedRoomTypes] = useState<string[]>(initialConfig?.pickedRoomTypes || []);
     const [pickedCleaningTypes, setPickedCleaningTypes] = useState<string[]>(initialConfig?.pickedCleaningTypes || []);
 
@@ -137,7 +139,27 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
       setter((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
     const apply = useCallback(async (): Promise<boolean> => {
-      if (selectedGovernesses.length === 0) return true; // étape facultative
+      // Champs obligatoires : au moins une gouvernante doit être choisie.
+      if (selectedGovernesses.length === 0) {
+        toast.error('Veuillez sélectionner au moins une gouvernante');
+        return false;
+      }
+      // Et au moins un élément doit être choisi selon le mode actif.
+      const modePicks =
+        mode === 'floor' ? pickedFloors.length
+        : mode === 'housekeeper' ? pickedHousekeepers.length
+        : mode === 'roomtype' ? pickedRoomTypes.length
+        : pickedCleaningTypes.length;
+      if (modePicks === 0) {
+        const labels: Record<GovMode, string> = {
+          floor: 'au moins un étage',
+          housekeeper: 'au moins une femme de chambre',
+          roomtype: 'au moins un type de chambre',
+          cleaningtype: 'au moins un type de nettoyage',
+        };
+        toast.error(`Veuillez sélectionner ${labels[mode]}`);
+        return false;
+      }
       const selectedGovs = Array.from(
         new Map(
           governesses
@@ -145,7 +167,10 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
             .map((g) => [normalizeGovName(g.name || 'Gouvernante'), { ...g, name: g.name.trim() || 'Gouvernante' }])
         ).values()
       );
-      if (selectedGovs.length === 0) return true;
+      if (selectedGovs.length === 0) {
+        toast.error('Veuillez sélectionner au moins une gouvernante');
+        return false;
+      }
       const n = selectedGovs.length;
 
       const buckets = selectedGovs.map(() => ({ floors: [] as number[], housekeepers: [] as string[], rooms: [] as string[] }));
@@ -227,11 +252,11 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Gouvernantes disponibles</Label>
+          <Label>Gouvernantes disponibles <span className="text-destructive">*</span></Label>
           {loading ? (
             <p className="text-sm text-muted-foreground">Chargement…</p>
           ) : governesses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée. (Étape facultative)</p>
+            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {governesses.map((g) => (
