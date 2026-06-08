@@ -392,93 +392,103 @@ function TechnicianWorkContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 p-3 sm:p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 pb-6">
       <div className="max-w-7xl mx-auto space-y-4">
-        {/* Header */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate('/technician/hotels')}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div className="bg-blue-100 p-2 rounded-full">
-                  <Wrench className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">{profile?.name}</CardTitle>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Building2 className="h-4 w-4" />
-                    {hotel?.name}
-                  </div>
-                </div>
+        {/* App Header */}
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white rounded-b-[28px] shadow-xl px-4 pt-5 pb-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => navigate('/technician/hotels')}
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition shrink-0"
+                aria-label="Retour"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-white/15 shrink-0">
+                <Wrench className="h-6 w-6" />
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Actualiser
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Déconnexion
-                </Button>
+              <div className="min-w-0">
+                <p className="text-base font-semibold leading-tight truncate">
+                  {[profile?.first_name, profile?.name].filter(Boolean).join(' ') || profile?.name}
+                </p>
+                <div className="flex items-center gap-1.5 text-xs text-white/80 mt-0.5">
+                  <Building2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{hotel?.name}</span>
+                </div>
               </div>
             </div>
-          </CardHeader>
-        </Card>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={openContactDialog}
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition"
+                aria-label="Mes coordonnées"
+              >
+                <User className="h-5 w-5" />
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition disabled:opacity-60"
+                aria-label="Actualiser"
+              >
+                <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition"
+                aria-label="Déconnexion"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
 
+        <div className="px-3 sm:px-4 space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-full bg-red-100">
-                <AlertCircle className="h-4 w-4 text-red-600" />
+          <Card className="p-4 rounded-2xl border-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-red-100">
+                <AlertCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{countByStatus.new}</p>
-                <p className="text-xs text-muted-foreground">Nouveaux</p>
+                <p className="text-2xl font-bold leading-none">{countByStatus.new}</p>
+                <p className="text-xs text-muted-foreground mt-1">Nouveaux</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-full bg-amber-100">
-                <Clock className="h-4 w-4 text-amber-600" />
+          <Card className="p-4 rounded-2xl border-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-100">
+                <Clock className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{countByStatus.in_progress}</p>
-                <p className="text-xs text-muted-foreground">En cours</p>
+                <p className="text-2xl font-bold leading-none">{countByStatus.in_progress}</p>
+                <p className="text-xs text-muted-foreground mt-1">En cours</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-full bg-green-100">
-                <CheckCircle className="h-4 w-4 text-green-600" />
+          <Card className="p-4 rounded-2xl border-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-green-100">
+                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{countByStatus.resolved}</p>
-                <p className="text-xs text-muted-foreground">Résolus</p>
+                <p className="text-2xl font-bold leading-none">{countByStatus.resolved}</p>
+                <p className="text-xs text-muted-foreground mt-1">Résolus</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-full bg-purple-100">
-                <AlertTriangle className="h-4 w-4 text-purple-600" />
+          <Card className="p-4 rounded-2xl border-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-100">
+                <AlertTriangle className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{countByPriority.urgent + countByPriority.high}</p>
-                <p className="text-xs text-muted-foreground">Urgents</p>
+                <p className="text-2xl font-bold leading-none">{countByPriority.urgent + countByPriority.high}</p>
+                <p className="text-xs text-muted-foreground mt-1">Urgents</p>
               </div>
             </div>
           </Card>
