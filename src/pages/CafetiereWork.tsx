@@ -46,6 +46,47 @@ interface SimpleRoom {
 export default function CafetiereWork() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { profile, updateProfile } = useCafetiereAuth();
+
+  // Coordonnées du personnel point de vente (visibles par l'établissement).
+  const [contactOpen, setContactOpen] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', first_name: '', phone: '', email: '' });
+
+  useEffect(() => {
+    if (profile) {
+      setContactForm({
+        name: profile.name || '',
+        first_name: profile.first_name || '',
+        phone: profile.phone || '',
+        email: profile.email || '',
+      });
+    }
+  }, [profile]);
+
+  const saveContact = async () => {
+    if (!profile) {
+      toast.error('Profil indisponible');
+      return;
+    }
+    if (!contactForm.name.trim()) {
+      toast.error('Le nom est obligatoire');
+      return;
+    }
+    setSavingContact(true);
+    const { error } = await updateProfile({
+      name: contactForm.name.trim(),
+      first_name: contactForm.first_name.trim() || null,
+      phone: contactForm.phone.trim() || null,
+    } as any);
+    setSavingContact(false);
+    if (error) {
+      toast.error('Échec de l’enregistrement des coordonnées');
+      return;
+    }
+    toast.success('Coordonnées enregistrées');
+    setContactOpen(false);
+  };
 
   const hotelId = useMemo(() => {
     const fromUrl = params.get('hotel');
