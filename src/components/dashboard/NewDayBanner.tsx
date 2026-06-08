@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sunrise, Loader2, RefreshCw } from 'lucide-react';
+import { Sunrise, Loader2, RefreshCw, CalendarClock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useOperationalDate } from '@/hooks/useOperationalDate';
 
 interface NewDayBannerProps {
   hotelId: string | null;
@@ -13,64 +14,73 @@ interface NewDayBannerProps {
 
 /**
  * Bannière affichée après la clôture de la journée.
- * Propose de "Commencer une nouvelle journée", action qui synchronise
- * les données : déclenche la synchronisation PMS si configurée,
- * sinon recharge les chambres et invite à importer le planning.
+ * Affiche en grand la date opérationnelle (basée sur les clôtures, pas
+ * l'agenda) et propose de "Commencer une nouvelle journée". Si des jours
+ * ont été manqués (bug, pas de connexion, déconnexion), elle invite à
+ * ouvrir une nouvelle journée aux dates non utilisées. Un bouton de
+ * resynchronisation est proposé lorsqu'une connexion PMS (API) existe.
  */
 export function NewDayBanner({ hotelId, roomsEmpty, onStarted }: NewDayBannerProps) {
-  const [closedToday, setClosedToday] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [hasPms, setHasPms] = useState(false);
+  const { operationalDate, isBehind, missedDaysCount, lastClosureDate, loading, refresh } =
+    useOperationalDate(hotelId);
 
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
-      if (!hotelId || !roomsEmpty) {
-        if (!cancelled) setClosedToday(false);
-        return;
-      }
-      const today = new Date().toISOString().split('T')[0];
-      const { count } = await supabase
-        .from('daily_reports')
-        .select('id', { count: 'exact', head: true })
+      if (!hotelId) return;
+      const { data } = await supabase
+        .from('hotel_pms_configs' as any)
+        .select('id')
         .eq('hotel_id', hotelId)
-        .eq('report_date', today);
-      if (!cancelled) setClosedToday((count || 0) > 0);
+        .maybeSingle();
+      if (!cancelled) setHasPms(!!data);
     };
     check();
     return () => {
       cancelled = true;
     };
-  }, [hotelId, roomsEmpty]);
+  }, [hotelId]);
 
-  if (!closedToday || !roomsEmpty) return null;
+  // On affiche la bannière uniquement après une clôture (chambres vides + au
+  // moins une clôture déjà effectuée).
+  if (loading || !roomsEmpty || !lastClosureDate) return null;
+
+  const dateLabel = new Date(operationalDate).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const runSync = async () => {
+    if (!hotelId) return;
+    const { data, error } = await supabase.functions.invoke('pms-sync', {
+      body: { hotel_id: hotelId, action: 'sync' },
+    });
+    if (error || (data && data.success === false)) {
+      toast({
+        variant: 'destructive',
+        title: 'Échec de la synchronisation',
+        description: (data && data.error) || 'Impossible de récupérer le planning du PMS.',
+      });
+      return false;
+    }
+    toast({
+      title: '🔄 Resynchronisé',
+      description: `${data?.rooms_synced ?? 0} chambre(s) synchronisée(s) depuis le PMS.`,
+    });
+    return true;
+  };
 
   const handleStart = async () => {
     if (!hotelId) return;
     setStarting(true);
     try {
-      // Vérifier si une configuration PMS existe pour synchroniser automatiquement
-      const { data: pmsConfig } = await supabase
-        .from('hotel_pms_configs' as any)
-        .select('id')
-        .eq('hotel_id', hotelId)
-        .maybeSingle();
-
-      if (pmsConfig) {
-        const { data, error } = await supabase.functions.invoke('pms-sync', {
-          body: { hotel_id: hotelId, action: 'sync' },
-        });
-        if (error || (data && data.success === false)) {
-          toast({
-            variant: 'destructive',
-            title: 'Échec de la synchronisation',
-            description: (data && data.error) || 'Impossible de récupérer le planning du PMS.',
-          });
-        } else {
-          toast({
-            title: '☀️ Nouvelle journée démarrée',
-            description: `${data?.rooms_synced ?? 0} chambre(s) synchronisée(s) depuis le PMS.`,
-          });
-        }
+      if (hasPms) {
+        const ok = await runSync();
+        if (!ok) return;
       } else {
         toast({
           title: '☀️ Nouvelle journée',
@@ -78,7 +88,7 @@ export function NewDayBanner({ hotelId, roomsEmpty, onStarted }: NewDayBannerPro
         });
       }
       onStarted();
-      setClosedToday(false);
+      refresh();
     } catch (e) {
       toast({
         variant: 'destructive',
@@ -90,9 +100,20 @@ export function NewDayBanner({ hotelId, roomsEmpty, onStarted }: NewDayBannerPro
     }
   };
 
+  const handleResync = async () => {
+    setStarting(true);
+    try {
+      await runSync();
+      onStarted();
+      refresh();
+    } finally {
+      setStarting(false);
+    }
+  };
+
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5">
-      <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <CardContent className="flex flex-col gap-4 p-5">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-primary/15 p-2.5 text-primary">
             <Sunrise className="h-5 w-5" />
@@ -100,18 +121,50 @@ export function NewDayBanner({ hotelId, roomsEmpty, onStarted }: NewDayBannerPro
           <div>
             <p className="font-semibold">La journée a été clôturée</p>
             <p className="text-sm text-muted-foreground">
-              Démarrez une nouvelle journée pour synchroniser le planning et réinitialiser le tableau de bord.
+              Démarrez la prochaine journée pour synchroniser le planning et réinitialiser le tableau de bord.
             </p>
           </div>
         </div>
-        <Button onClick={handleStart} disabled={starting} className="shrink-0 gap-2">
-          {starting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
+
+        {/* Date opérationnelle en grand */}
+        <div className="rounded-xl border bg-background/60 p-4 text-center">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Prochaine journée à ouvrir
+          </p>
+          <p className="text-2xl font-bold text-primary sm:text-3xl">{dateLabel}</p>
+          {isBehind && (
+            <p className="mt-2 flex items-center justify-center gap-2 text-sm font-medium text-amber-600">
+              <CalendarClock className="h-4 w-4" />
+              {missedDaysCount} journée(s) non utilisée(s) détectée(s) — ouverture de la plus ancienne.
+            </p>
           )}
-          Commencer une nouvelle journée
-        </Button>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          {hasPms && (
+            <Button
+              variant="outline"
+              onClick={handleResync}
+              disabled={starting}
+              className="gap-2"
+            >
+              {starting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Resynchroniser (API)
+            </Button>
+          )}
+          <Button onClick={handleStart} disabled={starting} className="gap-2">
+            {starting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sunrise className="h-4 w-4" />
+            )}
+            Ouvrir cette journée
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
