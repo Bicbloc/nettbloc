@@ -526,24 +526,23 @@ function GovernessDashboardContent() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {[
-                { value: stats.totalRooms, label: 'Chambres', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
-                { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
-                { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-red-100 text-red-600 dark:bg-red-950/30', icon: AlertTriangle },
-                { value: stats.lostItems, label: 'Objets', color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30', icon: Package },
+                { value: stats.totalRooms, label: 'Chambres', color: 'bg-blue-50 text-blue-500 dark:bg-blue-950/30', icon: Building2 },
+                { value: stats.cleanRooms, label: 'Propres', color: 'bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30', icon: CheckCircle },
+                { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-rose-50 text-rose-500 dark:bg-rose-950/30', icon: AlertTriangle },
+                { value: stats.lostItems, label: 'Objets', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/30', icon: Package },
               ].map(({ value, label, color, icon: StatIcon }) => (
-                <Card key={label} className="p-2 rounded-2xl">
-                  <div className="text-center">
-                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1", color)}>
-                      <StatIcon className="h-4 w-4" />
-                    </div>
-                    <p className="text-lg font-bold">{value}</p>
-                    <p className="text-[10px] text-muted-foreground">{label}</p>
+                <div key={label} className="bg-card p-3 rounded-2xl shadow-sm border border-border/60 flex flex-col items-center text-center">
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-2", color)}>
+                    <StatIcon className="h-4 w-4" />
                   </div>
-                </Card>
+                  <p className="text-lg font-bold leading-none">{value}</p>
+                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-semibold tracking-wide">{label}</p>
+                </div>
               ))}
             </div>
+
 
             {/* Pour changer d'établissement : utiliser l'icône bâtiment dans
                 l'en-tête (retour au hub des hôtels). Pas de sélecteur inline ici
