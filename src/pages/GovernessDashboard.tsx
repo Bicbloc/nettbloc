@@ -553,7 +553,7 @@ function GovernessDashboardContent() {
             {selectedHotel && (
               <>
                 {activeTab === 'rooms' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                  <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                     <div className="p-4 border-b">
                       <h2 className="font-semibold">Chambres & assignations</h2>
                       <p className="text-xs text-muted-foreground">Assignez ou désassignez les chambres aux femmes de chambre</p>
@@ -565,7 +565,7 @@ function GovernessDashboardContent() {
                 )}
 
                 {activeTab === 'staff' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                  <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                     <div className="p-4 border-b">
                       <h2 className="font-semibold">Femmes de chambre</h2>
                       <p className="text-xs text-muted-foreground">Suivez l'activité de votre équipe</p>
@@ -628,7 +628,7 @@ function GovernessDashboardContent() {
                     </div>
 
                     {declareSection === 'incident' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Incidents</h2>
@@ -643,7 +643,7 @@ function GovernessDashboardContent() {
                     )}
 
                     {declareSection === 'lost' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Objets trouvés</h2>
@@ -658,7 +658,7 @@ function GovernessDashboardContent() {
                     )}
 
                     {declareSection === 'linen' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Inventaire du linge</h2>
