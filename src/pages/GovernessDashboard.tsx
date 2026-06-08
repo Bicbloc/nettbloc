@@ -410,38 +410,41 @@ function GovernessDashboardContent() {
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-muted/30">
       {/* App Header */}
-      <div className="flex-none z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+      <div className="flex-none z-40 bg-gradient-to-br from-amber-500 to-orange-600 text-white safe-area-top rounded-b-[32px] shadow-lg">
 
-        <div className="px-4 py-3">
+        <div className="px-5 pt-4 pb-7">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                <span className="font-bold text-base">{initials}</span>
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-sm">
+                <span className="font-bold text-lg">{initials}</span>
               </div>
               <div className="min-w-0">
-                <p className="text-white/70 text-xs font-medium">{greeting} 👑</p>
-                <h1 className="font-bold text-base truncate">{profile.name}</h1>
+                <p className="text-amber-50/80 text-xs font-medium flex items-center gap-1">{greeting} 👑</p>
+                <h1 className="font-bold text-xl leading-tight truncate">{profile.name}</h1>
                 {selectedHotel && (
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <Building2 className="h-3 w-3 text-white/60 flex-shrink-0" />
-                    <span className="text-xs text-white/70 truncate">{selectedHotel.name}</span>
+                    <Building2 className="h-3 w-3 text-white/70 flex-shrink-0" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-50/80 truncate">{selectedHotel.name}</span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors border border-white/10 shadow-inner active:scale-95"
                 onClick={() => navigate('/governess/hotels')}>
-                <Building2 className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                <Building2 className="h-5 w-5 text-white" />
+              </button>
+              <button
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors border border-white/10 shadow-inner active:scale-95"
                 onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
+                <LogOut className="h-5 w-5 text-white" />
+              </button>
             </div>
           </div>
         </div>
       </div>
+
 
 
 
