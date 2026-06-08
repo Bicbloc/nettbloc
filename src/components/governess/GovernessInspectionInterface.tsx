@@ -360,7 +360,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
   const sections = useMemo(() => {
-    const result: { key: string; name: string; scope: string; rooms: Room[] }[] = [];
+    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean }[] = [];
     const claimed = new Set<string>();
 
     for (const a of govAssignments) {
@@ -382,7 +382,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
     const unassigned = rooms.filter((r) => !claimed.has(r.id));
     if (unassigned.length > 0) {
-      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'Aucune gouvernante', rooms: unassigned });
+      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
     }
     return result;
   }, [rooms, govAssignments]);
