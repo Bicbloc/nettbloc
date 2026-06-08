@@ -217,6 +217,28 @@ export function AssignmentTab({
         }}
       />
 
+      {/* Incitation à redistribuer si des chambres ne sont pas encore attribuées */}
+      {housekeeperNames.length > 0 && getUnassignedRooms().length > 0 && (
+        <Alert className="border-primary/40 bg-primary/5">
+          <RefreshCw className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              <strong>{getUnassignedRooms().length}</strong> chambre(s) ne sont pas encore
+              attribuée(s). Appuyez sur <strong>Redistribuer</strong> pour les répartir
+              équitablement entre vos femmes de chambre.
+            </span>
+            <Button
+              size="sm"
+              onClick={() => setIsRedistributionDialogOpen(true)}
+              className="shrink-0"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Redistribuer maintenant
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Attribution de l'inventaire du linge */}
       {currentHotelId && (
         <InventoryAssignmentCard hotelId={currentHotelId} />
