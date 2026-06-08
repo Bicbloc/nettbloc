@@ -378,34 +378,56 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return matchFloor || matchHk || matchRoom;
   };
 
-  // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
+  // Regroupe les chambres à inspecter par gouvernante (une carte par gouvernante).
   const sections = useMemo(() => {
-    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean; assignment?: DailyGovAssignment }[] = [];
+    const result: {
+      key: string;
+      governessId: string | null;
+      name: string;
+      scope: string;
+      rooms: Room[];
+      isUnassigned?: boolean;
+      assignment?: DailyGovAssignment;
+    }[] = [];
     const claimed = new Set<string>();
 
-    for (const a of govAssignments) {
-      const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
+    // Une carte pour chaque gouvernante approuvée.
+    for (const g of governesses) {
+      const assignment = govAssignments.find((a) => a.governess_profile_id === g.id);
+      const sectionRooms = assignment
+        ? rooms.filter((r) => roomMatchesAssignment(r, assignment))
+        : [];
       sectionRooms.forEach((r) => claimed.add(r.id));
       const scopeParts: string[] = [];
-      if ((a.assigned_floors || []).length > 0) {
-        scopeParts.push(`Étages : ${(a.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
+      if (assignment) {
+        if ((assignment.assigned_floors || []).length > 0) {
+          scopeParts.push(`Étages : ${(assignment.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
+        }
+        if ((assignment.assigned_housekeepers || []).length > 0) {
+          scopeParts.push(`Femmes de chambre : ${(assignment.assigned_housekeepers || []).join(', ')}`);
+        }
+        if ((assignment.assigned_rooms || []).length > 0) {
+          scopeParts.push(`Chambres : ${(assignment.assigned_rooms || []).join(', ')}`);
+        }
       }
-      if ((a.assigned_housekeepers || []).length > 0) {
-        scopeParts.push(`Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ')}`);
-      }
-      if ((a.assigned_rooms || []).length > 0) {
-        scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
-      }
-      const scope = scopeParts.join(' • ') || '—';
-      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms, assignment: a });
+      const scope = scopeParts.join(' • ') || 'Aucune chambre attribuée';
+      result.push({ key: g.id, governessId: g.id, name: g.name, scope, rooms: sectionRooms, assignment });
+    }
+
+    // Gouvernantes assignées mais non listées dans les approuvées (sécurité).
+    for (const a of govAssignments) {
+      if (a.governess_profile_id && governesses.some((g) => g.id === a.governess_profile_id)) continue;
+      const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
+      sectionRooms.forEach((r) => claimed.add(r.id));
+      result.push({ key: a.id, governessId: a.governess_profile_id, name: a.governess_name, scope: (a.assigned_rooms || []).length ? `Chambres : ${(a.assigned_rooms || []).join(', ')}` : 'Aucune chambre attribuée', rooms: sectionRooms, assignment: a });
     }
 
     const unassigned = rooms.filter((r) => !claimed.has(r.id));
     if (unassigned.length > 0) {
-      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
+      result.push({ key: '__unassigned__', governessId: null, name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
     }
     return result;
-  }, [rooms, govAssignments]);
+  }, [rooms, govAssignments, governesses]);
 
   const renderRoomCard = (room: Room, allowAssign = false) => {
     const inspection = getInspectionStatus(room.id);
