@@ -568,46 +568,70 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Card>
       ) : (
         <div className="space-y-6">
-          {sections.map(section => {
-            const doneCount = section.rooms.filter(
-              r => getInspectionStatus(r.id)?.status === 'passed'
-            ).length;
-            const isDropTarget = !section.isUnassigned && !!section.assignment;
-            return (
-              <div
-                key={section.key}
-                className={`space-y-3 rounded-lg ${isDropTarget ? 'border border-dashed border-transparent hover:border-primary/40 p-2 transition-colors' : ''}`}
-                onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5'); } : undefined}
-                onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('border-primary', 'bg-primary/5') : undefined}
-                onDrop={isDropTarget ? (e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                  const roomNumber = e.dataTransfer.getData('text/room-number');
-                  if (roomNumber && section.assignment) handleDropOnAssignment(section.assignment, roomNumber);
-                } : undefined}
-              >
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-base">{section.name}</h3>
-                    <span className="text-xs text-muted-foreground">{section.scope}</span>
-                  </div>
-                  <Badge variant="secondary">
-                    {doneCount}/{section.rooms.length} validée(s)
-                  </Badge>
+          {/* Une carte par gouvernante disponible */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {sections.filter(s => !s.isUnassigned).map(section => {
+              const doneCount = section.rooms.filter(
+                r => getInspectionStatus(r.id)?.status === 'passed'
+              ).length;
+              const isDropTarget = !!section.governessId;
+              return (
+                <Card
+                  key={section.key}
+                  className="transition-colors"
+                  onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-primary'); } : undefined}
+                  onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('ring-2', 'ring-primary') : undefined}
+                  onDrop={isDropTarget ? (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                    const roomNumber = e.dataTransfer.getData('text/room-number');
+                    if (roomNumber) handleDropOnGoverness(section, roomNumber);
+                  } : undefined}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <UserCheck className="h-5 w-5 text-primary" />
+                        {section.name}
+                      </CardTitle>
+                      <Badge variant="secondary">
+                        {doneCount}/{section.rooms.length} validée(s)
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{section.scope}</p>
+                  </CardHeader>
+                  <CardContent>
+                    {section.rooms.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-lg">
+                        Glissez une chambre ici pour l'attribuer
+                      </p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {section.rooms.map((r) => renderRoomCard(r, false))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Chambres non attribuées */}
+          {sections.filter(s => s.isUnassigned).map(section => (
+            <div key={section.key} className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="font-semibold text-base">{section.name}</h3>
+                  <span className="text-xs text-muted-foreground">{section.scope}</span>
                 </div>
-                {section.rooms.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
-                  </p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))}
-                  </div>
-                )}
+                <Badge variant="outline">{section.rooms.length}</Badge>
               </div>
-            );
-          })}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {section.rooms.map((r) => renderRoomCard(r, true))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
