@@ -1026,9 +1026,8 @@ const HousekeeperWorkContent: React.FC = () => {
           .invoke('apaleo-update-condition', {
             body: { hotelId, roomNumber: room.room_number, status: newStatus },
           })
-          .then(({ data, error }) => {
+          .then(({ error }) => {
             if (error) console.warn('⚠️ Synchro statut Apaleo échouée:', error.message);
-            else console.log('🔄 Synchro Apaleo:', data);
           })
           .catch((e) => console.warn('⚠️ Synchro statut Apaleo échouée:', e));
       }

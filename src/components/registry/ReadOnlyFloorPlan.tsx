@@ -66,7 +66,6 @@ export const ReadOnlyFloorPlan: React.FC<ReadOnlyFloorPlanProps> = ({ hotelId, h
           console.error('❌ ReadOnlyFloorPlan: Error loading rooms registry:', error.message);
         }
         if (data) {
-          console.log(`✅ ReadOnlyFloorPlan: Loaded ${data.length} rooms for hotel ${hotelId}`);
           setRooms(data);
         }
       } catch (err) {
