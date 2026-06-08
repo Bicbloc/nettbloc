@@ -98,6 +98,19 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    if (hotelId === '__debug__') {
+      const trimmed = serviceAccountRaw.trim();
+      return new Response(JSON.stringify({
+        length: serviceAccountRaw.length,
+        firstChar: serviceAccountRaw[0],
+        lastChar: serviceAccountRaw[serviceAccountRaw.length - 1],
+        first30: serviceAccountRaw.slice(0, 30),
+        startsWithBrace: trimmed.startsWith('{'),
+        endsWithBrace: trimmed.endsWith('}'),
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const serviceAccount = JSON.parse(serviceAccountRaw);
 
     const supabase = createClient(
