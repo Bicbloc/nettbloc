@@ -360,7 +360,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
   const sections = useMemo(() => {
-    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean }[] = [];
+    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean; assignment?: DailyGovAssignment }[] = [];
     const claimed = new Set<string>();
 
     for (const a of govAssignments) {
