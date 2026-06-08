@@ -1195,7 +1195,7 @@ const HousekeeperWorkContent: React.FC = () => {
         <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
       )}
 
-      <div className="container mx-auto px-4 py-4 space-y-4">
+      <div className="container mx-auto px-4 pt-4 pb-28 space-y-4">
         {/* Consignes du jour */}
         {hotelId && <DailyInstructionsBanner hotelId={hotelId} />}
 
