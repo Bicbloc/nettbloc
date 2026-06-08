@@ -154,6 +154,19 @@ export default function CafetiereWork() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Synchronisation manuelle : recharge les chambres + clients depuis le PMS.
+  const handleSync = useCallback(async () => {
+    if (!hotelId || syncing) return;
+    setSyncing(true);
+    try {
+      await loadAll();
+    } finally {
+      setSyncing(false);
+    }
+  }, [hotelId, syncing, loadAll]);
+
+
+
   // Realtime sync of breakfast logs + room sources
   useEffect(() => {
     if (!hotelId) return;
