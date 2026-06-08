@@ -83,9 +83,14 @@ export function DashboardHeader({
                     </Badge>
                   )}
                   {hotelName && (
-                    <span className="text-[10px] text-muted-foreground hidden lg:inline">
-                      {hotelName} {hotelCode && `• ${hotelCode}`}
+                    <span className="text-sm font-semibold text-foreground">
+                      {hotelName}
                     </span>
+                  )}
+                  {hotelCode && (
+                    <Badge variant="outline" className="h-5 px-2 text-xs font-bold tracking-wide">
+                      {hotelCode}
+                    </Badge>
                   )}
                 </div>
               </div>
