@@ -192,6 +192,58 @@ const Profile = () => {
     setIsEditing(false);
   };
 
+  const emailIsValid = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+  const handleSaveContact = async () => {
+    if (!user) return;
+    setIsSavingContact(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          billing_contact_name: billingContactName.trim() || null,
+          billing_phone: billingPhone.trim() || null,
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+      setProfile(prev => prev ? {
+        ...prev,
+        billing_contact_name: billingContactName.trim() || null,
+        billing_phone: billingPhone.trim() || null,
+      } : null);
+      toast({ title: 'Contact enregistré', description: 'Le contact de référence a été mis à jour.' });
+    } catch (e) {
+      console.error('Erreur contact:', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer le contact.' });
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
+  const handleSaveBilling = async () => {
+    if (!user) return;
+    const trimmed = billingEmail.trim();
+    if (trimmed && !emailIsValid(trimmed)) {
+      toast({ variant: 'destructive', title: 'Email invalide', description: 'Saisissez une adresse e-mail valide.' });
+      return;
+    }
+    setIsSavingBilling(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ billing_email: trimmed || null })
+        .eq('id', user.id);
+      if (error) throw error;
+      setProfile(prev => prev ? { ...prev, billing_email: trimmed || null } : null);
+      toast({ title: 'E-mail de facturation enregistré', description: 'Chaque facture sera envoyée à cette adresse.' });
+    } catch (e) {
+      console.error('Erreur facturation:', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer l\'e-mail de facturation.' });
+    } finally {
+      setIsSavingBilling(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
