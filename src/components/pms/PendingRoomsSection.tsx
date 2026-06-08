@@ -141,7 +141,26 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
     }
   };
 
+  const ignoreAll = async () => {
+    if (!hotelId || rooms.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await supabase
+        .from('pms_pending_rooms')
+        .update({ status: 'ignored', resolved_at: new Date().toISOString() })
+        .in('id', rooms.map(r => r.id));
+
+      toast({ title: 'Chambres ignorées', description: `${rooms.length} chambres non validées.` });
+      setRooms([]);
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || "Impossible d'ignorer les chambres.", variant: 'destructive' });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!hotelId || (!loading && rooms.length === 0)) return null;
+
 
   return (
     <>
