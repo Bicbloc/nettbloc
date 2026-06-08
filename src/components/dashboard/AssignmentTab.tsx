@@ -15,7 +15,7 @@ import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { CleanRoomsSection } from "@/components/CleanRoomsSection";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
-import { InspectionRequestDialog } from "@/components/InspectionRequestDialog";
+
 import { CreateColumnDialog } from "@/components/CreateColumnDialog";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
