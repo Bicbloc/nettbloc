@@ -32,6 +32,7 @@ export const useAdminBanners = () => {
       if (error) throw error;
       setBanners((data || []) as AdminBanner[]);
     } catch (e) {
+      if (import.meta.env.DEV) console.error('useAdminBanners: failed to load banners', e);
       setBanners([]);
     } finally {
       setLoading(false);
