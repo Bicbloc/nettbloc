@@ -87,7 +87,7 @@ export function AssignmentTab({
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
-  const [showInspectionDialog, setShowInspectionDialog] = useState(false);
+  
   const [activeColumns, setActiveColumns] = useState<string[]>([]);
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const queryClient = useQueryClient();
