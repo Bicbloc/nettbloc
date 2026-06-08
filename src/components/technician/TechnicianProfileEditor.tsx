@@ -163,17 +163,31 @@ export function TechnicianProfileEditor() {
               </p>
             </div>
 
+            {/* Prénom */}
+            <div className="space-y-2">
+              <Label htmlFor="first_name" className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                Prénom
+              </Label>
+              <Input
+                id="first_name"
+                value={formData.first_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="Votre prénom"
+              />
+            </div>
+
             {/* Nom */}
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                Nom complet *
+                Nom *
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Votre nom complet"
+                placeholder="Votre nom"
               />
             </div>
 
