@@ -24,7 +24,7 @@ import { stayLabel } from '@/utils/stayStatus';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
-  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
+  upsertBreakfastLog, sendBreakfastsToPms, fetchPmsRooms, todayDate,
   type PmsRoom,
 } from '@/services/breakfastConfigService';
 
@@ -81,7 +81,7 @@ export default function CafetiereWork() {
   const loadAll = useCallback(async () => {
     if (!hotelId) { setLoading(false); return; }
     setLoading(true);
-    const [{ data: roomData }, { data: pendingRooms }, cfg, pmsOk] = await Promise.all([
+    const [{ data: roomData }, { data: pendingRooms }, cfg] = await Promise.all([
       supabase.from('hotel_rooms_registry')
         .select('room_number')
         .eq('hotel_id', hotelId)
@@ -93,30 +93,30 @@ export default function CafetiereWork() {
         .eq('status', 'pending')
         .order('room_number'),
       loadBreakfastConfig(hotelId),
-      hasActivePmsConfig(hotelId),
     ]);
     // Inclusion + occupation récupérées en temps réel depuis le PMS (Mews/Apaleo).
     // On ne facture QUE les chambres en cours de séjour : par défaut on affiche
     // les chambres occupées du PMS, avec le nom du client.
+    // IMPORTANT : on tente TOUJOURS la récupération PMS via l'edge function (qui
+    // utilise le service role). On ne s'appuie pas sur une lecture RLS de
+    // hotel_pms_configs côté client, car la cafetière n'a pas accès à cette table.
     let pmsMap: Record<string, PmsRoom> = {};
-    let hasPmsRooms = false;
-    if (pmsOk) {
-      const pmsRooms = await fetchPmsRooms(hotelId);
-      if (pmsRooms.ok) {
-        setPmsError(null);
-        setPmsRoomCount(pmsRooms.rooms.length);
-        if (pmsRooms.rooms.length > 0) {
-          hasPmsRooms = true;
-          pmsMap = Object.fromEntries(
-            pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
-          );
-        }
-      } else {
-        setPmsError(pmsRooms.error || 'Synchronisation PMS impossible');
-        setPmsRoomCount(null);
+    let pmsOk = false;
+    const pmsRooms = await fetchPmsRooms(hotelId);
+    if (pmsRooms.ok) {
+      pmsOk = true;
+      setPmsError(null);
+      setPmsRoomCount(pmsRooms.rooms.length);
+      if (pmsRooms.rooms.length > 0) {
+        pmsMap = Object.fromEntries(
+          pmsRooms.rooms.map((r) => [String(r.room_number).trim().toLowerCase(), r])
+        );
       }
     } else {
-      setPmsError(null);
+      // Pas de PMS configuré (message explicite) → pas d'erreur affichée.
+      const err = pmsRooms.error || '';
+      const noPms = /aucune chambre|no pms|not configured|pas de config/i.test(err);
+      setPmsError(noPms ? null : (err || 'Synchronisation PMS impossible'));
       setPmsRoomCount(null);
     }
 
