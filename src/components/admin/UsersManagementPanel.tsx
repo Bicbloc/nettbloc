@@ -86,6 +86,7 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
   const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'name'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedUser, setSelectedUser] = useState<AllUser | null>(null);
+  const [selectedUserContact, setSelectedUserContact] = useState<{ phone?: string | null; name?: string | null } | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
