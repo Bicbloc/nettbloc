@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { storageService } from '@/services/storageService';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
+import { pushNotificationService } from '@/services/pushNotificationService';
 import { nativeCameraService } from '@/services/nativeCameraService';
 
 // Build ID injected at build time - this will change on each deployment
