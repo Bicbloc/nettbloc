@@ -172,10 +172,16 @@ export function PendingRoomsSection({ hotelId, refreshKey }: PendingRoomsSection
             Nouvelles chambres détectées ({rooms.length})
           </div>
           {rooms.length > 0 && (
-            <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
-              {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-              Tout ajouter
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="outline" disabled={bulkBusy || loading} onClick={ignoreAll}>
+                <X className="h-4 w-4 mr-1" />
+                Ne pas valider
+              </Button>
+              <Button size="sm" disabled={bulkBusy || loading} onClick={addAll}>
+                {bulkBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                Tout valider
+              </Button>
+            </div>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
