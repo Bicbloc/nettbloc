@@ -71,6 +71,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     issues: [] as string[]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
+
 
   const loadData = useCallback(async () => {
     try {
