@@ -35,7 +35,8 @@ interface UserProfile {
 
 const Profile = () => {
   const { user } = useAuth();
-  const { refreshHotel } = useHotel();
+  const { refreshHotel, hotelId } = useHotel();
+  const { preferences, updatePreference } = useUserPreferences();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { plan, subscribed, canAccessFeature, isInTrial, trialDaysRemaining } = useSubscription();
