@@ -293,7 +293,11 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       !!room.housekeeper_name &&
       hks.includes(room.housekeeper_name.trim().toLowerCase());
 
-    return matchFloor || matchHk;
+    const roomNums = (a.assigned_rooms || []).map((r) => (r || '').trim().toLowerCase());
+    const matchRoom =
+      roomNums.length > 0 && roomNums.includes(room.room_number.trim().toLowerCase());
+
+    return matchFloor || matchHk || matchRoom;
   };
 
   // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
