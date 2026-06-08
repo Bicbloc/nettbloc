@@ -30,7 +30,7 @@ interface UserPreferences {
 }
 
 const defaultPreferences: UserPreferences = {
-  theme: 'system',
+  theme: 'light',
   language: 'fr',
   notifications: {
     email: true,
