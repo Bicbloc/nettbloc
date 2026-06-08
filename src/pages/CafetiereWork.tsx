@@ -24,7 +24,7 @@ import { stayLabel } from '@/utils/stayStatus';
 import { toast } from 'sonner';
 import {
   BreakfastConfig, BreakfastLog, loadBreakfastConfig, loadBreakfastLogs,
-  upsertBreakfastLog, sendBreakfastsToPms, hasActivePmsConfig, fetchPmsRooms, todayDate,
+  upsertBreakfastLog, sendBreakfastsToPms, fetchPmsRooms, todayDate,
   type PmsRoom,
 } from '@/services/breakfastConfigService';
 
