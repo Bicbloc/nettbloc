@@ -98,6 +98,11 @@ const ALL_PERMISSIONS: Permission[] = [
   { key: 'incidents.view', label: 'Voir les incidents', category: 'Incidents' },
   { key: 'incidents.manage', label: 'Gérer les incidents', category: 'Incidents' },
   { key: 'incidents.add_items', label: 'Ajouter des items', category: 'Incidents' },
+  { key: 'inspection.view', label: 'Voir les inspections', category: 'Inspection' },
+  { key: 'inspection.manage', label: 'Gérer les inspections', category: 'Inspection' },
+  { key: 'breakfast.view', label: 'Voir le petit-déjeuner', category: 'Petit-déjeuner' },
+  { key: 'breakfast.manage', label: 'Gérer le petit-déjeuner', category: 'Petit-déjeuner' },
+  { key: 'breakfast.config', label: 'Configurer le petit-déjeuner', category: 'Configuration petit-déjeuner' },
 ];
 
 const STEPS = [
