@@ -9,7 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Wrench, LogOut, Building2, AlertTriangle, Home, 
   CheckCircle, Clock, AlertCircle, Calendar, RefreshCw,
-  MessageSquare, Filter, ArrowLeft, Package, LayoutGrid
+  MessageSquare, Filter, ArrowLeft, Package, LayoutGrid,
+  User, Phone, Mail, Save, Loader2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Map as MapIcon } from 'lucide-react';
