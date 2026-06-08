@@ -42,11 +42,11 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const [{ data: profs }, { data: reqs }, { data: hotel }] = await Promise.all([
       supabase.from('cafetiere_profiles')
-        .select('id, name, email')
+        .select('id, name, first_name, email, phone')
         .eq('is_active', true)
         .order('name'),
       supabase.from('cafetiere_access_requests')
-        .select('id, cafetiere_profile_id, status, cafetiere_profiles(name, email)')
+        .select('id, cafetiere_profile_id, status, cafetiere_profiles(name, first_name, email, phone)')
         .eq('hotel_id', hotelId)
         .eq('status', 'approved'),
       supabase.from('hotels').select('hotel_code').eq('id', hotelId).maybeSingle(),
