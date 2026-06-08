@@ -138,6 +138,7 @@ export function DashboardHeader({
               />
             </div>
 
+            <ThemeToggle />
             <NotificationBell />
             <UserMenu />
           </div>
