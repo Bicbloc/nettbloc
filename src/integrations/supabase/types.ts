@@ -820,6 +820,7 @@ export type Database = {
         Row: {
           assigned_floors: number[] | null
           assigned_housekeepers: string[] | null
+          assigned_rooms: string[]
           assignment_date: string
           assignment_type: string
           created_at: string
@@ -833,6 +834,7 @@ export type Database = {
         Insert: {
           assigned_floors?: number[] | null
           assigned_housekeepers?: string[] | null
+          assigned_rooms?: string[]
           assignment_date?: string
           assignment_type?: string
           created_at?: string
@@ -846,6 +848,7 @@ export type Database = {
         Update: {
           assigned_floors?: number[] | null
           assigned_housekeepers?: string[] | null
+          assigned_rooms?: string[]
           assignment_date?: string
           assignment_type?: string
           created_at?: string
