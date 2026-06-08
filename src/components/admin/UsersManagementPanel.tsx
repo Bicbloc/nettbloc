@@ -912,7 +912,22 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                     <div>{format(new Date(selectedUser.trial_end_date), 'dd MMMM yyyy', { locale: fr })}</div>
                   </div>
                 )}
+                <div>
+                  <Label className="text-muted-foreground">Contact de référence</Label>
+                  <div className="font-medium">{selectedUserContact?.name || 'Non défini'}</div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Téléphone</Label>
+                  <div className="font-medium">
+                    {selectedUserContact?.phone ? (
+                      <a href={`tel:${selectedUserContact.phone}`} className="text-primary hover:underline">
+                        {selectedUserContact.phone}
+                      </a>
+                    ) : 'Non défini'}
+                  </div>
+                </div>
               </div>
+
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowUserDetails(false)}>
