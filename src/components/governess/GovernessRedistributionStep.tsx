@@ -60,13 +60,15 @@ interface Props {
   hotelId: string;
   initialConfig?: GovStepConfig | null;
   onConfigChange?: (config: GovStepConfig) => void;
+  /** Femmes de chambre sélectionnées à l'étape précédente. */
+  availableHousekeepers?: string[];
 }
 
 export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
-  ({ hotelId, initialConfig, onConfigChange }, ref) => {
+  ({ hotelId, initialConfig, onConfigChange, availableHousekeepers }, ref) => {
     const [governesses, setGovernesses] = useState<Governess[]>([]);
     const [rooms, setRooms] = useState<RoomRow[]>([]);
-    const [housekeepers, setHousekeepers] = useState<string[]>([]);
+    const [assignedHousekeepers, setAssignedHousekeepers] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Gouvernantes et femmes de chambre : toujours désélectionnées au départ,
@@ -80,11 +82,17 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
 
     const load = useCallback(async () => {
       setLoading(true);
-      const [gov, reg, asg] = await Promise.all([
+      const [gov, registry, daily, asg] = await Promise.all([
         supabase.from('governess_access_requests')
           .select('governess_profile_id, status, governess_profiles(id, name)')
           .eq('hotel_id', hotelId)
           .eq('status', 'approved'),
+        // Étages + chambres de référence : registre des chambres.
+        supabase.from('hotel_rooms_registry')
+          .select('room_number, floor, room_type')
+          .eq('hotel_id', hotelId)
+          .eq('is_active', true),
+        // Type de nettoyage du jour : table opérationnelle des chambres.
         supabase.from('rooms').select('room_number, floor, room_type, cleaning_type').eq('hotel_id', hotelId),
         supabase.from('assignments').select('housekeeper_name').eq('hotel_id', hotelId),
       ]);
@@ -93,14 +101,35 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
         id: g.governess_profile_id,
         name: g.governess_profiles?.name || 'Gouvernante',
       })));
-      setRooms(((reg.data as any[]) || []) as RoomRow[]);
-      setHousekeepers([...new Set(
+
+      // Fusionner registre (référence) + chambres du jour (pour cleaning_type).
+      const cleaningByNumber = new Map<string, string | null>();
+      ((daily.data as any[]) || []).forEach((r) => {
+        cleaningByNumber.set((r.room_number || '').trim(), r.cleaning_type ?? null);
+      });
+      const registryRows = ((registry.data as any[]) || []) as RoomRow[];
+      const merged: RoomRow[] = registryRows.length > 0
+        ? registryRows.map((r) => ({
+            ...r,
+            cleaning_type: cleaningByNumber.get((r.room_number || '').trim()) ?? null,
+          }))
+        : (((daily.data as any[]) || []) as RoomRow[]);
+      setRooms(merged);
+
+      setAssignedHousekeepers([...new Set(
         ((asg.data as any[]) || []).map((a) => (a.housekeeper_name || '').trim()).filter(Boolean)
       )].sort((a, b) => a.localeCompare(b)));
       setLoading(false);
     }, [hotelId]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Femmes de chambre proposées : celles sélectionnées à l'étape 1 en priorité.
+    const housekeepers = useMemo(() => {
+      const fromStep1 = (availableHousekeepers || []).map((h) => h.trim()).filter(Boolean);
+      const list = fromStep1.length > 0 ? fromStep1 : assignedHousekeepers;
+      return [...new Set(list)].sort((a, b) => a.localeCompare(b));
+    }, [availableHousekeepers, assignedHousekeepers]);
 
     const floors = useMemo(
       () => [...new Set(rooms.map((r) => Number(r.floor)).filter((n) => !Number.isNaN(n)))].sort((a, b) => a - b),
