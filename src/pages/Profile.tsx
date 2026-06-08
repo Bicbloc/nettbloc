@@ -430,6 +430,50 @@ const Profile = () => {
                   </CardContent>
                 </Card>
 
+                {/* Contact de référence */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      Contact de référence
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Personne à contacter et numéro de téléphone de votre établissement.
+                      Ces informations sont visibles par l'administration.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-name">Nom du contact</Label>
+                        <Input
+                          id="contact-name"
+                          value={billingContactName}
+                          onChange={(e) => setBillingContactName(e.target.value)}
+                          placeholder="Ex. Jean Dupont"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-phone">Numéro de téléphone</Label>
+                        <Input
+                          id="contact-phone"
+                          type="tel"
+                          value={billingPhone}
+                          onChange={(e) => setBillingPhone(e.target.value)}
+                          placeholder="Ex. +33 6 12 34 56 78"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveContact} disabled={isSavingContact}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSavingContact ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+
                 {/* Limites */}
                 <Card>
                   <CardHeader>
