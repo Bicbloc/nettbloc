@@ -81,19 +81,6 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
               variant="ghost" 
               size="icon" 
               className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
-              title="Petit-déjeuner"
-              onClick={() => {
-                const id = storageService.getHousekeeperHotelId() || storageService.getHotelId();
-                navigate(`/breakfast/work${id ? `?hotel=${id}` : ''}`);
-              }}
-            >
-              <Coffee className="h-4 w-4" />
-            </Button>
-
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
               onClick={onToggleActivityLog}
             >
               <ScrollText className="h-4 w-4" />
