@@ -349,6 +349,20 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     }
   };
 
+  // Glisser-déposer vers une carte gouvernante (crée l'attribution si besoin).
+  const handleDropOnGoverness = async (
+    section: { governessId: string | null; name: string; assignment?: DailyGovAssignment },
+    roomNumber: string,
+  ) => {
+    if (!roomNumber || !section.governessId) return;
+    if (section.assignment) {
+      await handleDropOnAssignment(section.assignment, roomNumber);
+      return;
+    }
+    const room = rooms.find((r) => r.room_number === roomNumber);
+    if (room) await assignRoomToGoverness(room, section.governessId);
+  };
+
 
 
 
