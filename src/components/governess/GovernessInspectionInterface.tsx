@@ -387,21 +387,22 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return result;
   }, [rooms, govAssignments]);
 
-  const renderRoomCard = (room: Room) => {
+  const renderRoomCard = (room: Room, allowAssign = false) => {
     const inspection = getInspectionStatus(room.id);
     const StatusIcon = inspection ? statusConfig[inspection.status].icon : Eye;
     return (
       <Card
         key={room.id}
+        draggable={allowAssign}
+        onDragStart={allowAssign ? (e) => e.dataTransfer.setData('text/room-number', room.room_number) : undefined}
         className={`cursor-pointer transition-all hover:shadow-lg ${
           inspection?.status === 'passed' ? 'border-green-200 bg-green-50/50' :
           inspection?.status === 'failed' ? 'border-red-200 bg-red-50/50' :
           inspection?.status === 'needs_rework' ? 'border-orange-200 bg-orange-50/50' :
           ''
         }`}
-        onClick={() => openInspectionDialog(room)}
       >
-        <CardContent className="p-4">
+        <CardContent className="p-4" onClick={() => openInspectionDialog(room)}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Home className="h-5 w-5 text-muted-foreground" />
@@ -437,9 +438,30 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
             </div>
           )}
         </CardContent>
+
+        {allowAssign && (
+          <div className="px-4 pb-3" onClick={(e) => e.stopPropagation()}>
+            <Select onValueChange={(govId) => assignRoomToGoverness(room, govId)}>
+              <SelectTrigger className="h-8 text-xs">
+                <UserPlus className="h-3.5 w-3.5 mr-1" />
+                <SelectValue placeholder="Attribuer à une gouvernante" />
+              </SelectTrigger>
+              <SelectContent>
+                {governesses.length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Aucune gouvernante approuvée</div>
+                ) : (
+                  governesses.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </Card>
     );
   };
+
 
   if (isLoading) {
     return (
