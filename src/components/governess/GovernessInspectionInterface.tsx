@@ -380,6 +380,11 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     }
     setIsBulkAssigning(true);
     try {
+      // Repartir d'une base propre : on supprime les attributions du jour pour que
+      // les chambres ne restent pas collées à une gouvernante précédente. Ainsi,
+      // si une seule gouvernante est choisie, TOUTES les chambres lui reviennent.
+      await clearTodayGovAssignments(hotelId);
+
       if (assignMode === 'saved') {
         const config = loadSavedGovConfig(hotelId);
         if (!config) {
@@ -401,7 +406,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       }
       // Garantir qu'aucune chambre propre ne reste non attribuée.
       await ensureAllRoomsAssigned(hotelId, chosen);
-      toast({ title: '✅ Attribution effectuée', description: 'Toutes les chambres ont été attribuées aux gouvernantes.' });
+      toast({ title: '✅ Attribution effectuée', description: chosen.length === 1 ? `Toutes les chambres → ${chosen[0].name}` : 'Toutes les chambres ont été attribuées aux gouvernantes.' });
       setConfigDialogOpen(false);
       loadData();
     } catch (e) {
