@@ -231,16 +231,17 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Gouvernantes disponibles <span className="text-destructive">*</span></Label>
+          <Label>Gouvernantes disponibles</Label>
           {loading ? (
             <p className="text-sm text-muted-foreground">Chargement…</p>
           ) : governesses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée.</p>
+            <p className="text-sm text-muted-foreground">Aucune gouvernante approuvée. (Étape facultative)</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {governesses.map((g) => (
-                <label
+                <button
                   key={g.id}
+                  type="button"
                   onClick={() => toggle(setSelectedGovernesses, g.id)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                     selectedGovernesses.includes(g.id) ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted'
@@ -248,7 +249,7 @@ export const GovernessRedistributionStep = forwardRef<GovStepHandle, Props>(
                 >
                   <Checkbox checked={selectedGovernesses.includes(g.id)} className="pointer-events-none" />
                   {g.name}
-                </label>
+                </button>
               ))}
             </div>
           )}
