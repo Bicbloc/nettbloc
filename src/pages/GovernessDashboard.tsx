@@ -454,25 +454,8 @@ function GovernessDashboardContent() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Secondary tabs - scrollable */}
-        <div className="flex overflow-x-auto gap-1 px-4 pb-2 scrollbar-hide">
-          {secondaryTabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all",
-                activeTab === key
-                  ? "bg-white text-amber-700"
-                  : "bg-white/15 text-white/80 hover:bg-white/25"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
