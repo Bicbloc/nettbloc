@@ -6,10 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck, UserPlus } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package, UserCheck, UserPlus, Wand2 } from 'lucide-react';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { applyGovernessAssignment, getAvailableGovernesses, loadSavedGovConfig } from '@/utils/governessAssignment';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
   governessName: string;
