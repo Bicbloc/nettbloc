@@ -171,25 +171,42 @@ export function CafetiereShareCard({ hotelId }: { hotelId: string }) {
         {shared.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Personnel ayant accès</p>
-            {shared.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                    <Check className="h-3 w-3" /> Partagé
-                  </Badge>
-                  <span className="font-medium">
-                    {s.cafetiere_profiles?.name || s.cafetiere_profiles?.email || 'Personnel'}
-                  </span>
+            {shared.map((s) => {
+              const p = s.cafetiere_profiles;
+              const fullName = [p?.first_name, p?.name].filter(Boolean).join(' ') || p?.email || 'Personnel';
+              return (
+                <div key={s.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                          <Check className="h-3 w-3" /> Partagé
+                        </Badge>
+                        <span className="font-medium truncate">{fullName}</span>
+                      </div>
+                      {p?.phone && (
+                        <a href={`tel:${p.phone}`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary">
+                          <Phone className="h-3 w-3" /> {p.phone}
+                        </a>
+                      )}
+                      {p?.email && (
+                        <a href={`mailto:${p.email}`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary break-all">
+                          <Mail className="h-3 w-3" /> {p.email}
+                        </a>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost" size="icon" className="shrink-0"
+                      onClick={() => handleRevoke(s.id, p?.name ?? null)}
+                      title="Retirer l'accès"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost" size="icon"
-                  onClick={() => handleRevoke(s.id, s.cafetiere_profiles?.name ?? null)}
-                  title="Retirer l'accès"
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
         )}
       </CardContent>
