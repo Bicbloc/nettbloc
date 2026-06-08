@@ -1189,11 +1189,6 @@ const HousekeeperWorkContent: React.FC = () => {
       {/* Notification banner compacte et glissable */}
       <StaffNotificationBanner hotelId={hotelId || undefined} />
 
-      {hotelId && (
-        <div className="px-3 pt-3 sm:px-4">
-          <OccupancyBanner hotelId={hotelId} />
-        </div>
-      )}
 
 
       {showActivityLog && (
