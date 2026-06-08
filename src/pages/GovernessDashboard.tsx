@@ -410,38 +410,41 @@ function GovernessDashboardContent() {
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-muted/30">
       {/* App Header */}
-      <div className="flex-none z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+      <div className="flex-none z-40 bg-gradient-to-br from-amber-500 to-orange-600 text-white safe-area-top rounded-b-[32px] shadow-lg">
 
-        <div className="px-4 py-3">
+        <div className="px-5 pt-4 pb-7">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                <span className="font-bold text-base">{initials}</span>
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-sm">
+                <span className="font-bold text-lg">{initials}</span>
               </div>
               <div className="min-w-0">
-                <p className="text-white/70 text-xs font-medium">{greeting} 👑</p>
-                <h1 className="font-bold text-base truncate">{profile.name}</h1>
+                <p className="text-amber-50/80 text-xs font-medium flex items-center gap-1">{greeting} 👑</p>
+                <h1 className="font-bold text-xl leading-tight truncate">{profile.name}</h1>
                 {selectedHotel && (
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <Building2 className="h-3 w-3 text-white/60 flex-shrink-0" />
-                    <span className="text-xs text-white/70 truncate">{selectedHotel.name}</span>
+                    <Building2 className="h-3 w-3 text-white/70 flex-shrink-0" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-50/80 truncate">{selectedHotel.name}</span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors border border-white/10 shadow-inner active:scale-95"
                 onClick={() => navigate('/governess/hotels')}>
-                <Building2 className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                <Building2 className="h-5 w-5 text-white" />
+              </button>
+              <button
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors border border-white/10 shadow-inner active:scale-95"
                 onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
+                <LogOut className="h-5 w-5 text-white" />
+              </button>
             </div>
           </div>
         </div>
       </div>
+
 
 
 
@@ -523,24 +526,23 @@ function GovernessDashboardContent() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {[
-                { value: stats.totalRooms, label: 'Chambres', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
-                { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
-                { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-red-100 text-red-600 dark:bg-red-950/30', icon: AlertTriangle },
-                { value: stats.lostItems, label: 'Objets', color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30', icon: Package },
+                { value: stats.totalRooms, label: 'Chambres', color: 'bg-blue-50 text-blue-500 dark:bg-blue-950/30', icon: Building2 },
+                { value: stats.cleanRooms, label: 'Propres', color: 'bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30', icon: CheckCircle },
+                { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-rose-50 text-rose-500 dark:bg-rose-950/30', icon: AlertTriangle },
+                { value: stats.lostItems, label: 'Objets', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/30', icon: Package },
               ].map(({ value, label, color, icon: StatIcon }) => (
-                <Card key={label} className="p-2 rounded-2xl">
-                  <div className="text-center">
-                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1", color)}>
-                      <StatIcon className="h-4 w-4" />
-                    </div>
-                    <p className="text-lg font-bold">{value}</p>
-                    <p className="text-[10px] text-muted-foreground">{label}</p>
+                <div key={label} className="bg-card p-3 rounded-2xl shadow-sm border border-border/60 flex flex-col items-center text-center">
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-2", color)}>
+                    <StatIcon className="h-4 w-4" />
                   </div>
-                </Card>
+                  <p className="text-lg font-bold leading-none">{value}</p>
+                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-semibold tracking-wide">{label}</p>
+                </div>
               ))}
             </div>
+
 
             {/* Pour changer d'établissement : utiliser l'icône bâtiment dans
                 l'en-tête (retour au hub des hôtels). Pas de sélecteur inline ici
@@ -551,7 +553,7 @@ function GovernessDashboardContent() {
             {selectedHotel && (
               <>
                 {activeTab === 'rooms' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                  <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                     <div className="p-4 border-b">
                       <h2 className="font-semibold">Chambres & assignations</h2>
                       <p className="text-xs text-muted-foreground">Assignez ou désassignez les chambres aux femmes de chambre</p>
@@ -563,7 +565,7 @@ function GovernessDashboardContent() {
                 )}
 
                 {activeTab === 'staff' && (
-                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                  <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                     <div className="p-4 border-b">
                       <h2 className="font-semibold">Femmes de chambre</h2>
                       <p className="text-xs text-muted-foreground">Suivez l'activité de votre équipe</p>
@@ -626,7 +628,7 @@ function GovernessDashboardContent() {
                     </div>
 
                     {declareSection === 'incident' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Incidents</h2>
@@ -641,7 +643,7 @@ function GovernessDashboardContent() {
                     )}
 
                     {declareSection === 'lost' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Objets trouvés</h2>
@@ -656,7 +658,7 @@ function GovernessDashboardContent() {
                     )}
 
                     {declareSection === 'linen' && (
-                      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="bg-card rounded-3xl shadow-sm border border-border/60 overflow-hidden">
                         <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <h2 className="font-semibold">Inventaire du linge</h2>
