@@ -28,6 +28,7 @@ interface Room {
 
 interface DailyGovAssignment {
   id: string;
+  governess_profile_id: string | null;
   governess_name: string;
   assignment_type: string;
   assigned_floors: number[] | null;
@@ -110,7 +111,7 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       // Charger les attributions de gouvernantes du jour (par étage / femme de chambre)
       const { data: govData } = await supabase
         .from('daily_governess_assignments')
-        .select('id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms')
+        .select('id, governess_profile_id, governess_name, assignment_type, assigned_floors, assigned_housekeepers, assigned_rooms')
         .eq('hotel_id', hotelId)
         .eq('assignment_date', today);
       setGovAssignments((govData as DailyGovAssignment[]) || []);
@@ -348,6 +349,20 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     }
   };
 
+  // Glisser-déposer vers une carte gouvernante (crée l'attribution si besoin).
+  const handleDropOnGoverness = async (
+    section: { governessId: string | null; name: string; assignment?: DailyGovAssignment },
+    roomNumber: string,
+  ) => {
+    if (!roomNumber || !section.governessId) return;
+    if (section.assignment) {
+      await handleDropOnAssignment(section.assignment, roomNumber);
+      return;
+    }
+    const room = rooms.find((r) => r.room_number === roomNumber);
+    if (room) await assignRoomToGoverness(room, section.governessId);
+  };
+
 
 
 
@@ -377,34 +392,56 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return matchFloor || matchHk || matchRoom;
   };
 
-  // Regroupe les chambres à inspecter par gouvernante attribuée (sections).
+  // Regroupe les chambres à inspecter par gouvernante (une carte par gouvernante).
   const sections = useMemo(() => {
-    const result: { key: string; name: string; scope: string; rooms: Room[]; isUnassigned?: boolean; assignment?: DailyGovAssignment }[] = [];
+    const result: {
+      key: string;
+      governessId: string | null;
+      name: string;
+      scope: string;
+      rooms: Room[];
+      isUnassigned?: boolean;
+      assignment?: DailyGovAssignment;
+    }[] = [];
     const claimed = new Set<string>();
 
-    for (const a of govAssignments) {
-      const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
+    // Une carte pour chaque gouvernante approuvée.
+    for (const g of governesses) {
+      const assignment = govAssignments.find((a) => a.governess_profile_id === g.id);
+      const sectionRooms = assignment
+        ? rooms.filter((r) => roomMatchesAssignment(r, assignment))
+        : [];
       sectionRooms.forEach((r) => claimed.add(r.id));
       const scopeParts: string[] = [];
-      if ((a.assigned_floors || []).length > 0) {
-        scopeParts.push(`Étages : ${(a.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
+      if (assignment) {
+        if ((assignment.assigned_floors || []).length > 0) {
+          scopeParts.push(`Étages : ${(assignment.assigned_floors || []).map((f) => (f === 0 ? 'RDC' : f)).join(', ')}`);
+        }
+        if ((assignment.assigned_housekeepers || []).length > 0) {
+          scopeParts.push(`Femmes de chambre : ${(assignment.assigned_housekeepers || []).join(', ')}`);
+        }
+        if ((assignment.assigned_rooms || []).length > 0) {
+          scopeParts.push(`Chambres : ${(assignment.assigned_rooms || []).join(', ')}`);
+        }
       }
-      if ((a.assigned_housekeepers || []).length > 0) {
-        scopeParts.push(`Femmes de chambre : ${(a.assigned_housekeepers || []).join(', ')}`);
-      }
-      if ((a.assigned_rooms || []).length > 0) {
-        scopeParts.push(`Chambres : ${(a.assigned_rooms || []).join(', ')}`);
-      }
-      const scope = scopeParts.join(' • ') || '—';
-      result.push({ key: a.id, name: a.governess_name, scope, rooms: sectionRooms, assignment: a });
+      const scope = scopeParts.join(' • ') || 'Aucune chambre attribuée';
+      result.push({ key: g.id, governessId: g.id, name: g.name, scope, rooms: sectionRooms, assignment });
+    }
+
+    // Gouvernantes assignées mais non listées dans les approuvées (sécurité).
+    for (const a of govAssignments) {
+      if (a.governess_profile_id && governesses.some((g) => g.id === a.governess_profile_id)) continue;
+      const sectionRooms = rooms.filter((r) => roomMatchesAssignment(r, a));
+      sectionRooms.forEach((r) => claimed.add(r.id));
+      result.push({ key: a.id, governessId: a.governess_profile_id, name: a.governess_name, scope: (a.assigned_rooms || []).length ? `Chambres : ${(a.assigned_rooms || []).join(', ')}` : 'Aucune chambre attribuée', rooms: sectionRooms, assignment: a });
     }
 
     const unassigned = rooms.filter((r) => !claimed.has(r.id));
     if (unassigned.length > 0) {
-      result.push({ key: '__unassigned__', name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
+      result.push({ key: '__unassigned__', governessId: null, name: 'Non attribuées', scope: 'À glisser vers une gouvernante', rooms: unassigned, isUnassigned: true });
     }
     return result;
-  }, [rooms, govAssignments]);
+  }, [rooms, govAssignments, governesses]);
 
   const renderRoomCard = (room: Room, allowAssign = false) => {
     const inspection = getInspectionStatus(room.id);
@@ -531,46 +568,70 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Card>
       ) : (
         <div className="space-y-6">
-          {sections.map(section => {
-            const doneCount = section.rooms.filter(
-              r => getInspectionStatus(r.id)?.status === 'passed'
-            ).length;
-            const isDropTarget = !section.isUnassigned && !!section.assignment;
-            return (
-              <div
-                key={section.key}
-                className={`space-y-3 rounded-lg ${isDropTarget ? 'border border-dashed border-transparent hover:border-primary/40 p-2 transition-colors' : ''}`}
-                onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5'); } : undefined}
-                onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('border-primary', 'bg-primary/5') : undefined}
-                onDrop={isDropTarget ? (e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                  const roomNumber = e.dataTransfer.getData('text/room-number');
-                  if (roomNumber && section.assignment) handleDropOnAssignment(section.assignment, roomNumber);
-                } : undefined}
-              >
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-base">{section.name}</h3>
-                    <span className="text-xs text-muted-foreground">{section.scope}</span>
-                  </div>
-                  <Badge variant="secondary">
-                    {doneCount}/{section.rooms.length} validée(s)
-                  </Badge>
+          {/* Une carte par gouvernante disponible */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {sections.filter(s => !s.isUnassigned).map(section => {
+              const doneCount = section.rooms.filter(
+                r => getInspectionStatus(r.id)?.status === 'passed'
+              ).length;
+              const isDropTarget = !!section.governessId;
+              return (
+                <Card
+                  key={section.key}
+                  className="transition-colors"
+                  onDragOver={isDropTarget ? (e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-primary'); } : undefined}
+                  onDragLeave={isDropTarget ? (e) => e.currentTarget.classList.remove('ring-2', 'ring-primary') : undefined}
+                  onDrop={isDropTarget ? (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                    const roomNumber = e.dataTransfer.getData('text/room-number');
+                    if (roomNumber) handleDropOnGoverness(section, roomNumber);
+                  } : undefined}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <UserCheck className="h-5 w-5 text-primary" />
+                        {section.name}
+                      </CardTitle>
+                      <Badge variant="secondary">
+                        {doneCount}/{section.rooms.length} validée(s)
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{section.scope}</p>
+                  </CardHeader>
+                  <CardContent>
+                    {section.rooms.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-lg">
+                        Glissez une chambre ici pour l'attribuer
+                      </p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {section.rooms.map((r) => renderRoomCard(r, false))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Chambres non attribuées */}
+          {sections.filter(s => s.isUnassigned).map(section => (
+            <div key={section.key} className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="font-semibold text-base">{section.name}</h3>
+                  <span className="text-xs text-muted-foreground">{section.scope}</span>
                 </div>
-                {section.rooms.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    {isDropTarget ? 'Glissez une chambre ici pour l\'attribuer' : 'Aucune chambre'}
-                  </p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {section.rooms.map((r) => renderRoomCard(r, section.isUnassigned))}
-                  </div>
-                )}
+                <Badge variant="outline">{section.rooms.length}</Badge>
               </div>
-            );
-          })}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {section.rooms.map((r) => renderRoomCard(r, true))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
