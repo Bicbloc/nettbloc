@@ -35,7 +35,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed, open: controll
   const [closingStep, setClosingStep] = useState('');
   const recapEmailKey = `closing_recap_email_${hotelId}`;
   const [recapEmail, setRecapEmail] = useState('');
-  const { operationalDate, lastClosureDate, isBehind, missedDaysCount } = useOperationalDate(hotelId);
+  const { operationalDate, isBehind, missedDaysCount } = useOperationalDate(hotelId);
 
   useEffect(() => {
     try {
