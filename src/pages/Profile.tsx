@@ -446,6 +446,7 @@ const Profile = () => {
 
           {/* Onglet Paramètres */}
           <TabsContent value="settings" className="space-y-6 mt-6">
+            {/* Notifications */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -453,30 +454,172 @@ const Profile = () => {
                   Notifications
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 <p className="text-sm text-muted-foreground">
                   Gérez vos préférences de notifications pour rester informé de l'activité de votre établissement.
                 </p>
-                <div className="pt-2">
-                  <NotificationBell />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Activer les notifications</Label>
+                    <p className="text-xs text-muted-foreground">Notifications dans l'application et push.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.notifications.push}
+                    onCheckedChange={(v) => updatePreference('notifications', { push: v })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Notifications par e-mail</Label>
+                    <p className="text-xs text-muted-foreground">Recevoir un e-mail pour les événements importants.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.notifications.email}
+                    onCheckedChange={(v) => updatePreference('notifications', { email: v })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Son des notifications</Label>
+                    <p className="text-xs text-muted-foreground">Émettre un son à la réception.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.notifications.sound}
+                    onCheckedChange={(v) => updatePreference('notifications', { sound: v })}
+                  />
+                </div>
+
+                <div className={cn('space-y-2', !preferences.notifications.email && 'opacity-50 pointer-events-none')}>
+                  <Label htmlFor="notif-email">Adresse e-mail de réception des notifications</Label>
+                  <Input
+                    id="notif-email"
+                    type="email"
+                    placeholder="exemple@hotel.com"
+                    value={preferences.notifications.email_address}
+                    onChange={(e) => updatePreference('notifications', { email_address: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Laissez vide pour utiliser l'adresse de votre compte.
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Types d'e-mails */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Préférences
+                  <Mail className="h-5 w-5" />
+                  Types d'e-mails
+                </CardTitle>
+              </CardHeader>
+              <CardContent className={cn('space-y-4', !preferences.notifications.email && 'opacity-50 pointer-events-none')}>
+                <p className="text-sm text-muted-foreground">
+                  Choisissez les e-mails que vous souhaitez recevoir.
+                </p>
+                {([
+                  { key: 'closureRecap', label: 'Récapitulatif de clôture', desc: "Résumé envoyé à chaque clôture de journée." },
+                  { key: 'dailyReports', label: 'Rapports quotidiens', desc: 'Rapports d\'activité de l\'établissement.' },
+                  { key: 'incidents', label: 'Incidents', desc: 'Alerte lors d\'un nouvel incident.' },
+                  { key: 'accessRequests', label: "Demandes d'accès du personnel", desc: 'Nouvelle demande de connexion du personnel.' },
+                ] as const).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between">
+                    <div>
+                      <Label className="font-medium">{item.label}</Label>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                    <Switch
+                      checked={preferences.emails[item.key]}
+                      onCheckedChange={(v) => updatePreference('emails', { [item.key]: v })}
+                    />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Clôture & archives */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Clôture & archives
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Les paramètres avancés sont accessibles depuis le tableau de bord principal.
+                  Définissez l'heure et les jours de clôture automatique, ainsi que l'adresse e-mail
+                  qui recevra le récapitulatif d'archivage à chaque clôture.
                 </p>
+                {hotelId ? (
+                  <AutoCloseSettingsDialog hotelId={hotelId} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucun établissement actif.</p>
+                )}
               </CardContent>
             </Card>
 
+            {/* Préférences générales */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Préférences générales
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Rafraîchissement automatique</Label>
+                    <p className="text-xs text-muted-foreground">Mettre à jour les données en temps réel.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.dashboard.autoRefresh}
+                    onCheckedChange={(v) => updatePreference('dashboard', { autoRefresh: v })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Animations</Label>
+                    <p className="text-xs text-muted-foreground">Activer les transitions et animations.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.accessibility.animations}
+                    onCheckedChange={(v) => updatePreference('accessibility', { animations: v })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Contraste élevé</Label>
+                    <p className="text-xs text-muted-foreground">Améliorer la lisibilité.</p>
+                  </div>
+                  <Switch
+                    checked={preferences.accessibility.highContrast}
+                    onCheckedChange={(v) => updatePreference('accessibility', { highContrast: v })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="font-size">Taille de police</Label>
+                  <select
+                    id="font-size"
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={preferences.accessibility.fontSize}
+                    onChange={(e) => updatePreference('accessibility', { fontSize: e.target.value as 'small' | 'medium' | 'large' })}
+                  >
+                    <option value="small">Petite</option>
+                    <option value="medium">Moyenne</option>
+                    <option value="large">Grande</option>
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Déconnexion */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-destructive">
