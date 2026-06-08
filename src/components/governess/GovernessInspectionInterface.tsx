@@ -115,6 +115,19 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         .eq('assignment_date', today);
       setGovAssignments((govData as DailyGovAssignment[]) || []);
 
+      // Charger les gouvernantes approuvées (pour l'attribution directe des chambres)
+      const { data: govApproved } = await supabase
+        .from('governess_access_requests')
+        .select('governess_profile_id, governess_profiles(id, name)')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'approved');
+      setGovernesses(
+        ((govApproved as any[]) || []).map((g) => ({
+          id: g.governess_profile_id,
+          name: g.governess_profiles?.name || 'Gouvernante',
+        }))
+      );
+
       // Charger les inspections du jour
       const { data: inspectionsData, error: inspectionsError } = await supabase
         .from('room_inspections')
