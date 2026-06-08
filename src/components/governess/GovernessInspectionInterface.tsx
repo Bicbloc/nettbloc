@@ -173,6 +173,23 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     loadData();
   }, [loadData]);
 
+  // Attribution automatique : dès que des chambres propres ne sont attribuées à
+  // aucune gouvernante, on applique la configuration enregistrée (une seule fois
+  // par session) en répartissant sur les gouvernantes disponibles du jour.
+  const autoAssignedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || autoAssignedRef.current) return;
+    if (rooms.length === 0) return;
+    if (!loadSavedGovConfig(hotelId)) return;
+    // Y a-t-il des chambres propres non encore rattachées à une attribution ?
+    const hasAssignments = govAssignments.length > 0;
+    if (hasAssignments) { autoAssignedRef.current = true; return; }
+    autoAssignedRef.current = true;
+    handleBulkAssign();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, rooms, govAssignments, hotelId]);
+
+
   // Realtime sync
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
     if (table === 'rooms' || table === 'room_inspections' || table === 'daily_governess_assignments' || table === 'assignments') {
