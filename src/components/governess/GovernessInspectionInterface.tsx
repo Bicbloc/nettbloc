@@ -607,13 +607,18 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
         </Card>
       </div>
 
-      {/* Refresh button */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button onClick={handleBulkAssign} disabled={isBulkAssigning} className="gap-2">
+          {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          Assignation en masse (selon config)
+        </Button>
         <Button variant="outline" onClick={loadData} className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Actualiser
         </Button>
       </div>
+
 
       {/* Room list grouped by governess */}
       {sections.length === 0 ? (
