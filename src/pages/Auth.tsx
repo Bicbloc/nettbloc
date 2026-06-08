@@ -15,6 +15,7 @@ import { useTranslation } from '@/contexts/LanguageContext';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 import { validateEmailForUserType } from '@/services/userTypeValidationService';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { storageService } from '@/services/storageService';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
@@ -223,9 +224,14 @@ const Auth = () => {
     setMode('select');
   };
 
-  // Detect staff-only mode (used by mobile APK)
+  // Detect staff-only mode (used by mobile APK). Persist it so it survives
+  // refresh and internal navigation (the ?mode=staff param is only on the
+  // initial APK URL and gets lost otherwise).
   const urlParams = new URLSearchParams(window.location.search);
-  const isStaffMode = urlParams.get('mode') === 'staff';
+  if (urlParams.get('mode') === 'staff') {
+    storageService.setStaffMode(true);
+  }
+  const isStaffMode = urlParams.get('mode') === 'staff' || storageService.isStaffMode();
 
   // Selection screen
   if (mode === 'select') {

@@ -24,12 +24,14 @@ function detectBrowserLanguage(): Language {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    // Check localStorage first
+    // If the user explicitly chose a language in-app, always honour that choice.
+    const userSet = localStorage.getItem('preferred_language_user_set') === 'true';
     const stored = localStorage.getItem('preferred_language') as Language;
-    if (stored && (stored === 'fr' || stored === 'en')) {
+    if (userSet && (stored === 'fr' || stored === 'en')) {
       return stored;
     }
-    // Otherwise detect from browser
+    // Otherwise always follow the device/phone language (navigator.language
+    // reflects the device locale inside the Capacitor WebView).
     return detectBrowserLanguage();
   });
 
