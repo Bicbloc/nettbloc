@@ -9,6 +9,7 @@ import { validateEmailForUserType } from '@/services/userTypeValidationService';
 interface TechnicianProfile {
   id: string;
   name: string;
+  first_name: string | null;
   email: string;
   phone: string | null;
   is_active: boolean;
