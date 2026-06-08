@@ -10,7 +10,9 @@ import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, Ref
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { applyGovernessAssignment, getAvailableGovernesses, loadSavedGovConfig } from '@/utils/governessAssignment';
+import { applyGovernessAssignment, getAvailableGovernesses, loadSavedGovConfig, ensureAllRoomsAssigned, distributeRoomNumbers, type GovLite } from '@/utils/governessAssignment';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
   governessName: string;
@@ -72,6 +74,11 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [availableGovs, setAvailableGovs] = useState<GovLite[]>([]);
+  const [selectedGovIds, setSelectedGovIds] = useState<string[]>([]);
+  const [assignMode, setAssignMode] = useState<'saved' | 'even'>('saved');
+  const [hasSavedConfig, setHasSavedConfig] = useState(false);
 
 
 
@@ -173,19 +180,15 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     loadData();
   }, [loadData]);
 
-  // Attribution automatique : dès que des chambres propres ne sont attribuées à
-  // aucune gouvernante, on applique la configuration enregistrée (une seule fois
-  // par session) en répartissant sur les gouvernantes disponibles du jour.
+  // Attribution automatique : on applique la configuration enregistrée puis on
+  // garantit qu'aucune chambre propre ne reste non attribuée (une seule fois par
+  // session) en répartissant sur les gouvernantes disponibles du jour.
   const autoAssignedRef = useRef(false);
   useEffect(() => {
     if (isLoading || autoAssignedRef.current) return;
     if (rooms.length === 0) return;
-    if (!loadSavedGovConfig(hotelId)) return;
-    // Y a-t-il des chambres propres non encore rattachées à une attribution ?
-    const hasAssignments = govAssignments.length > 0;
-    if (hasAssignments) { autoAssignedRef.current = true; return; }
     autoAssignedRef.current = true;
-    handleBulkAssign();
+    autoAssign();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, rooms, govAssignments, hotelId]);
 
@@ -326,42 +329,88 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
     return inspections.get(roomId);
   };
 
-  // Assignation en masse : applique la configuration enregistrée et répartit
-  // automatiquement les chambres entre les gouvernantes disponibles aujourd'hui.
-  const handleBulkAssign = async () => {
+  // Attribution automatique silencieuse : applique la config enregistrée (si elle
+  // existe) puis garantit qu'aucune chambre propre ne reste non attribuée.
+  const autoAssign = async () => {
+    try {
+      const available = await getAvailableGovernesses(hotelId);
+      if (available.length === 0) return;
+      const config = loadSavedGovConfig(hotelId);
+      if (config) {
+        await applyGovernessAssignment(hotelId, config, available);
+      }
+      await ensureAllRoomsAssigned(hotelId, available);
+      loadData();
+    } catch (e) {
+      console.error('autoAssign error', e);
+    }
+  };
+
+  // Ouvre la boîte de dialogue de choix de configuration pour l'assignation en masse.
+  const openAssignDialog = async () => {
     setIsBulkAssigning(true);
     try {
-      const config = loadSavedGovConfig(hotelId);
-      if (!config) {
-        toast({
-          variant: 'destructive',
-          title: 'Aucune configuration',
-          description: "Enregistrez d'abord une configuration depuis la redistribution des chambres.",
-        });
-        return;
-      }
       const available = await getAvailableGovernesses(hotelId);
       if (available.length === 0) {
         toast({ variant: 'destructive', title: 'Aucune gouvernante', description: "Aucune gouvernante disponible aujourd'hui." });
         return;
       }
-      const { ok, assignedCount, error } = await applyGovernessAssignment(hotelId, config, available);
-      if (!ok) {
-        toast({ variant: 'destructive', title: 'Erreur', description: error || "Échec de l'attribution" });
-        return;
+      const savedExists = !!loadSavedGovConfig(hotelId);
+      setAvailableGovs(available);
+      setSelectedGovIds(available.map((g) => g.id));
+      setHasSavedConfig(savedExists);
+      setAssignMode(savedExists ? 'saved' : 'even');
+      setConfigDialogOpen(true);
+    } catch (e) {
+      console.error('openAssignDialog error', e);
+      toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de préparer l'attribution" });
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
+  // Exécute l'assignation en masse selon le mode choisi, en garantissant qu'aucune
+  // chambre propre ne reste non attribuée.
+  const runAssignment = async () => {
+    const chosen = availableGovs.filter((g) => selectedGovIds.includes(g.id));
+    if (chosen.length === 0) {
+      toast({ variant: 'destructive', title: 'Aucune gouvernante', description: 'Sélectionnez au moins une gouvernante.' });
+      return;
+    }
+    setIsBulkAssigning(true);
+    try {
+      if (assignMode === 'saved') {
+        const config = loadSavedGovConfig(hotelId);
+        if (!config) {
+          toast({ variant: 'destructive', title: 'Aucune configuration', description: "Aucune configuration enregistrée. Choisissez la répartition équitable." });
+          return;
+        }
+        const res = await applyGovernessAssignment(hotelId, config, chosen);
+        if (!res.ok) {
+          toast({ variant: 'destructive', title: 'Erreur', description: res.error || "Échec de l'attribution" });
+          return;
+        }
+      } else {
+        const roomNumbers = rooms.map((r) => r.room_number);
+        const res = await distributeRoomNumbers(hotelId, chosen, roomNumbers);
+        if (!res.ok) {
+          toast({ variant: 'destructive', title: 'Erreur', description: res.error || "Échec de l'attribution" });
+          return;
+        }
       }
-      toast({
-        title: '✅ Attribution effectuée',
-        description: `Chambres réparties sur ${assignedCount} gouvernante(s) disponible(s).`,
-      });
+      // Garantir qu'aucune chambre propre ne reste non attribuée.
+      await ensureAllRoomsAssigned(hotelId, chosen);
+      toast({ title: '✅ Attribution effectuée', description: 'Toutes les chambres ont été attribuées aux gouvernantes.' });
+      setConfigDialogOpen(false);
       loadData();
     } catch (e) {
-      console.error('handleBulkAssign error', e);
+      console.error('runAssignment error', e);
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'effectuer l'attribution en masse" });
     } finally {
       setIsBulkAssigning(false);
     }
   };
+
 
 
 
@@ -626,9 +675,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
 
       {/* Actions */}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button onClick={handleBulkAssign} disabled={isBulkAssigning} className="gap-2">
+        <Button onClick={openAssignDialog} disabled={isBulkAssigning} className="gap-2">
           {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-          Assignation en masse (selon config)
+          Assignation en masse
         </Button>
         <Button variant="outline" onClick={loadData} className="gap-2">
           <RefreshCw className="h-4 w-4" />
@@ -716,6 +765,80 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       )}
 
 
+
+      {/* Bulk assignment config dialog */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assignation en masse</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Configuration</label>
+              <RadioGroup value={assignMode} onValueChange={(v) => setAssignMode(v as 'saved' | 'even')} className="space-y-2">
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                  <RadioGroupItem value="saved" id="mode-saved" disabled={!hasSavedConfig} className="mt-0.5" />
+                  <label htmlFor="mode-saved" className="cursor-pointer">
+                    <div className="text-sm font-medium">Config actuelle</div>
+                    <p className="text-xs text-muted-foreground">
+                      {hasSavedConfig
+                        ? 'Réutilise la configuration enregistrée (étage / femme de chambre / type).'
+                        : 'Aucune configuration enregistrée.'}
+                    </p>
+                  </label>
+                </div>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                  <RadioGroupItem value="even" id="mode-even" className="mt-0.5" />
+                  <label htmlFor="mode-even" className="cursor-pointer">
+                    <div className="text-sm font-medium">Nouvelle config — répartition équitable</div>
+                    <p className="text-xs text-muted-foreground">
+                      Répartit toutes les chambres équitablement entre les gouvernantes sélectionnées.
+                    </p>
+                  </label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                Dans tous les cas, aucune chambre ne reste « non attribuée ».
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Gouvernantes disponibles</label>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {availableGovs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Aucune gouvernante disponible aujourd'hui.</p>
+                ) : (
+                  availableGovs.map((g) => (
+                    <div key={g.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`gov-${g.id}`}
+                        checked={selectedGovIds.includes(g.id)}
+                        onCheckedChange={(c) =>
+                          setSelectedGovIds((prev) =>
+                            c ? [...new Set([...prev, g.id])] : prev.filter((id) => id !== g.id),
+                          )
+                        }
+                      />
+                      <label htmlFor={`gov-${g.id}`} className="text-sm cursor-pointer">{g.name}</label>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)} disabled={isBulkAssigning}>
+              Annuler
+            </Button>
+            <Button onClick={runAssignment} disabled={isBulkAssigning || selectedGovIds.length === 0} className="gap-2">
+              {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              Attribuer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Inspection Dialog */}
       <Dialog open={inspectionDialog} onOpenChange={setInspectionDialog}>
