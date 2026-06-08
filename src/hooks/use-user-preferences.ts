@@ -36,6 +36,13 @@ const defaultPreferences: UserPreferences = {
     email: true,
     push: true,
     sound: false,
+    email_address: '',
+  },
+  emails: {
+    closureRecap: true,
+    dailyReports: true,
+    incidents: true,
+    accessRequests: true,
   },
   dashboard: {
     layout: 'grid',
