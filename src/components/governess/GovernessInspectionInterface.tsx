@@ -346,6 +346,9 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
       console.error('handleDropOnAssignment error', e);
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible d'attribuer la chambre" });
     }
+  };
+
+
 
 
   const stats = {
