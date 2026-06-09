@@ -559,6 +559,7 @@ const Landing = () => {
                   const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
                   const subtitle = (c.pricing as any).planSubtitles?.[plan.plan_name] || '';
                   const featuresList = planFeatures[plan.plan_name] || [];
+                  const trialLabel = getTrialLabel(plan.trial_days);
 
                   return (
                     <div
@@ -572,15 +573,18 @@ const Landing = () => {
                           <Badge className="bg-primary text-primary-foreground px-2 py-0.5 text-xs">
                             {c.pricing.popular}
                           </Badge>
-                          <Badge className="bg-amber-500 text-white px-2 py-0.5 text-xs">
-                            {(c.pricing as any).threeMonthsFree}
-                          </Badge>
+                          {isPaid && trialLabel && (
+                            <Badge className="bg-amber-500 text-white px-2 py-0.5 text-xs">
+                              {trialLabel}
+                            </Badge>
+                          )}
                         </div>
-                      ) : isPaid && !isEnterprise ? (
+                      ) : isPaid && !isEnterprise && trialLabel ? (
                         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-3 py-0.5 text-xs whitespace-nowrap">
-                          {(c.pricing as any).threeMonthsFree}
+                          {trialLabel}
                         </Badge>
                       ) : null}
+
 
                       <div className="mb-3">
                         {planIcons[plan.plan_name] || <Zap className="w-8 h-8 text-muted-foreground" />}
