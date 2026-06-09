@@ -44,6 +44,7 @@ import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { OnboardingWizard, TrialExpiryBanner, TrialExpiredBlocker } from "@/components/onboarding";
 import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
+import { EmailConfirmationRequired } from "@/components/auth/EmailConfirmationRequired";
 
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
