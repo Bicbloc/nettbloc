@@ -237,6 +237,33 @@ async function processRow(admin: any, row: any): Promise<void> {
   const ctx = await loadHotelContext(admin, row.hotel_id);
   const target = (row.room_number || '').toString().trim().toLowerCase();
 
+  if (ctx.pmsType === 'mister_booking') {
+    // MisterBooking ne connaît que clean / dirty.
+    const s = (row.status || '').toLowerCase();
+    let mbStatus: 'clean' | 'dirty' | null = null;
+    if (s === 'clean' || s === 'propre' || s === 'inspected' || s === 'inspecté') mbStatus = 'clean';
+    else if (['needs-cleaning', 'dirty', 'sale', 'checkout', 'ready-to-clean', 'in-progress'].includes(s)) mbStatus = 'dirty';
+    if (!mbStatus) {
+      await admin
+        .from('pms_sync_queue')
+        .update({ state: 'success', last_error: `Statut "${row.status}" non synchronisé` })
+        .eq('id', row.id);
+      return;
+    }
+    const roomId = ctx.mbRoomIdByName?.get(target);
+    if (!roomId) {
+      throw new Error(`Chambre MisterBooking introuvable (roomId) pour la chambre ${row.room_number}`);
+    }
+    const result = await mbUpdateHousekeeping(ctx.mbHotelId!, [
+      { roomId, status: mbStatus, date: new Date().toISOString() },
+    ]);
+    if (!result?.success) {
+      throw new Error(`Mise à jour housekeeping MisterBooking refusée: ${JSON.stringify(result?.data || {})}`);
+    }
+    await admin.from('pms_sync_queue').update({ state: 'success', last_error: null }).eq('id', row.id);
+    return;
+  }
+
   if (ctx.pmsType === 'apaleo') {
     const condition = mapStatusToApaleoCondition(row.status);
     if (!condition) {
