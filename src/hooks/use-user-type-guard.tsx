@@ -50,6 +50,10 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
   }, [user?.id]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      storageService.syncActivePortalFromPath(window.location.pathname);
+    }
+
     if (!isInitialized || authLoading) {
       return;
     }
@@ -72,7 +76,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
     // SÉCURITÉ: jamais de fast-path pour l'établissement — il doit TOUJOURS être
     // confirmé par la vérification DB du rôle, pour éviter qu'une session staff
     // (femme de chambre, gouvernante, technicien...) n'atterrisse sur l'établissement.
-    const remembered = storageService.getActivePortal();
+    const remembered = typeof window !== 'undefined'
+      ? storageService.syncActivePortalFromPath(window.location.pathname)
+      : storageService.getActivePortal();
     if (remembered === expectedType && expectedType !== 'establishment' && !hasCheckedRef.current) {
       setUserType(expectedType);
       setIsVerified(true);
