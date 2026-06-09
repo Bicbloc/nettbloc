@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
+import { mbConfigured, mbFetchBookings, mbUpdateHousekeeping } from "../_shared/misterbooking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
