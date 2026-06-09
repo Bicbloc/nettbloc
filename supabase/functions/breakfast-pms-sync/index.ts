@@ -737,7 +737,7 @@ Deno.serve(async (req) => {
       .from('hotel_pms_configs')
       .select('credentials, property_id, base_url, pms_type, is_active')
       .eq('hotel_id', hotel_id)
-      .in('pms_type', ['apaleo', 'mews'])
+      .in('pms_type', ['apaleo', 'mews', 'mister_booking'])
       .order('is_active', { ascending: false })
       .limit(1)
       .maybeSingle()
