@@ -266,7 +266,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                   </div>
                   <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Essai gratuit</span>
-                    <span className="font-medium text-green-600">3 mois</span>
+                    <span className="font-medium text-green-600">{trialLabel}</span>
                   </div>
                 </div>
               </CardContent>
