@@ -771,7 +771,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        // MisterBooking n'expose pas de catalogue de prestations facturables.
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', service_id: null, products: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const services = await fetchMewsServices(creds)
         const serviceId = bfCfg?.pms_service_id || pickOrderableService(services)?.id || null
         if (!serviceId) {
