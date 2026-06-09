@@ -18,6 +18,16 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePricingConfig } from '@/hooks/use-pricing-config';
+
+/** Formate la durée d'essai (en jours) en un libellé lisible, synchronisé avec la config admin. */
+function formatTrialDuration(days: number): string {
+  if (days >= 60 && days % 30 === 0) {
+    const months = days / 30;
+    return `${months} mois`;
+  }
+  return `${days} jours`;
+}
 
 interface OnboardingWizardProps {
   isOpen: boolean;
