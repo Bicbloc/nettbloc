@@ -83,6 +83,8 @@ const t = {
       choose: 'Choisir',
       featuresLabel: 'Fonctionnalités incluses',
       threeMonthsFree: '3 mois offerts',
+      trialMonths: '{n} mois offerts',
+      trialDays: '{n} jours offerts',
       euNote: 'Paiement par GoCardless. UE : HT + TVA 20%. Hors UE : HT uniquement.',
       features: {
         pdfAnalysis: 'Analyse PDF automatique',
