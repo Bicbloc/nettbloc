@@ -119,6 +119,12 @@ const Index = () => {
     return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
   }
 
+  // SÉCURITÉ: l'accès à l'espace établissement exige une adresse e-mail confirmée.
+  // Aucun basculement, aucun accès tant que l'e-mail n'est pas vérifié.
+  if (isAuthenticated && !isGuestMode && user && !user.email_confirmed_at) {
+    return <EmailConfirmationRequired email={user.email} />;
+  }
+
   // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)
   if (isAuthenticated && !isGuestMode && user) {
     if (typeCheckLoading) {
