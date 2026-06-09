@@ -125,7 +125,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
       toast({
         title: "🎉 Bienvenue chez NettoBloc !",
-        description: "Votre période d'essai de 3 mois a commencé.",
+        description: `Votre période d'essai de ${trialLabel} a commencé.`,
       });
 
       onComplete();
