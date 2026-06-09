@@ -786,7 +786,7 @@ Deno.serve(async (req) => {
     // Test connection only
     if (action === 'test') {
       try {
-        const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
+        const credentials = { ...(pmsConfig.credentials as PmsCredentials), propertyId: (pmsConfig.credentials as PmsCredentials)?.propertyId || pmsConfig.property_id, baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
         let rooms: ExtractedRoom[] = [];
 
         switch (pmsConfig.pms_type) {
@@ -795,6 +795,9 @@ Deno.serve(async (req) => {
             break;
           case 'apaleo':
             rooms = await fetchApaleoRooms(credentials);
+            break;
+          case 'mister_booking':
+            rooms = await fetchMisterBookingRooms(credentials);
             break;
           default:
             return new Response(JSON.stringify({ success: false, error: `Le PMS '${pmsConfig.pms_type}' n'est pas encore supporté pour la synchro API directe.` }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
