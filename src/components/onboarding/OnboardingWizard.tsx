@@ -164,7 +164,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                 <div className="flex items-center gap-4">
                   <Gift className="h-9 w-9 sm:h-10 sm:w-10 text-green-600 shrink-0" />
                   <div>
-                    <p className="font-semibold text-base text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
+                    <p className="font-semibold text-base text-green-800 dark:text-green-200">{trialLabel} d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       Accès complet à toutes les fonctionnalités, sans carte bancaire.
                     </p>
