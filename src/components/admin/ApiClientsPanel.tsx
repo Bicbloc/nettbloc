@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Search, RefreshCw, Cpu, Plug, Coins, Activity, Download } from 'lucide-react';
+import { Search, RefreshCw, Cpu, Plug, Coins, Activity, Download, Euro, Calendar } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
@@ -26,11 +26,13 @@ interface ApiClient {
   pms_syncs: number;
   ai_calls: number;
   ai_tokens: number;
+  ai_cost: number;
   ai_last_at: string | null;
 }
 
 interface DailyUsage { day: string; calls: number; tokens: number; }
-interface FunctionUsage { function_name: string; calls: number; tokens: number; last_at: string | null; }
+interface FunctionUsage { function_name: string; calls: number; tokens: number; cost: number; last_at: string | null; }
+interface MonthlyUsage { hotel_id: string; hotel_name: string; hotel_code: string; month: string; calls: number; tokens: number; cost: number; }
 
 const RANGES = [
   { value: '7', label: '7 jours' },
@@ -43,6 +45,7 @@ export function ApiClientsPanel() {
   const [clients, setClients] = useState<ApiClient[]>([]);
   const [daily, setDaily] = useState<DailyUsage[]>([]);
   const [byFunction, setByFunction] = useState<FunctionUsage[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState('30');
   const [search, setSearch] = useState('');
@@ -52,16 +55,24 @@ export function ApiClientsPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: clientsData, error: e1 }, { data: dailyData, error: e2 }, { data: fnData, error: e3 }] = await Promise.all([
+      const [
+        { data: clientsData, error: e1 },
+        { data: dailyData, error: e2 },
+        { data: fnData, error: e3 },
+        { data: monthlyData, error: e4 },
+      ] = await Promise.all([
         supabase.rpc('admin_get_api_clients', { p_days: Number(days) }),
         supabase.rpc('admin_get_ai_usage_daily', { p_days: Number(days) }),
         supabase.rpc('admin_get_ai_usage_by_function', { p_days: Number(days) }),
+        supabase.rpc('admin_get_ai_usage_by_client_month', { p_months: 12 }),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
       if (e3) throw e3;
+      if (e4) throw e4;
       setClients((clientsData as ApiClient[]) || []);
       setByFunction((fnData as FunctionUsage[]) || []);
+      setMonthly((monthlyData as MonthlyUsage[]) || []);
       setDaily(((dailyData as DailyUsage[]) || []).map(d => ({
         ...d,
         day: format(new Date(d.day), 'dd/MM', { locale: fr }),
@@ -90,17 +101,39 @@ export function ApiClientsPanel() {
     aiClients: clients.filter(c => Number(c.ai_calls) > 0).length,
     tokens: byFunction.reduce((s, f) => s + Number(f.tokens || 0), 0),
     calls: byFunction.reduce((s, f) => s + Number(f.calls || 0), 0),
+    cost: byFunction.reduce((s, f) => s + Number(f.cost || 0), 0),
   }), [clients, byFunction]);
 
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
+  const eur = (n: number) => new Intl.NumberFormat('fr-FR', {
+    style: 'currency', currency: 'EUR', minimumFractionDigits: n < 1 ? 4 : 2, maximumFractionDigits: 4,
+  }).format(Number(n) || 0);
+
+  // Group monthly data by month for the table (latest months first)
+  const monthlyGrouped = useMemo(() => {
+    const map = new Map<string, MonthlyUsage[]>();
+    monthly.forEach(m => {
+      const key = m.month;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(m);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([month, rows]) => ({
+        month,
+        rows: rows.sort((a, b) => Number(b.cost) - Number(a.cost)),
+        totalCost: rows.reduce((s, r) => s + Number(r.cost || 0), 0),
+        totalTokens: rows.reduce((s, r) => s + Number(r.tokens || 0), 0),
+      }));
+  }, [monthly]);
 
   const exportCsv = () => {
     const csv = [
-      ['Établissement', 'Code', 'PMS', 'PMS actif', 'Dernière synchro', 'Synchros', 'Appels IA', 'Tokens IA', 'Dernier appel IA'].join(','),
+      ['Établissement', 'Code', 'PMS', 'PMS actif', 'Dernière synchro', 'Synchros', 'Appels IA', 'Tokens IA', 'Coût IA (EUR)', 'Dernier appel IA'].join(','),
       ...filtered.map(c => [
         c.hotel_name, c.hotel_code, c.pms_type || '-', c.pms_active ? 'oui' : 'non',
         c.pms_last_sync ? format(new Date(c.pms_last_sync), 'yyyy-MM-dd HH:mm') : '-',
-        c.pms_syncs, c.ai_calls, c.ai_tokens,
+        c.pms_syncs, c.ai_calls, c.ai_tokens, Number(c.ai_cost || 0).toFixed(4),
         c.ai_last_at ? format(new Date(c.ai_last_at), 'yyyy-MM-dd HH:mm') : '-',
       ].join(',')),
     ].join('\n');
@@ -111,14 +144,30 @@ export function ApiClientsPanel() {
     a.click();
   };
 
+  const exportMonthlyCsv = () => {
+    const csv = [
+      ['Mois', 'Établissement', 'Code', 'Appels IA', 'Tokens IA', 'Coût IA (EUR)'].join(','),
+      ...monthly.map(m => [
+        format(new Date(m.month), 'yyyy-MM'),
+        m.hotel_name, m.hotel_code, m.calls, m.tokens, Number(m.cost || 0).toFixed(4),
+      ].join(',')),
+    ].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cout_ia_mensuel_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+  };
+
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard icon={Plug} label="Clients PMS" value={fmt(totals.pmsClients)} />
         <StatCard icon={Cpu} label="Clients IA" value={fmt(totals.aiClients)} />
         <StatCard icon={Activity} label="Appels IA" value={fmt(totals.calls)} />
         <StatCard icon={Coins} label="Tokens consommés" value={fmt(totals.tokens)} />
+        <StatCard icon={Euro} label="Coût IA estimé" value={eur(totals.cost)} />
       </div>
 
       {/* Daily usage chart */}
@@ -153,13 +202,71 @@ export function ApiClientsPanel() {
         </CardContent>
       </Card>
 
+      {/* Monthly cost per client */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-4 w-4" /> Coût IA mensuel par client
+              </CardTitle>
+              <CardDescription>Coût estimé en euros et tokens par établissement, mois par mois (12 derniers mois)</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportMonthlyCsv}><Download className="h-4 w-4 mr-2" />Export mensuel</Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : monthlyGrouped.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 text-sm">Aucune consommation IA</div>
+          ) : monthlyGrouped.map(group => (
+            <div key={group.month}>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold capitalize">
+                  {format(new Date(group.month), 'MMMM yyyy', { locale: fr })}
+                </h4>
+                <div className="text-sm text-muted-foreground">
+                  {fmt(group.totalTokens)} tokens · <span className="font-semibold text-foreground">{eur(group.totalCost)}</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead className="text-right">Appels IA</TableHead>
+                      <TableHead className="text-right">Tokens</TableHead>
+                      <TableHead className="text-right">Coût estimé</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.rows.map(r => (
+                      <TableRow key={r.hotel_id + group.month}>
+                        <TableCell>
+                          <div className="font-medium">{r.hotel_name}</div>
+                          <div className="text-xs text-muted-foreground">{r.hotel_code}</div>
+                        </TableCell>
+                        <TableCell className="text-right">{fmt(Number(r.calls))}</TableCell>
+                        <TableCell className="text-right">{fmt(Number(r.tokens))}</TableCell>
+                        <TableCell className="text-right font-semibold">{eur(Number(r.cost))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       {/* AI usage by function */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Cpu className="h-4 w-4" /> Consommation IA par fonction
           </CardTitle>
-          <CardDescription>Détail des appels et tokens par fonctionnalité IA sur la période</CardDescription>
+          <CardDescription>Détail des appels, tokens et coût estimé par fonctionnalité IA sur la période</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -169,6 +276,7 @@ export function ApiClientsPanel() {
                   <TableHead>Fonction</TableHead>
                   <TableHead className="text-right">Appels</TableHead>
                   <TableHead className="text-right">Tokens</TableHead>
+                  <TableHead className="text-right">Coût estimé</TableHead>
                   <TableHead>Dernier appel</TableHead>
                 </TableRow>
               </TableHeader>
@@ -176,18 +284,19 @@ export function ApiClientsPanel() {
                 {loading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 4 }).map((__, j) => (
+                      {Array.from({ length: 5 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : byFunction.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune consommation IA sur la période</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Aucune consommation IA sur la période</TableCell></TableRow>
                 ) : byFunction.map(f => (
                   <TableRow key={f.function_name}>
                     <TableCell className="font-medium">{f.function_name}</TableCell>
                     <TableCell className="text-right">{fmt(Number(f.calls))}</TableCell>
                     <TableCell className="text-right font-medium">{fmt(Number(f.tokens))}</TableCell>
+                    <TableCell className="text-right font-semibold">{eur(Number(f.cost))}</TableCell>
                     <TableCell className="text-xs">
                       {f.last_at ? format(new Date(f.last_at), 'dd/MM/yy HH:mm', { locale: fr }) : '—'}
                     </TableCell>
@@ -242,6 +351,7 @@ export function ApiClientsPanel() {
                   <TableHead className="text-right">Synchros</TableHead>
                   <TableHead className="text-right">Appels IA</TableHead>
                   <TableHead className="text-right">Tokens</TableHead>
+                  <TableHead className="text-right">Coût estimé</TableHead>
                   <TableHead>Dernier appel IA</TableHead>
                 </TableRow>
               </TableHeader>
@@ -249,13 +359,13 @@ export function ApiClientsPanel() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Aucun client</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Aucun client</TableCell></TableRow>
                 ) : filtered.map(c => (
                   <TableRow key={c.hotel_id}>
                     <TableCell>
@@ -275,6 +385,7 @@ export function ApiClientsPanel() {
                     <TableCell className="text-right">{fmt(Number(c.pms_syncs))}</TableCell>
                     <TableCell className="text-right">{fmt(Number(c.ai_calls))}</TableCell>
                     <TableCell className="text-right font-medium">{fmt(Number(c.ai_tokens))}</TableCell>
+                    <TableCell className="text-right font-semibold">{eur(Number(c.ai_cost))}</TableCell>
                     <TableCell className="text-xs">
                       {c.ai_last_at ? format(new Date(c.ai_last_at), 'dd/MM/yy HH:mm', { locale: fr }) : '—'}
                     </TableCell>
