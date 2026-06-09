@@ -1,5 +1,58 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { mbBookingToRoom, mbConfigured, mbFetchBookings, mbGuestName } from '../_shared/misterbooking.ts'
+
+// ─── MisterBooking ─────────────────────────────────────────────────
+// Chambres occupées du jour (occupation + statut), depuis connectedDevices.
+async function fetchMisterBookingRooms(propertyId: string): Promise<PmsRoom[]> {
+  if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).')
+  const hotelId = parseInt(String(propertyId || ''), 10)
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant.')
+  const today = new Date().toISOString().split('T')[0]
+  const bookings = await mbFetchBookings(hotelId)
+  const rooms: PmsRoom[] = []
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, today)
+    if (!r.roomNumber) continue
+    rooms.push({
+      room_number: r.roomNumber,
+      occupied: true,
+      // MisterBooking n'expose pas l'inclusion du petit-déjeuner : par défaut non inclus.
+      breakfast_included: false,
+      guest_name: r.guestName,
+      status: r.status === 'checkout' ? 'departure' : r.status === 'arrival' ? 'arrival' : 'inhouse',
+      check_in: r.arrivalDate,
+      check_out: r.departureDate,
+      comment: null,
+    })
+  }
+  return rooms
+}
+
+// Clients (objets trouvés) — séjours en cours.
+async function fetchMisterBookingRoomGuests(propertyId: string): Promise<PmsRoomGuest[]> {
+  if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).')
+  const hotelId = parseInt(String(propertyId || ''), 10)
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant.')
+  const today = new Date().toISOString().split('T')[0]
+  const bookings = await mbFetchBookings(hotelId)
+  return bookings
+    .filter((b) => (b.roomNumber || '').toString().trim())
+    .map((b) => {
+      const checkIn = (b.startDate || '').split('T')[0] || null
+      const checkOut = (b.endDate || '').split('T')[0] || null
+      let status = 'inhouse'
+      if (checkOut === today) status = 'departure'
+      else if (checkIn === today) status = 'arrival'
+      return {
+        room_number: String(b.roomNumber).trim(),
+        guest_name: mbGuestName(b),
+        check_in: checkIn,
+        check_out: checkOut,
+        status,
+      }
+    })
+}
 
 interface PmsCredentials {
   clientId?: string
