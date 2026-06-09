@@ -44,6 +44,7 @@ import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { OnboardingWizard, TrialExpiryBanner, TrialExpiredBlocker } from "@/components/onboarding";
 import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
+import { EmailConfirmationRequired } from "@/components/auth/EmailConfirmationRequired";
 
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
@@ -116,6 +117,12 @@ const Index = () => {
   if (!isAuthenticated && !isGuestMode) {
     const isStaffMode = searchParams.get('mode') === 'staff';
     return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
+  }
+
+  // SÉCURITÉ: l'accès à l'espace établissement exige une adresse e-mail confirmée.
+  // Aucun basculement, aucun accès tant que l'e-mail n'est pas vérifié.
+  if (isAuthenticated && !isGuestMode && user && !user.email_confirmed_at) {
+    return <EmailConfirmationRequired email={user.email} />;
   }
 
   // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)

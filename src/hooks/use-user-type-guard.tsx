@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService, type AppPortal } from '@/services/storageService';
+import { EmailConfirmationRequired } from '@/components/auth/EmailConfirmationRequired';
 
 export type UserType = AppPortal | null;
 
@@ -333,7 +334,7 @@ interface UserTypeGuardProps {
  */
 export function UserTypeGuard({ expectedType, children, loadingComponent }: UserTypeGuardProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { isLoading, isVerified, userType, matchingTypes, requiresPortalChoice } = useUserTypeGuard(expectedType);
 
   const handleLogout = async () => {
@@ -342,6 +343,12 @@ export function UserTypeGuard({ expectedType, children, loadingComponent }: User
   };
 
   const detectedProfiles = matchingTypes.map((type) => INTERFACE_NAMES[type]).join(' • ');
+
+  // SÉCURITÉ: aucun espace n'est accessible tant que l'e-mail n'est pas confirmé.
+  if (user && !user.email_confirmed_at) {
+    return <EmailConfirmationRequired email={user.email} />;
+  }
+
 
   if (isLoading) {
     return loadingComponent ? (
