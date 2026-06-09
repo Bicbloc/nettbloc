@@ -129,7 +129,7 @@ async function mewsFetch(url: string, body: unknown, attempt = 0): Promise<Respo
 // ─────────────────────────────────────────────────────────────────
 
 interface HotelContext {
-  pmsType: 'apaleo' | 'mews';
+  pmsType: 'apaleo' | 'mews' | 'mister_booking';
   // Apaleo
   apaleoToken?: string;
   apaleoUnits?: any[];
@@ -137,6 +137,9 @@ interface HotelContext {
   mewsAuth?: { ClientToken?: string; AccessToken?: string; Client: string };
   mewsBaseUrl?: string;
   mewsResourceByName?: Map<string, string>; // lowercased name -> ResourceId
+  // MisterBooking
+  mbHotelId?: number;
+  mbRoomIdByName?: Map<string, number>; // lowercased room number -> roomId
 }
 
 const hotelCache = new Map<string, HotelContext>();
@@ -149,13 +152,28 @@ async function loadHotelContext(admin: any, hotelId: string): Promise<HotelConte
     .select('credentials, property_id, base_url, pms_type, is_active')
     .eq('hotel_id', hotelId)
     .eq('is_active', true)
-    .in('pms_type', ['apaleo', 'mews'])
+    .in('pms_type', ['apaleo', 'mews', 'mister_booking'])
     .maybeSingle();
 
   if (configErr) throw configErr;
-  if (!config) throw new Error('Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel');
+  if (!config) throw new Error('Aucune configuration PMS active (Apaleo/Mews/MisterBooking) pour cet hôtel');
 
   const creds = (config.credentials || {}) as PmsCredentials;
+
+  if (config.pms_type === 'mister_booking') {
+    if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
+    const mbHotelId = parseInt(String(creds.propertyId || config.property_id || ''), 10);
+    if (!mbHotelId) throw new Error('ID établissement MisterBooking manquant');
+    // Construit la table chambre -> roomId à partir des réservations en cours.
+    const bookings = await mbFetchBookings(mbHotelId);
+    const byName = new Map<string, number>();
+    for (const b of bookings) {
+      if (b.roomNumber && b.roomId) byName.set(String(b.roomNumber).trim().toLowerCase(), b.roomId);
+    }
+    const ctx: HotelContext = { pmsType: 'mister_booking', mbHotelId, mbRoomIdByName: byName };
+    hotelCache.set(hotelId, ctx);
+    return ctx;
+  }
 
   if (config.pms_type === 'apaleo') {
     const propertyId = creds.propertyId || config.property_id;
