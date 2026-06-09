@@ -30,6 +30,8 @@ project_id = "rarhqnvvbjzfdevnghnz"
     verify_jwt = false
   [functions.apaleo-webhook]
     verify_jwt = false
+  [functions.misterbooking-webhook]
+    verify_jwt = false
   [functions.apaleo-oauth-callback]
     verify_jwt = false
   [functions.gocardless-webhook]
