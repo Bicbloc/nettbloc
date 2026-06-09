@@ -315,7 +315,7 @@ export async function hasActivePmsConfig(hotelId: string): Promise<boolean> {
     .select('id')
     .eq('hotel_id', hotelId)
     .eq('is_active', true)
-    .in('pms_type', ['apaleo', 'mews'])
+    .in('pms_type', ['apaleo', 'mews', 'mister_booking'])
     .maybeSingle();
   return !!data;
 }
