@@ -727,6 +727,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Single-hotel privileged sync (called by mews-webhook, no user auth) ──
+    // Triggered in near-real-time when Mews pushes a webhook event. Reuses the
+    // full performSync pipeline for one hotel only.
+    if (action === 'sync_hotel') {
+      if (!isAuthorizedCronRequest(req)) {
+        return unauthorizedResponse(corsHeaders);
+      }
+      if (!hotel_id) {
+        return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const { data: cfg } = await adminClient
+        .from('hotel_pms_configs')
+        .select('*')
+        .eq('hotel_id', hotel_id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!cfg) {
+        return new Response(JSON.stringify({ success: false, error: 'No active PMS config for hotel' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      try {
+        const count = await performSync(adminClient, cfg);
+        return new Response(JSON.stringify({ success: true, rooms_synced: count }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Sync failed';
+        return new Response(JSON.stringify({ success: false, error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // Validate auth (all other actions require a logged-in user)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
