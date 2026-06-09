@@ -50,6 +50,10 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
   }, [user?.id]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      storageService.syncActivePortalFromPath(window.location.pathname);
+    }
+
     if (!isInitialized || authLoading) {
       return;
     }
@@ -72,7 +76,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
     // SÉCURITÉ: jamais de fast-path pour l'établissement — il doit TOUJOURS être
     // confirmé par la vérification DB du rôle, pour éviter qu'une session staff
     // (femme de chambre, gouvernante, technicien...) n'atterrisse sur l'établissement.
-    const remembered = storageService.getActivePortal();
+    const remembered = typeof window !== 'undefined'
+      ? storageService.syncActivePortalFromPath(window.location.pathname)
+      : storageService.getActivePortal();
     if (remembered === expectedType && expectedType !== 'establishment' && !hasCheckedRef.current) {
       setUserType(expectedType);
       setIsVerified(true);
@@ -251,7 +257,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
         }
 
 
-        const rememberedPortal = storageService.getActivePortal();
+        const rememberedPortal = typeof window !== 'undefined'
+          ? storageService.syncActivePortalFromPath(window.location.pathname)
+          : storageService.getActivePortal();
         const needsExplicitChoice =
           expectedType === 'establishment' &&
           matchedTypes.length > 1 &&
@@ -281,7 +289,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
         // SÉCURITÉ: en cas d'erreur/timeout RPC (fréquent en APK sur réseau
         // instable), on n'accorde JAMAIS l'accès établissement sans confirmation.
         // Pour les portails staff déjà choisis explicitement, on reste tolérant.
-        const rememberedOnError = storageService.getActivePortal();
+        const rememberedOnError = typeof window !== 'undefined'
+          ? storageService.syncActivePortalFromPath(window.location.pathname)
+          : storageService.getActivePortal();
         if (rememberedOnError === expectedType && expectedType !== 'establishment') {
           setUserType(expectedType);
           setIsVerified(true);

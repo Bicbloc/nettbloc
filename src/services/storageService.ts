@@ -221,11 +221,37 @@ class StorageService {
       stored === 'establishment' ||
       stored === 'housekeeper' ||
       stored === 'governess' ||
-      stored === 'technician'
+      stored === 'technician' ||
+      stored === 'cafetiere'
     ) {
       return stored;
     }
     return null;
+  }
+
+  syncActivePortalFromPath(pathname: string): AppPortal | null {
+    if (!pathname) return this.getActivePortal();
+
+    let inferredPortal: AppPortal | null = null;
+
+    if (pathname.startsWith('/housekeeper')) {
+      inferredPortal = 'housekeeper';
+    } else if (pathname.startsWith('/governess')) {
+      inferredPortal = 'governess';
+    } else if (pathname.startsWith('/technician')) {
+      inferredPortal = 'technician';
+    } else if (pathname.startsWith('/cafetiere')) {
+      inferredPortal = 'cafetiere';
+    } else if (pathname === '/' || pathname.startsWith('/auth/establishment')) {
+      inferredPortal = 'establishment';
+    }
+
+    if (inferredPortal) {
+      this.saveActivePortal(inferredPortal);
+      return inferredPortal;
+    }
+
+    return this.getActivePortal();
   }
 
   clearActivePortal(): void {

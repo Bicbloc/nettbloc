@@ -32,6 +32,10 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
       const currentBuildId = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
       const storedBuildId = localStorage.getItem(BUILD_ID_KEY);
 
+      if (typeof window !== 'undefined') {
+        storageService.syncActivePortalFromPath(window.location.pathname);
+      }
+
       if (storedBuildId && storedBuildId !== currentBuildId) {
         VOLATILE_KEYS.forEach(key => {
           try { localStorage.removeItem(key); } catch { /* ignore */ }

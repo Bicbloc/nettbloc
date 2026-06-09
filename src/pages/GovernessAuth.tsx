@@ -11,6 +11,7 @@ import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 import { PASSWORD_RESET_URL, APP_ORIGIN } from '@/constants/appUrl';
+import { storageService } from '@/services/storageService';
 
 export default function GovernessAuth() {
   const [email, setEmail] = useState('');
@@ -169,6 +170,7 @@ export default function GovernessAuth() {
           // Nettoyer les profils d'autres rôles pour éviter les conflits
           localStorage.removeItem('housekeeper_profile');
           localStorage.removeItem('technician_profile');
+          storageService.saveActivePortal('governess');
           localStorage.setItem('governess_profile', JSON.stringify(profileData));
           
           toast({
@@ -267,6 +269,7 @@ export default function GovernessAuth() {
         // Session immédiate (confirmation email désactivée)
         localStorage.removeItem('housekeeper_profile');
         localStorage.removeItem('technician_profile');
+        storageService.saveActivePortal('governess');
         localStorage.setItem('governess_profile', JSON.stringify({ id: data.user?.id, email, name, is_active: true }));
         toast({
           title: "Inscription réussie !",
