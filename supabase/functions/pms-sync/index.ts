@@ -483,12 +483,14 @@ function toDbStatus(room: ExtractedRoom): string {
 }
 
 async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
-  const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
+  const credentials = { ...(pmsConfig.credentials as PmsCredentials), propertyId: (pmsConfig.credentials as PmsCredentials)?.propertyId || pmsConfig.property_id, baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
   switch (pmsConfig.pms_type) {
     case 'mews':
       return dedupeExtractedRooms(await fetchMewsRooms(credentials));
     case 'apaleo':
       return dedupeExtractedRooms(await fetchApaleoRooms(credentials));
+    case 'mister_booking':
+      return dedupeExtractedRooms(await fetchMisterBookingRooms(credentials));
     default:
       throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
   }
