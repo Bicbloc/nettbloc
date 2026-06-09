@@ -333,7 +333,7 @@ interface UserTypeGuardProps {
  */
 export function UserTypeGuard({ expectedType, children, loadingComponent }: UserTypeGuardProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { isLoading, isVerified, userType, matchingTypes, requiresPortalChoice } = useUserTypeGuard(expectedType);
 
   const handleLogout = async () => {
@@ -342,6 +342,12 @@ export function UserTypeGuard({ expectedType, children, loadingComponent }: User
   };
 
   const detectedProfiles = matchingTypes.map((type) => INTERFACE_NAMES[type]).join(' • ');
+
+  // SÉCURITÉ: aucun espace n'est accessible tant que l'e-mail n'est pas confirmé.
+  if (user && !user.email_confirmed_at) {
+    return <EmailConfirmationRequired email={user.email} />;
+  }
+
 
   if (isLoading) {
     return loadingComponent ? (
