@@ -302,7 +302,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             {STEPS[currentStep].title}
           </DialogTitle>
           <DialogDescription>
-            Étape {currentStep + 1} sur {STEPS.length}
+            {`Étape ${currentStep + 1} sur ${STEPS.length}`}
           </DialogDescription>
         </DialogHeader>
 
