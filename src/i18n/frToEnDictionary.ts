@@ -1711,4 +1711,9 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Commencer l'essai": "Start the trial",
   "🎉 Bienvenue chez NettoBloc !": "🎉 Welcome to NettoBloc!",
   "Votre période d'essai de 3 mois a commencé.": "Your 3-month trial period has started.",
+  "Confirmez votre adresse e-mail": "Confirm your email address",
+  "Renvoyer l'e-mail": "Resend email",
+  "E-mail envoyé": "Email sent",
+  "Un nouveau lien de confirmation vient de vous être envoyé.": "A new confirmation link has just been sent to you.",
+  "Impossible d'envoyer l'e-mail de confirmation.": "Unable to send the confirmation email.",
 };
