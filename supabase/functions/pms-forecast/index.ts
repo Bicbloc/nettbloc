@@ -1,5 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
+import { mbConfigured, mbFetchBookings } from "../_shared/misterbooking.ts";
+
+// MisterBooking : l'API connectedDevices ne renvoie que les séjours en cours
+// (englobant aujourd'hui). On en déduit l'occupation actuelle et la projection
+// des séjours déjà entamés ; les arrivées futures ne sont pas disponibles.
+async function fetchMisterBooking(credentials: { propertyId?: string }): Promise<{ stays: { start: string; end: string }[]; totalRooms: number }> {
+  if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
+  const hotelId = parseInt(String(credentials.propertyId || ''), 10);
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant.');
+  const bookings = await mbFetchBookings(hotelId);
+  const stays = bookings
+    .filter((b) => (b.startDate && b.endDate))
+    .map((b) => ({ start: b.startDate.split('T')[0], end: b.endDate.split('T')[0] }));
+  return { stays, totalRooms: 0 };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
