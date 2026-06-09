@@ -105,7 +105,7 @@ const PMS_TYPES = [
   { value: 'mews', label: 'Mews', fields: ['clientToken', 'accessToken'], fieldLabels: { clientToken: 'Client Token', accessToken: 'Access Token' } },
   { value: 'apaleo', label: 'Apaleo', fields: ['clientId', 'clientSecret', 'propertyId'], fieldLabels: { clientId: 'Client ID', clientSecret: 'Client Secret', propertyId: 'Property ID' } },
   { value: 'opera', label: 'Opera Cloud', fields: ['clientId', 'clientSecret', 'propertyId'], fieldLabels: { clientId: 'Client ID', clientSecret: 'Client Secret', propertyId: 'Property ID' } },
-  { value: 'mister_booking', label: 'Mister Booking', fields: ['apiKey', 'propertyId'], fieldLabels: { apiKey: 'Clé API', propertyId: 'ID Établissement' } },
+  { value: 'mister_booking', label: 'Mister Booking', fields: ['propertyId'], fieldLabels: { propertyId: 'ID Établissement MisterBooking' } },
   { value: 'protel', label: 'Protel', fields: ['apiKey', 'baseUrl'], fieldLabels: { apiKey: 'Token API', baseUrl: 'URL Serveur' } },
   { value: 'medialog', label: 'Medialog', fields: ['apiKey'], fieldLabels: { apiKey: 'Clé API' } },
 ];
