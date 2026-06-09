@@ -280,13 +280,13 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
       )}
       
       {/* Card content */}
-      <div className="relative p-5" style={{ zIndex: 1 }}>
-        <div className="space-y-4">
+      <div className="relative p-3.5" style={{ zIndex: 1 }}>
+        <div className="space-y-2.5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-3xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                <span className="text-2xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                   {room.room_number}
                 </span>
                 
@@ -429,18 +429,18 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'in_progress')}
-                  className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-xl shadow-blue-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-xl shadow-blue-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Play className="h-6 w-6 mr-2 fill-current" />
+                  <Play className="h-5 w-5 mr-2 fill-current" />
                   COMMENCER
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-14 w-14 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-6 w-6" />
+                  <X className="h-5 w-5" />
                 </Button>
               </>
             )}
@@ -448,18 +448,18 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'clean', notes || undefined)}
-                  className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-xl shadow-green-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-xl shadow-green-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <CheckCircle className="h-6 w-6 mr-2" />
+                  <CheckCircle className="h-5 w-5 mr-2" />
                   TERMINER
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-14 w-14 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-6 w-6" />
+                  <X className="h-5 w-5" />
                 </Button>
               </>
             )}
