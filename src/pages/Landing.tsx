@@ -305,6 +305,7 @@ interface PricingPlan {
   price_monthly: number;
   max_rooms: number | null;
   is_active: boolean;
+  trial_days: number | null;
 }
 
 const planDisplayNames: Record<string, Record<string, string>> = {
