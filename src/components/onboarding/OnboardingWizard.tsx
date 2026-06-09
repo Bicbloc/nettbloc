@@ -18,6 +18,16 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePricingConfig } from '@/hooks/use-pricing-config';
+
+/** Formate la durée d'essai (en jours) en un libellé lisible, synchronisé avec la config admin. */
+function formatTrialDuration(days: number): string {
+  if (days >= 60 && days % 30 === 0) {
+    const months = days / 30;
+    return `${months} mois`;
+  }
+  return `${days} jours`;
+}
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -39,6 +49,7 @@ const STEPS = [
 export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { byPlan, plans } = usePricingConfig();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasExistingName, setHasExistingName] = useState(false);
@@ -47,6 +58,10 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     contactName: '',
     phone: '',
   });
+
+  // Durée d'essai synchronisée avec la configuration admin (pricing_config)
+  const trialDays = byPlan?.decouverte?.trial_days ?? plans[0]?.trial_days ?? 30;
+  const trialLabel = formatTrialDuration(trialDays);
 
   // Préremplir avec les infos déjà connues (profil + métadonnées du compte)
   useEffect(() => {
@@ -110,7 +125,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
       toast({
         title: "🎉 Bienvenue chez NettoBloc !",
-        description: "Votre période d'essai de 3 mois a commencé.",
+        description: `Votre période d'essai de ${trialLabel} a commencé.`,
       });
 
       onComplete();
@@ -149,7 +164,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                 <div className="flex items-center gap-4">
                   <Gift className="h-9 w-9 sm:h-10 sm:w-10 text-green-600 shrink-0" />
                   <div>
-                    <p className="font-semibold text-base text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
+                    <p className="font-semibold text-base text-green-800 dark:text-green-200">{trialLabel} d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       Accès complet à toutes les fonctionnalités, sans carte bancaire.
                     </p>
@@ -232,7 +247,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <div>
                 <h3 className="text-xl font-bold">Tout est prêt !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Votre période d'essai de 3 mois va commencer.
+                  Votre période d'essai de {trialLabel} va commencer.
                 </p>
               </div>
             </div>
@@ -251,7 +266,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                   </div>
                   <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Essai gratuit</span>
-                    <span className="font-medium text-green-600">3 mois</span>
+                    <span className="font-medium text-green-600">{trialLabel}</span>
                   </div>
                 </div>
               </CardContent>
@@ -282,7 +297,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[480px] max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[560px] max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             {STEPS.map((step, idx) => (
