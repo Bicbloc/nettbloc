@@ -1677,8 +1677,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Toutes les chambres terminées !": "All rooms finished!",
   "Toutes les tâches sont terminées": "All tasks are completed",
   "chambres restantes": "rooms remaining",
-  "Faites": "Done",
-  "Restantes": "Remaining",
   "Rec.": "Sty.",
   "Dép.": "Dep.",
 };
