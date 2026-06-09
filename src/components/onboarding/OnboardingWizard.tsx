@@ -49,6 +49,7 @@ const STEPS = [
 export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { byPlan, plans } = usePricingConfig();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasExistingName, setHasExistingName] = useState(false);
@@ -57,6 +58,10 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     contactName: '',
     phone: '',
   });
+
+  // Durée d'essai synchronisée avec la configuration admin (pricing_config)
+  const trialDays = byPlan?.decouverte?.trial_days ?? plans[0]?.trial_days ?? 30;
+  const trialLabel = formatTrialDuration(trialDays);
 
   // Préremplir avec les infos déjà connues (profil + métadonnées du compte)
   useEffect(() => {
