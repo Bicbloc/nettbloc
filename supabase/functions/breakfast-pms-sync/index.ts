@@ -1052,6 +1052,17 @@ Deno.serve(async (req) => {
 
 
 
+    // MisterBooking n'expose pas d'endpoint de facturation folio (prestations).
+    // Seule l'API « payments » (encaissements) existe, ce qui ne convient pas
+    // pour facturer un petit-déjeuner. La facturation PMS du petit-déjeuner
+    // n'est donc pas disponible pour MisterBooking.
+    if (config.pms_type === 'mister_booking') {
+      return new Response(JSON.stringify({
+        sent: 0, failed: 0,
+        message: "MisterBooking ne propose pas d'endpoint de facturation de prestations. Le petit-déjeuner ne peut pas être facturé automatiquement au folio via MisterBooking.",
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id
       if (!propertyId) throw new Error('Property ID Apaleo manquant')
