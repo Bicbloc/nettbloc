@@ -247,7 +247,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <div>
                 <h3 className="text-xl font-bold">Tout est prêt !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Votre période d'essai de 3 mois va commencer.
+                  Votre période d'essai de {trialLabel} va commencer.
                 </p>
               </div>
             </div>
