@@ -204,6 +204,8 @@ const t = {
       choose: 'Choose',
       featuresLabel: 'Included features',
       threeMonthsFree: '3 months free',
+      trialMonths: '{n} months free',
+      trialDays: '{n} days free',
       euNote: 'Payment via GoCardless. EU: excl. tax + 20% VAT. Non-EU: excl. tax only.',
       features: {
         pdfAnalysis: 'Automatic PDF analysis',
