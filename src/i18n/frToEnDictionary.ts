@@ -1683,7 +1683,7 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Étape 1 sur 3": "Step 1 of 3",
   "Étape 2 sur 3": "Step 2 of 3",
   "Étape 3 sur 3": "Step 3 of 3",
-  "Bienvenue sur NettoBloc !": "Welcome to NettoBloc!",
+  "Bienvenue sur NettoBloc": "Welcome to NettoBloc",
   "Quelques informations de base suffisent pour démarrer. La configuration complète\n                  (chambres, équipe, consignes…) se fait ensuite tranquillement depuis votre tableau de bord.": "A few basic details are enough to get started. The full setup (rooms, team, instructions…) can then be done at your own pace from your dashboard.",
   "Quelques informations de base suffisent pour démarrer. La configuration complète (chambres, équipe, consignes…) se fait ensuite tranquillement depuis votre tableau de bord.": "A few basic details are enough to get started. The full setup (rooms, team, instructions…) can then be done at your own pace from your dashboard.",
   "3 mois d'essai gratuit": "3-month free trial",
