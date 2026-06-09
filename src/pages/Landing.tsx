@@ -83,6 +83,8 @@ const t = {
       choose: 'Choisir',
       featuresLabel: 'Fonctionnalités incluses',
       threeMonthsFree: '3 mois offerts',
+      trialMonths: '{n} mois offerts',
+      trialDays: '{n} jours offerts',
       euNote: 'Paiement par GoCardless. UE : HT + TVA 20%. Hors UE : HT uniquement.',
       features: {
         pdfAnalysis: 'Analyse PDF automatique',
@@ -202,6 +204,8 @@ const t = {
       choose: 'Choose',
       featuresLabel: 'Included features',
       threeMonthsFree: '3 months free',
+      trialMonths: '{n} months free',
+      trialDays: '{n} days free',
       euNote: 'Payment via GoCardless. EU: excl. tax + 20% VAT. Non-EU: excl. tax only.',
       features: {
         pdfAnalysis: 'Automatic PDF analysis',
@@ -301,6 +305,7 @@ interface PricingPlan {
   price_monthly: number;
   max_rooms: number | null;
   is_active: boolean;
+  trial_days: number | null;
 }
 
 const planDisplayNames: Record<string, Record<string, string>> = {
@@ -331,19 +336,43 @@ const showcaseImages: Record<string, string> = {
 const Landing = () => {
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
   const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const [defaultTrialDays, setDefaultTrialDays] = useState<number>(0);
   const navigate = useNavigate();
   const c = t[lang];
 
   useEffect(() => {
     supabase
       .from('pricing_config')
-      .select('plan_name, price_monthly, max_rooms, is_active')
+      .select('plan_name, price_monthly, max_rooms, is_active, trial_days')
       .eq('is_active', true)
       .order('price_monthly', { ascending: true })
       .then(({ data }) => {
         if (data) setPlans(data as PricingPlan[]);
       });
+
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'default_trial_days')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value !== undefined && data?.value !== null) {
+          setDefaultTrialDays(Number(data.value));
+        }
+      });
   }, []);
+
+  // Construit le label d'essai gratuit selon la config admin (jours -> mois si multiple de 30)
+  const getTrialLabel = (planTrialDays: number | null): string | null => {
+    const days = planTrialDays && planTrialDays > 0 ? planTrialDays : defaultTrialDays;
+    if (!days || days <= 0) return null;
+    if (days >= 30 && days % 30 === 0) {
+      const months = days / 30;
+      return ((c.pricing as any).trialMonths as string).replace('{n}', String(months));
+    }
+    return ((c.pricing as any).trialDays as string).replace('{n}', String(days));
+  };
+
 
   const popularPlan = 'confort';
 
@@ -530,6 +559,7 @@ const Landing = () => {
                   const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
                   const subtitle = (c.pricing as any).planSubtitles?.[plan.plan_name] || '';
                   const featuresList = planFeatures[plan.plan_name] || [];
+                  const trialLabel = getTrialLabel(plan.trial_days);
 
                   return (
                     <div
@@ -543,15 +573,18 @@ const Landing = () => {
                           <Badge className="bg-primary text-primary-foreground px-2 py-0.5 text-xs">
                             {c.pricing.popular}
                           </Badge>
-                          <Badge className="bg-amber-500 text-white px-2 py-0.5 text-xs">
-                            {(c.pricing as any).threeMonthsFree}
-                          </Badge>
+                          {isPaid && trialLabel && (
+                            <Badge className="bg-amber-500 text-white px-2 py-0.5 text-xs">
+                              {trialLabel}
+                            </Badge>
+                          )}
                         </div>
-                      ) : isPaid && !isEnterprise ? (
+                      ) : isPaid && !isEnterprise && trialLabel ? (
                         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-3 py-0.5 text-xs whitespace-nowrap">
-                          {(c.pricing as any).threeMonthsFree}
+                          {trialLabel}
                         </Badge>
                       ) : null}
+
 
                       <div className="mb-3">
                         {planIcons[plan.plan_name] || <Zap className="w-8 h-8 text-muted-foreground" />}
