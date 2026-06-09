@@ -445,7 +445,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Tableau de bord": "Dashboard",
   "Accueil": "Home",
   "Profil": "Profile",
-  "Mon profil": "My profile",
   "Paramètres": "Settings",
   "Préférences": "Preferences",
   "Compte": "Account",
@@ -489,7 +488,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Performances": "Performance",
   "Tâche": "Task",
   "Tâches": "Tasks",
-  "Tâches du jour": "Today's tasks",
   "Mes tâches": "My tasks",
   "Tâche manuelle": "Manual task",
   "Tâches manuelles": "Manual tasks",
@@ -899,7 +897,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Signalés": "Reported",
 
   // Linen
-  "Inventaire du linge": "Linen inventory",
   "Inventaire Linge": "Linen inventory",
   "Gérer les types de linge, livraisons et inventaires": "Manage linen types, deliveries and inventories",
   "Types de linge": "Linen types",
