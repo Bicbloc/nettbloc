@@ -6637,10 +6637,23 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_get_ai_usage_by_client_month: {
+        Args: { p_months?: number }
+        Returns: {
+          calls: number
+          cost: number
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
+          month: string
+          tokens: number
+        }[]
+      }
       admin_get_ai_usage_by_function: {
         Args: { p_days?: number }
         Returns: {
           calls: number
+          cost: number
           function_name: string
           last_at: string
           tokens: number
@@ -6658,6 +6671,7 @@ export type Database = {
         Args: { p_days?: number }
         Returns: {
           ai_calls: number
+          ai_cost: number
           ai_last_at: string
           ai_tokens: number
           hotel_code: string
@@ -6696,6 +6710,10 @@ export type Database = {
       admin_set_ai_features_enabled: {
         Args: { p_enabled: boolean; p_user_id: string }
         Returns: boolean
+      }
+      ai_cost_eur: {
+        Args: { p_completion: number; p_model: string; p_prompt: number }
+        Returns: number
       }
       analyze_error_trends: {
         Args: { p_days?: number; p_hotel_id: string }
