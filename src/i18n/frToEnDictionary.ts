@@ -1662,4 +1662,6 @@ export const FR_EN_WORDS: Record<string, string> = {
   "Nom du client": "Guest name",
   "Étape": "Step",
   "Passer": "Skip",
+  "TERMINER": "FINISH",
+  "Prioritaire": "Priority",
 };
