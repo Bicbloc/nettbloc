@@ -336,19 +336,43 @@ const showcaseImages: Record<string, string> = {
 const Landing = () => {
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
   const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const [defaultTrialDays, setDefaultTrialDays] = useState<number>(0);
   const navigate = useNavigate();
   const c = t[lang];
 
   useEffect(() => {
     supabase
       .from('pricing_config')
-      .select('plan_name, price_monthly, max_rooms, is_active')
+      .select('plan_name, price_monthly, max_rooms, is_active, trial_days')
       .eq('is_active', true)
       .order('price_monthly', { ascending: true })
       .then(({ data }) => {
         if (data) setPlans(data as PricingPlan[]);
       });
+
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'default_trial_days')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value !== undefined && data?.value !== null) {
+          setDefaultTrialDays(Number(data.value));
+        }
+      });
   }, []);
+
+  // Construit le label d'essai gratuit selon la config admin (jours -> mois si multiple de 30)
+  const getTrialLabel = (planTrialDays: number | null): string | null => {
+    const days = planTrialDays && planTrialDays > 0 ? planTrialDays : defaultTrialDays;
+    if (!days || days <= 0) return null;
+    if (days >= 30 && days % 30 === 0) {
+      const months = days / 30;
+      return ((c.pricing as any).trialMonths as string).replace('{n}', String(months));
+    }
+    return ((c.pricing as any).trialDays as string).replace('{n}', String(days));
+  };
+
 
   const popularPlan = 'confort';
 
