@@ -858,7 +858,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        const guests = await fetchMisterBookingRoomGuests(creds.propertyId || config.property_id || '')
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const guests = await fetchMewsRoomGuests(creds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', guests }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
