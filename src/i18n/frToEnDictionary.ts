@@ -1679,6 +1679,8 @@ export const FR_EN_WORDS: Record<string, string> = {
   "chambres restantes": "rooms remaining",
   "Rec.": "Sty.",
   "Dép.": "Dep.",
+  "Sélectionnez un hôtel pour commencer à travailler": "Select a hotel to start working",
+  "Ajoutez votre premier hôtel pour commencer à travailler": "Add your first hotel to start working",
   "Vos informations": "Your information",
   "Étape 1 sur 3": "Step 1 of 3",
   "Étape 2 sur 3": "Step 2 of 3",
