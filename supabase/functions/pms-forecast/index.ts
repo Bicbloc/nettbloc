@@ -239,6 +239,9 @@ async function buildForecastForConfig(adminClient: any, pmsConfig: any) {
     case 'apaleo':
       result = await fetchApaleo(credentials, start, end);
       break;
+    case 'mister_booking':
+      result = await fetchMisterBooking({ propertyId: credentials.propertyId || pmsConfig.property_id });
+      break;
     default:
       throw new Error(`PMS type '${pmsConfig.pms_type}' not supported for forecast`);
   }
