@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService, type AppPortal } from '@/services/storageService';
+import { EmailConfirmationRequired } from '@/components/auth/EmailConfirmationRequired';
 
 export type UserType = AppPortal | null;
 
