@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
+import { mbConfigured, mbFetchBookings, mbUpdateHousekeeping } from "../_shared/misterbooking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,7 +129,7 @@ async function mewsFetch(url: string, body: unknown, attempt = 0): Promise<Respo
 // ─────────────────────────────────────────────────────────────────
 
 interface HotelContext {
-  pmsType: 'apaleo' | 'mews';
+  pmsType: 'apaleo' | 'mews' | 'mister_booking';
   // Apaleo
   apaleoToken?: string;
   apaleoUnits?: any[];
@@ -136,6 +137,9 @@ interface HotelContext {
   mewsAuth?: { ClientToken?: string; AccessToken?: string; Client: string };
   mewsBaseUrl?: string;
   mewsResourceByName?: Map<string, string>; // lowercased name -> ResourceId
+  // MisterBooking
+  mbHotelId?: number;
+  mbRoomIdByName?: Map<string, number>; // lowercased room number -> roomId
 }
 
 const hotelCache = new Map<string, HotelContext>();
@@ -148,13 +152,28 @@ async function loadHotelContext(admin: any, hotelId: string): Promise<HotelConte
     .select('credentials, property_id, base_url, pms_type, is_active')
     .eq('hotel_id', hotelId)
     .eq('is_active', true)
-    .in('pms_type', ['apaleo', 'mews'])
+    .in('pms_type', ['apaleo', 'mews', 'mister_booking'])
     .maybeSingle();
 
   if (configErr) throw configErr;
-  if (!config) throw new Error('Aucune configuration PMS active (Apaleo/Mews) pour cet hôtel');
+  if (!config) throw new Error('Aucune configuration PMS active (Apaleo/Mews/MisterBooking) pour cet hôtel');
 
   const creds = (config.credentials || {}) as PmsCredentials;
+
+  if (config.pms_type === 'mister_booking') {
+    if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
+    const mbHotelId = parseInt(String(creds.propertyId || config.property_id || ''), 10);
+    if (!mbHotelId) throw new Error('ID établissement MisterBooking manquant');
+    // Construit la table chambre -> roomId à partir des réservations en cours.
+    const bookings = await mbFetchBookings(mbHotelId);
+    const byName = new Map<string, number>();
+    for (const b of bookings) {
+      if (b.roomNumber && b.roomId) byName.set(String(b.roomNumber).trim().toLowerCase(), b.roomId);
+    }
+    const ctx: HotelContext = { pmsType: 'mister_booking', mbHotelId, mbRoomIdByName: byName };
+    hotelCache.set(hotelId, ctx);
+    return ctx;
+  }
 
   if (config.pms_type === 'apaleo') {
     const propertyId = creds.propertyId || config.property_id;
@@ -217,6 +236,33 @@ async function loadHotelContext(admin: any, hotelId: string): Promise<HotelConte
 async function processRow(admin: any, row: any): Promise<void> {
   const ctx = await loadHotelContext(admin, row.hotel_id);
   const target = (row.room_number || '').toString().trim().toLowerCase();
+
+  if (ctx.pmsType === 'mister_booking') {
+    // MisterBooking ne connaît que clean / dirty.
+    const s = (row.status || '').toLowerCase();
+    let mbStatus: 'clean' | 'dirty' | null = null;
+    if (s === 'clean' || s === 'propre' || s === 'inspected' || s === 'inspecté') mbStatus = 'clean';
+    else if (['needs-cleaning', 'dirty', 'sale', 'checkout', 'ready-to-clean', 'in-progress'].includes(s)) mbStatus = 'dirty';
+    if (!mbStatus) {
+      await admin
+        .from('pms_sync_queue')
+        .update({ state: 'success', last_error: `Statut "${row.status}" non synchronisé` })
+        .eq('id', row.id);
+      return;
+    }
+    const roomId = ctx.mbRoomIdByName?.get(target);
+    if (!roomId) {
+      throw new Error(`Chambre MisterBooking introuvable (roomId) pour la chambre ${row.room_number}`);
+    }
+    const result = await mbUpdateHousekeeping(ctx.mbHotelId!, [
+      { roomId, status: mbStatus, date: new Date().toISOString() },
+    ]);
+    if (!result?.success) {
+      throw new Error(`Mise à jour housekeeping MisterBooking refusée: ${JSON.stringify(result?.data || {})}`);
+    }
+    await admin.from('pms_sync_queue').update({ state: 'success', last_error: null }).eq('id', row.id);
+    return;
+  }
 
   if (ctx.pmsType === 'apaleo') {
     const condition = mapStatusToApaleoCondition(row.status);

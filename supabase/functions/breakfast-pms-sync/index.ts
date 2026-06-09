@@ -1,5 +1,58 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { mbBookingToRoom, mbConfigured, mbFetchBookings, mbGuestName } from '../_shared/misterbooking.ts'
+
+// ─── MisterBooking ─────────────────────────────────────────────────
+// Chambres occupées du jour (occupation + statut), depuis connectedDevices.
+async function fetchMisterBookingRooms(propertyId: string): Promise<PmsRoom[]> {
+  if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).')
+  const hotelId = parseInt(String(propertyId || ''), 10)
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant.')
+  const today = new Date().toISOString().split('T')[0]
+  const bookings = await mbFetchBookings(hotelId)
+  const rooms: PmsRoom[] = []
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, today)
+    if (!r.roomNumber) continue
+    rooms.push({
+      room_number: r.roomNumber,
+      occupied: true,
+      // MisterBooking n'expose pas l'inclusion du petit-déjeuner : par défaut non inclus.
+      breakfast_included: false,
+      guest_name: r.guestName,
+      status: r.status === 'checkout' ? 'departure' : r.status === 'arrival' ? 'arrival' : 'inhouse',
+      check_in: r.arrivalDate,
+      check_out: r.departureDate,
+      comment: null,
+    })
+  }
+  return rooms
+}
+
+// Clients (objets trouvés) — séjours en cours.
+async function fetchMisterBookingRoomGuests(propertyId: string): Promise<PmsRoomGuest[]> {
+  if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).')
+  const hotelId = parseInt(String(propertyId || ''), 10)
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant.')
+  const today = new Date().toISOString().split('T')[0]
+  const bookings = await mbFetchBookings(hotelId)
+  return bookings
+    .filter((b) => (b.roomNumber || '').toString().trim())
+    .map((b) => {
+      const checkIn = (b.startDate || '').split('T')[0] || null
+      const checkOut = (b.endDate || '').split('T')[0] || null
+      let status = 'inhouse'
+      if (checkOut === today) status = 'departure'
+      else if (checkIn === today) status = 'arrival'
+      return {
+        room_number: String(b.roomNumber).trim(),
+        guest_name: mbGuestName(b),
+        check_in: checkIn,
+        check_out: checkOut,
+        status,
+      }
+    })
+}
 
 interface PmsCredentials {
   clientId?: string
@@ -684,7 +737,7 @@ Deno.serve(async (req) => {
       .from('hotel_pms_configs')
       .select('credentials, property_id, base_url, pms_type, is_active')
       .eq('hotel_id', hotel_id)
-      .in('pms_type', ['apaleo', 'mews'])
+      .in('pms_type', ['apaleo', 'mews', 'mister_booking'])
       .order('is_active', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -718,7 +771,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        // MisterBooking n'expose pas de catalogue de prestations facturables.
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', service_id: null, products: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const services = await fetchMewsServices(creds)
         const serviceId = bfCfg?.pms_service_id || pickOrderableService(services)?.id || null
         if (!serviceId) {
@@ -747,7 +804,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        const rooms = await fetchMisterBookingRooms(creds.propertyId || config.property_id || '')
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', rooms }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const rooms = await fetchMewsRooms(creds, includedRatePlanIds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', rooms }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -770,7 +831,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        // MisterBooking n'expose pas de plans tarifaires via cette API.
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', rate_plans: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const ratePlans = await fetchMewsRatePlans(creds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', rate_plans: ratePlans }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -793,7 +858,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        const guests = await fetchMisterBookingRoomGuests(creds.propertyId || config.property_id || '')
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', guests }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const guests = await fetchMewsRoomGuests(creds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', guests }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -982,6 +1051,17 @@ Deno.serve(async (req) => {
     }
 
 
+
+    // MisterBooking n'expose pas d'endpoint de facturation folio (prestations).
+    // Seule l'API « payments » (encaissements) existe, ce qui ne convient pas
+    // pour facturer un petit-déjeuner. La facturation PMS du petit-déjeuner
+    // n'est donc pas disponible pour MisterBooking.
+    if (config.pms_type === 'mister_booking') {
+      return new Response(JSON.stringify({
+        sent: 0, failed: 0,
+        message: "MisterBooking ne propose pas d'endpoint de facturation de prestations. Le petit-déjeuner ne peut pas être facturé automatiquement au folio via MisterBooking.",
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     if (config.pms_type === 'apaleo') {
       const propertyId = creds.propertyId || config.property_id

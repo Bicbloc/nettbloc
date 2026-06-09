@@ -105,7 +105,7 @@ const PMS_TYPES = [
   { value: 'mews', label: 'Mews', fields: ['clientToken', 'accessToken'], fieldLabels: { clientToken: 'Client Token', accessToken: 'Access Token' } },
   { value: 'apaleo', label: 'Apaleo', fields: ['clientId', 'clientSecret', 'propertyId'], fieldLabels: { clientId: 'Client ID', clientSecret: 'Client Secret', propertyId: 'Property ID' } },
   { value: 'opera', label: 'Opera Cloud', fields: ['clientId', 'clientSecret', 'propertyId'], fieldLabels: { clientId: 'Client ID', clientSecret: 'Client Secret', propertyId: 'Property ID' } },
-  { value: 'mister_booking', label: 'Mister Booking', fields: ['apiKey', 'propertyId'], fieldLabels: { apiKey: 'Clé API', propertyId: 'ID Établissement' } },
+  { value: 'mister_booking', label: 'Mister Booking', fields: ['propertyId'], fieldLabels: { propertyId: 'ID Établissement MisterBooking' } },
   { value: 'protel', label: 'Protel', fields: ['apiKey', 'baseUrl'], fieldLabels: { apiKey: 'Token API', baseUrl: 'URL Serveur' } },
   { value: 'medialog', label: 'Medialog', fields: ['apiKey'], fieldLabels: { apiKey: 'Clé API' } },
 ];
@@ -876,6 +876,25 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
               </Button>
             )}
           </div>
+
+          {config.pms_type === 'mister_booking' && (
+            <div className="mt-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 text-sm space-y-2">
+              <p className="font-medium flex items-center gap-2">
+                <Wifi className="h-4 w-4" /> Temps réel check-in / check-out
+              </p>
+              <p className="text-muted-foreground">
+                Transmettez cette URL de webhook à MisterBooking (action CheckInOut) pour recevoir
+                instantanément les arrivées et départs :
+              </p>
+              <code className="block break-all rounded bg-muted px-2 py-1 text-xs">
+                {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/misterbooking-webhook`}
+              </code>
+              <p className="text-muted-foreground text-xs">
+                Les requêtes sont authentifiées par signature HMAC (en-tête X-Signature). La synchro
+                du ménage (propre / sale) et l'occupation sont automatiques une fois la connexion active.
+              </p>
+            </div>
+          )}
         </CardContent>
         )}
       </Card>

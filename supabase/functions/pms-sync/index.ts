@@ -1,5 +1,39 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
+import { mbBookingToRoom, mbConfigured, mbFetchBookings } from "../_shared/misterbooking.ts";
+
+// ─── MisterBooking ────────────────────────────────────────────────
+// Récupère les chambres occupées du jour depuis l'API connectedDevices.
+// MisterBooking n'expose pas la liste complète des chambres : on connaît
+// uniquement les chambres avec une réservation en cours.
+async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  if (!mbConfigured()) {
+    throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
+  }
+  const hotelId = parseInt(String(credentials.propertyId || ''), 10);
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
+
+  const today = new Date().toISOString().split('T')[0];
+  const bookings = await mbFetchBookings(hotelId);
+  const seen = new Set<string>();
+  const rooms: ExtractedRoom[] = [];
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, today);
+    if (!r.roomNumber) continue; // chambre non affectée
+    const key = r.roomNumber.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rooms.push({
+      roomNumber: r.roomNumber,
+      status: r.status,
+      cleaningType: r.cleaningType,
+      guestName: r.guestName ?? undefined,
+      arrivalDate: r.arrivalDate ?? undefined,
+      departureDate: r.departureDate ?? undefined,
+    });
+  }
+  return rooms;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -449,12 +483,14 @@ function toDbStatus(room: ExtractedRoom): string {
 }
 
 async function extractRoomsForConfig(pmsConfig: any): Promise<ExtractedRoom[]> {
-  const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
+  const credentials = { ...(pmsConfig.credentials as PmsCredentials), propertyId: (pmsConfig.credentials as PmsCredentials)?.propertyId || pmsConfig.property_id, baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
   switch (pmsConfig.pms_type) {
     case 'mews':
       return dedupeExtractedRooms(await fetchMewsRooms(credentials));
     case 'apaleo':
       return dedupeExtractedRooms(await fetchApaleoRooms(credentials));
+    case 'mister_booking':
+      return dedupeExtractedRooms(await fetchMisterBookingRooms(credentials));
     default:
       throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
   }
@@ -630,7 +666,7 @@ async function runRealtimePoll(adminClient: any) {
     .select('*')
     .eq('is_active', true)
     .eq('auto_sync_enabled', true)
-    .in('pms_type', ['mews', 'apaleo']);
+    .in('pms_type', ['mews', 'apaleo', 'mister_booking']);
 
   if (error) throw error;
 
@@ -750,7 +786,7 @@ Deno.serve(async (req) => {
     // Test connection only
     if (action === 'test') {
       try {
-        const credentials = { ...(pmsConfig.credentials as PmsCredentials), baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
+        const credentials = { ...(pmsConfig.credentials as PmsCredentials), propertyId: (pmsConfig.credentials as PmsCredentials)?.propertyId || pmsConfig.property_id, baseUrl: pmsConfig.base_url || (pmsConfig.credentials as PmsCredentials)?.baseUrl } as PmsCredentials;
         let rooms: ExtractedRoom[] = [];
 
         switch (pmsConfig.pms_type) {
@@ -759,6 +795,9 @@ Deno.serve(async (req) => {
             break;
           case 'apaleo':
             rooms = await fetchApaleoRooms(credentials);
+            break;
+          case 'mister_booking':
+            rooms = await fetchMisterBookingRooms(credentials);
             break;
           default:
             return new Response(JSON.stringify({ success: false, error: `Le PMS '${pmsConfig.pms_type}' n'est pas encore supporté pour la synchro API directe.` }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
