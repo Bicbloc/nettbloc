@@ -1,5 +1,39 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
+import { mbBookingToRoom, mbConfigured, mbFetchBookings } from "../_shared/misterbooking.ts";
+
+// ─── MisterBooking ────────────────────────────────────────────────
+// Récupère les chambres occupées du jour depuis l'API connectedDevices.
+// MisterBooking n'expose pas la liste complète des chambres : on connaît
+// uniquement les chambres avec une réservation en cours.
+async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  if (!mbConfigured()) {
+    throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
+  }
+  const hotelId = parseInt(String(credentials.propertyId || ''), 10);
+  if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
+
+  const today = new Date().toISOString().split('T')[0];
+  const bookings = await mbFetchBookings(hotelId);
+  const seen = new Set<string>();
+  const rooms: ExtractedRoom[] = [];
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, today);
+    if (!r.roomNumber) continue; // chambre non affectée
+    const key = r.roomNumber.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rooms.push({
+      roomNumber: r.roomNumber,
+      status: r.status,
+      cleaningType: r.cleaningType,
+      guestName: r.guestName ?? undefined,
+      arrivalDate: r.arrivalDate ?? undefined,
+      departureDate: r.departureDate ?? undefined,
+    });
+  }
+  return rooms;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
