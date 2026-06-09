@@ -831,7 +831,11 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const creds = { ...(config.credentials || {}), baseUrl: config.base_url || (config.credentials as PmsCredentials)?.baseUrl } as PmsCredentials
-      if (config.pms_type === 'mews') {
+      if (config.pms_type === 'mister_booking') {
+        // MisterBooking n'expose pas de plans tarifaires via cette API.
+        return new Response(JSON.stringify({ ok: true, pms: 'mister_booking', rate_plans: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      } else if (config.pms_type === 'mews') {
         const ratePlans = await fetchMewsRatePlans(creds)
         return new Response(JSON.stringify({ ok: true, pms: 'mews', rate_plans: ratePlans }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
