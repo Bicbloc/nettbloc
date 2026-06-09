@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
         .from('hotel_pms_configs')
         .select('*')
         .eq('is_active', true)
-        .in('pms_type', ['mews', 'apaleo']);
+        .in('pms_type', ['mews', 'apaleo', 'mister_booking']);
       const results: any[] = [];
       for (const cfg of (configs || [])) {
         try {

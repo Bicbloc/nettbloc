@@ -666,7 +666,7 @@ async function runRealtimePoll(adminClient: any) {
     .select('*')
     .eq('is_active', true)
     .eq('auto_sync_enabled', true)
-    .in('pms_type', ['mews', 'apaleo']);
+    .in('pms_type', ['mews', 'apaleo', 'mister_booking']);
 
   if (error) throw error;
 
