@@ -16,9 +16,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { APP_ORIGIN } from '@/constants/appUrl';
 import { useToast } from "@/hooks/use-toast";
 
-// Google reCAPTCHA Site Key - Production key should be stored as secret
-// For production, replace with your verified site key from https://www.google.com/recaptcha/admin
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"; // Test key - works for development
+// Google reCAPTCHA Site Key (publishable). Set VITE_RECAPTCHA_SITE_KEY in your
+// environment with a real key from https://www.google.com/recaptcha/admin for
+// production bot protection. Falls back to Google's test key in development only.
+const RECAPTCHA_SITE_KEY =
+  import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 declare global {
   interface Window {
