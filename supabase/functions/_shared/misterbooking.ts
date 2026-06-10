@@ -157,13 +157,13 @@ async function mbProbe(path: string, payload: unknown): Promise<string> {
 export async function mbFetchBookings(hotelId: number): Promise<MbBooking[]> {
   const candidates = [
     'connectedDevices/customers',
-    'houseKeeping/customers',
-    'houseKeeping/rooms',
-    'houseKeeping/list',
-    'houseKeeping/get',
-    'customers',
-    'booking/customers',
-    'reservations/list',
+    'connectedDevices/getCustomers',
+    'connectedDevices/houseKeeping',
+    'connectedDevices/rooms',
+    'connectedDevices/reservations',
+    'houseKeeping/update',
+    'connectedDevices/checkInOut',
+    'connectedDevices/establishments',
   ];
   for (const p of candidates) {
     const r = await mbProbe(p, { hotelId });
