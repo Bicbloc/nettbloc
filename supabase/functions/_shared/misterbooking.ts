@@ -138,6 +138,7 @@ export async function mbFetchBookings(hotelId: number): Promise<MbBooking[]> {
     'connectedDevices/customers',
     { hotelId },
   );
+  console.log('MB_RAW_RESPONSE', JSON.stringify(data).slice(0, 4000));
   return data?.data?.bookingList || [];
 }
 
