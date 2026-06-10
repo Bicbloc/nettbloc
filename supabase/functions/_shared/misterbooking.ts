@@ -132,48 +132,37 @@ export interface MbBooking {
   };
 }
 
-// Probe brut : tente un endpoint sans lever d'exception, retourne status + corps.
-async function mbProbe(path: string, payload: unknown): Promise<string> {
-  try {
-    const rawBody = JSON.stringify(payload);
-    const wsse = await buildWsseHeader();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Wsse': wsse,
-    };
-    const signature = await mbSignBody(rawBody);
-    if (signature) headers['X-Signature'] = signature;
-    const res = await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
-      method: 'POST', headers, body: rawBody,
-    });
-    const text = await res.text();
-    return `[${res.status}] ${text.slice(0, 600)}`;
-  } catch (e) {
-    return `THROW ${e instanceof Error ? e.message : e}`;
-  }
-}
-
 // Récupère les réservations en cours (séjour englobant la date du jour).
+//
+// IMPORTANT : la lecture des clients/réservations passe par l'API
+// `connectedDevices/customers`. Cette API doit être ACTIVÉE par MisterBooking
+// pour les identifiants partenaire (login WSSE). Si elle ne l'est pas,
+// MisterBooking renvoie HTTP 200 avec `{ success:"false", data:{ errors:[{ code:"E1001",
+// description:"You don't have access to this api" }] } }`. Dans ce cas on lève
+// une erreur explicite au lieu de retourner « 0 chambre » silencieusement.
 export async function mbFetchBookings(hotelId: number): Promise<MbBooking[]> {
-  const candidates = [
-    'connectedDevices/customers',
-    'connectedDevices/getCustomers',
-    'connectedDevices/houseKeeping',
-    'connectedDevices/rooms',
-    'connectedDevices/reservations',
-    'houseKeeping/update',
-    'connectedDevices/checkInOut',
-    'connectedDevices/establishments',
-  ];
-  for (const p of candidates) {
-    const r = await mbProbe(p, { hotelId });
-    console.log('MB_PROBE', p, r);
+  const data = await mbPost<{
+    success?: string | boolean;
+    data?: { bookingList?: MbBooking[]; errors?: Array<{ code?: string; description?: string }> };
+    errors?: Array<{ code?: string; description?: string }>;
+  }>('connectedDevices/customers', { hotelId });
+
+  const errors = data?.data?.errors || data?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const first = errors[0];
+    if (first?.code === 'E1001' || /access to this api/i.test(first?.description || '')) {
+      throw new Error(
+        "Accès à l'API MisterBooking refusé (E1001). MisterBooking doit activer " +
+          "l'API « connectedDevices/customers » pour vos identifiants partenaire. " +
+          "Contactez le support MisterBooking pour autoriser la lecture des clients/réservations " +
+          `pour l'établissement ${hotelId}.`,
+      );
+    }
+    throw new Error(
+      `MisterBooking a renvoyé une erreur : ${first?.description || first?.code || 'inconnue'}.`,
+    );
   }
-  const data = await mbPost<{ success: boolean; data?: { bookingList?: MbBooking[] } }>(
-    'connectedDevices/customers',
-    { hotelId },
-  );
-  console.log('MB_RAW_RESPONSE', JSON.stringify(data).slice(0, 4000));
+
   return data?.data?.bookingList || [];
 }
 
