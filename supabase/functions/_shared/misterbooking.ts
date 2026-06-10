@@ -132,8 +132,43 @@ export interface MbBooking {
   };
 }
 
+// Probe brut : tente un endpoint sans lever d'exception, retourne status + corps.
+async function mbProbe(path: string, payload: unknown): Promise<string> {
+  try {
+    const rawBody = JSON.stringify(payload);
+    const wsse = await buildWsseHeader();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Wsse': wsse,
+    };
+    const signature = await mbSignBody(rawBody);
+    if (signature) headers['X-Signature'] = signature;
+    const res = await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
+      method: 'POST', headers, body: rawBody,
+    });
+    const text = await res.text();
+    return `[${res.status}] ${text.slice(0, 600)}`;
+  } catch (e) {
+    return `THROW ${e instanceof Error ? e.message : e}`;
+  }
+}
+
 // Récupère les réservations en cours (séjour englobant la date du jour).
 export async function mbFetchBookings(hotelId: number): Promise<MbBooking[]> {
+  const candidates = [
+    'connectedDevices/customers',
+    'houseKeeping/customers',
+    'houseKeeping/rooms',
+    'houseKeeping/list',
+    'houseKeeping/get',
+    'customers',
+    'booking/customers',
+    'reservations/list',
+  ];
+  for (const p of candidates) {
+    const r = await mbProbe(p, { hotelId });
+    console.log('MB_PROBE', p, r);
+  }
   const data = await mbPost<{ success: boolean; data?: { bookingList?: MbBooking[] } }>(
     'connectedDevices/customers',
     { hotelId },
