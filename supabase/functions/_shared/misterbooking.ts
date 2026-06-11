@@ -223,36 +223,47 @@ async function mbCrmBookings(
   return list;
 }
 
-// Récupère les séjours « en chambre » du jour (occupation actuelle) via l'API
-// CRM. Essaie successivement les valeurs de statut acceptées par MisterBooking
-// et journalise celle qui fonctionne, afin de figer la bonne valeur ensuite.
+// Statuts acceptés par crm/bookings (valeurs confirmées en production) :
+//  - 'new'     : réservations créées entre les deux dates
+//  - 'stay'    : réservations débutant durant la plage (arrivées à venir incluses)
+//  - 'inhouse' : séjours en chambre (arrivée effectuée, départ non encore fait)
+export type MbBookingStatus = 'new' | 'stay' | 'inhouse';
+
+// Récupère les réservations via l'API CRM pour un ou plusieurs statuts, en
+// dédupliquant par bookingId.
 export async function mbFetchBookings(
   hotelId: number,
   startDate?: string,
   endDate?: string,
+  statuses: MbBookingStatus[] = ['inhouse'],
 ): Promise<MbBooking[]> {
   const start = startDate || today();
   const end = endDate || start;
-  const statuses = ['inHouse', 'stays', 'new'];
+  const byId = new Map<number, MbBooking>();
   let lastError: unknown = null;
+  let anySuccess = false;
 
   for (const status of statuses) {
     try {
       const list = await mbCrmBookings(hotelId, start, end, status);
+      anySuccess = true;
+      for (const b of list) {
+        const id = Number(b.bookingId);
+        if (!byId.has(id)) byId.set(id, b);
+      }
       console.log(
         `[misterbooking] crm/bookings hotel=${hotelId} ${start}->${end} status=${status} -> ${list.length} réservations`,
       );
-      if (list.length > 0) return list;
-      lastError = null; // requête valide mais vide : on tente le statut suivant
     } catch (err) {
       lastError = err;
       console.warn(`[misterbooking] crm/bookings status=${status} échec: ${(err as Error).message}`);
     }
   }
 
-  if (lastError) throw lastError;
-  return [];
+  if (!anySuccess && lastError) throw lastError;
+  return Array.from(byId.values());
 }
+
 
 // Met à jour le statut housekeeping (clean/dirty) de chambres côté MisterBooking.
 export async function mbUpdateHousekeeping(
