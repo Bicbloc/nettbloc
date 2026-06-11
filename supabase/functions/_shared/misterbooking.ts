@@ -132,39 +132,138 @@ export interface MbBooking {
   };
 }
 
-// Récupère les réservations en cours (séjour englobant la date du jour).
-//
-// IMPORTANT : la lecture des clients/réservations passe par l'API
-// `connectedDevices/customers`. Cette API doit être ACTIVÉE par MisterBooking
-// pour les identifiants partenaire (login WSSE). Si elle ne l'est pas,
-// MisterBooking renvoie HTTP 200 avec `{ success:"false", data:{ errors:[{ code:"E1001",
-// description:"You don't have access to this api" }] } }`. Dans ce cas on lève
-// une erreur explicite au lieu de retourner « 0 chambre » silencieusement.
-export async function mbFetchBookings(hotelId: number): Promise<MbBooking[]> {
+// Chambre issue du mappage MisterBooking (inventaire complet de l'hôtel).
+export interface MbRoom {
+  roomId: number;
+  roomNumber: string;
+}
+
+const today = () => new Date().toISOString().split('T')[0];
+
+function mbExtractErrors(data: any): Array<{ code?: string; description?: string }> | null {
+  const errors = data?.data?.errors || data?.errors;
+  return Array.isArray(errors) && errors.length > 0 ? errors : null;
+}
+
+// ─── Mapping API (mappingRoomRate) ────────────────────────────────
+// Retourne TOUT l'inventaire de chambres de l'hôtel (roomId + numéro), via les
+// services d'hébergement. C'est la source documentée du `roomId` utilisé par
+// l'API housekeeping. Corps de requête : { hotelId }.
+export async function mbFetchRoomMapping(hotelId: number): Promise<MbRoom[]> {
   const data = await mbPost<{
     success?: string | boolean;
-    data?: { bookingList?: MbBooking[]; errors?: Array<{ code?: string; description?: string }> };
+    data?: {
+      rooms?: Array<{ roomList?: Array<{ id?: number; name?: string }> }>;
+      errors?: Array<{ code?: string; description?: string }>;
+    };
     errors?: Array<{ code?: string; description?: string }>;
-  }>('connectedDevices/customers', { hotelId });
+  }>('mappingRoomRate', { hotelId });
 
-  const errors = data?.data?.errors || data?.errors;
-  if (Array.isArray(errors) && errors.length > 0) {
+  const errors = mbExtractErrors(data);
+  if (errors) {
     const first = errors[0];
-    if (first?.code === 'E1001' || /access to this api/i.test(first?.description || '')) {
-      throw new Error(
-        "Accès à l'API MisterBooking refusé (E1001). MisterBooking doit activer " +
-          "l'API « connectedDevices/customers » pour vos identifiants partenaire. " +
-          "Contactez le support MisterBooking pour autoriser la lecture des clients/réservations " +
-          `pour l'établissement ${hotelId}.`,
-      );
-    }
     throw new Error(
-      `MisterBooking a renvoyé une erreur : ${first?.description || first?.code || 'inconnue'}.`,
+      `MisterBooking (mappingRoomRate) a renvoyé une erreur : ${first?.description || first?.code || 'inconnue'}.`,
     );
   }
 
-  return data?.data?.bookingList || [];
+  const services = data?.data?.rooms || [];
+  const out: MbRoom[] = [];
+  const seen = new Set<number>();
+  for (const svc of services) {
+    for (const r of svc.roomList || []) {
+      const num = String(r.name ?? '').trim();
+      const id = Number(r.id);
+      if (!num || !id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ roomId: id, roomNumber: num });
+    }
+  }
+  console.log(`[misterbooking] mappingRoomRate hotel=${hotelId} -> ${out.length} chambres`);
+  return out;
 }
+
+// ─── CRM API (crm/bookings) ───────────────────────────────────────
+// Récupère les réservations sur une plage de dates. `data.bookings` est un
+// OBJET indexé par bookingId (pas un tableau). Le paramètre `status` accepte
+// (cf. doc) : « new » (nouvelles réservations), « stays » (séjours débutant sur
+// la plage), et les séjours « en chambre » (arrivée effectuée, pas encore de
+// départ). On essaie plusieurs valeurs et on conserve la première qui répond.
+async function mbCrmBookings(
+  hotelId: number,
+  startDate: string,
+  endDate: string,
+  status: string,
+): Promise<MbBooking[]> {
+  const data = await mbPost<{
+    success?: string | boolean;
+    data?: {
+      bookings?: Record<string, MbBooking> | MbBooking[];
+      errors?: Array<{ code?: string; description?: string }>;
+    };
+    errors?: Array<{ code?: string; description?: string }>;
+  }>('crm/bookings', { hotelId, startDate, endDate, status });
+
+  const errors = mbExtractErrors(data);
+  if (errors) {
+    const first = errors[0];
+    const e = new Error(
+      `MisterBooking (crm/bookings status=${status}) : ${first?.description || first?.code || 'inconnue'}.`,
+    );
+    (e as any).mbCode = first?.code;
+    throw e;
+  }
+
+  const raw = data?.data?.bookings;
+  const list: MbBooking[] = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object'
+      ? Object.values(raw)
+      : [];
+  return list;
+}
+
+// Statuts acceptés par crm/bookings (valeurs confirmées en production) :
+//  - 'new'     : réservations créées entre les deux dates
+//  - 'stay'    : réservations débutant durant la plage (arrivées à venir incluses)
+//  - 'inhouse' : séjours en chambre (arrivée effectuée, départ non encore fait)
+export type MbBookingStatus = 'new' | 'stay' | 'inhouse';
+
+// Récupère les réservations via l'API CRM pour un ou plusieurs statuts, en
+// dédupliquant par bookingId.
+export async function mbFetchBookings(
+  hotelId: number,
+  startDate?: string,
+  endDate?: string,
+  statuses: MbBookingStatus[] = ['inhouse'],
+): Promise<MbBooking[]> {
+  const start = startDate || today();
+  const end = endDate || start;
+  const byId = new Map<number, MbBooking>();
+  let lastError: unknown = null;
+  let anySuccess = false;
+
+  for (const status of statuses) {
+    try {
+      const list = await mbCrmBookings(hotelId, start, end, status);
+      anySuccess = true;
+      for (const b of list) {
+        const id = Number(b.bookingId);
+        if (!byId.has(id)) byId.set(id, b);
+      }
+      console.log(
+        `[misterbooking] crm/bookings hotel=${hotelId} ${start}->${end} status=${status} -> ${list.length} réservations`,
+      );
+    } catch (err) {
+      lastError = err;
+      console.warn(`[misterbooking] crm/bookings status=${status} échec: ${(err as Error).message}`);
+    }
+  }
+
+  if (!anySuccess && lastError) throw lastError;
+  return Array.from(byId.values());
+}
+
 
 // Met à jour le statut housekeeping (clean/dirty) de chambres côté MisterBooking.
 export async function mbUpdateHousekeeping(
@@ -211,4 +310,56 @@ export function mbBookingToRoom(b: MbBooking, today: string) {
     arrivalDate: arrival || null,
     departureDate: departure || null,
   };
+}
+
+export interface MbExtractedRoom {
+  roomNumber: string;
+  roomId?: number;
+  status: string;
+  cleaningType: string;
+  guestName?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+}
+
+// Construit la liste complète des chambres : on part de l'inventaire (mapping)
+// puis on superpose l'occupation issue des réservations en cours. Les chambres
+// sans réservation restent « à nettoyer » (règle registre du projet).
+export function mbBuildRoomList(
+  mapping: MbRoom[],
+  bookings: MbBooking[],
+  todayStr: string,
+): MbExtractedRoom[] {
+  const byNumber = new Map<string, MbExtractedRoom>();
+
+  // 1. Inventaire complet, par défaut « à nettoyer ».
+  for (const m of mapping) {
+    const num = String(m.roomNumber || '').trim();
+    if (!num) continue;
+    byNumber.set(num.toLowerCase(), {
+      roomNumber: num,
+      roomId: m.roomId,
+      status: 'needs-cleaning',
+      cleaningType: 'none',
+    });
+  }
+
+  // 2. Superposition des séjours actuels.
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, todayStr);
+    if (!r.roomNumber) continue;
+    const key = r.roomNumber.toLowerCase();
+    const existing = byNumber.get(key);
+    byNumber.set(key, {
+      roomNumber: r.roomNumber,
+      roomId: r.roomId || existing?.roomId,
+      status: r.status,
+      cleaningType: r.cleaningType,
+      guestName: r.guestName ?? undefined,
+      arrivalDate: r.arrivalDate ?? undefined,
+      departureDate: r.departureDate ?? undefined,
+    });
+  }
+
+  return Array.from(byNumber.values());
 }

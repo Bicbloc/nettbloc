@@ -1,19 +1,35 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
-import { mbConfigured, mbFetchBookings } from "../_shared/misterbooking.ts";
+import { mbConfigured, mbFetchBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
-// MisterBooking : l'API connectedDevices ne renvoie que les séjours en cours
-// (englobant aujourd'hui). On en déduit l'occupation actuelle et la projection
-// des séjours déjà entamés ; les arrivées futures ne sont pas disponibles.
+// MisterBooking : lecture via l'API CRM (crm/bookings) sur la fenêtre de
+// prévision, et l'inventaire total via l'API Mapping (mappingRoomRate).
+// L'API Connected Devices n'est PAS utilisée.
 async function fetchMisterBooking(credentials: { propertyId?: string }): Promise<{ stays: { start: string; end: string }[]; totalRooms: number }> {
   if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
   const hotelId = parseInt(String(credentials.propertyId || ''), 10);
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant.');
-  const bookings = await mbFetchBookings(hotelId);
+
+  const start = new Date().toISOString().split('T')[0];
+  // crm/bookings impose un écart < 1 mois entre startDate et endDate : on borne
+  // la fenêtre à 27 jours par sécurité.
+  const windowDays = Math.min(HORIZON_DAYS - 1, 27);
+  const end = new Date(Date.now() + windowDays * 86400000).toISOString().split('T')[0];
+
+  const [mapping, bookings] = await Promise.all([
+    mbFetchRoomMapping(hotelId).catch((e) => {
+      console.warn(`[forecast/mb] mapping échec: ${(e as Error).message}`);
+      return [] as { roomId: number; roomNumber: string }[];
+    }),
+    // « inhouse » = séjours en cours, « stay » = arrivées à venir sur la fenêtre.
+    mbFetchBookings(hotelId, start, end, ['inhouse', 'stay']),
+  ]);
+
+
   const stays = bookings
     .filter((b) => (b.startDate && b.endDate))
     .map((b) => ({ start: b.startDate.split('T')[0], end: b.endDate.split('T')[0] }));
-  return { stays, totalRooms: 0 };
+  return { stays, totalRooms: mapping.length };
 }
 
 const corsHeaders = {
