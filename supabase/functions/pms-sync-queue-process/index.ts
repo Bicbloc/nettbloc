@@ -164,11 +164,11 @@ async function loadHotelContext(admin: any, hotelId: string): Promise<HotelConte
     if (!mbConfigured()) throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
     const mbHotelId = parseInt(String(creds.propertyId || config.property_id || ''), 10);
     if (!mbHotelId) throw new Error('ID établissement MisterBooking manquant');
-    // Construit la table chambre -> roomId à partir des réservations en cours.
-    const bookings = await mbFetchBookings(mbHotelId);
+    // Construit la table chambre -> roomId à partir du mapping (inventaire complet).
+    const mapping = await mbFetchRoomMapping(mbHotelId);
     const byName = new Map<string, number>();
-    for (const b of bookings) {
-      if (b.roomNumber && b.roomId) byName.set(String(b.roomNumber).trim().toLowerCase(), b.roomId);
+    for (const m of mapping) {
+      if (m.roomNumber && m.roomId) byName.set(String(m.roomNumber).trim().toLowerCase(), m.roomId);
     }
     const ctx: HotelContext = { pmsType: 'mister_booking', mbHotelId, mbRoomIdByName: byName };
     hotelCache.set(hotelId, ctx);
