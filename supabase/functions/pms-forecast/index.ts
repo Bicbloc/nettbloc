@@ -11,16 +11,20 @@ async function fetchMisterBooking(credentials: { propertyId?: string }): Promise
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant.');
 
   const start = new Date().toISOString().split('T')[0];
-  // crm/bookings impose un écart < 1 mois entre startDate et endDate.
-  const end = new Date(Date.now() + (HORIZON_DAYS - 1) * 86400000).toISOString().split('T')[0];
+  // crm/bookings impose un écart < 1 mois entre startDate et endDate : on borne
+  // la fenêtre à 27 jours par sécurité.
+  const windowDays = Math.min(HORIZON_DAYS - 1, 27);
+  const end = new Date(Date.now() + windowDays * 86400000).toISOString().split('T')[0];
 
   const [mapping, bookings] = await Promise.all([
     mbFetchRoomMapping(hotelId).catch((e) => {
       console.warn(`[forecast/mb] mapping échec: ${(e as Error).message}`);
       return [] as { roomId: number; roomNumber: string }[];
     }),
-    mbFetchBookings(hotelId, start, end),
+    // « inhouse » = séjours en cours, « stay » = arrivées à venir sur la fenêtre.
+    mbFetchBookings(hotelId, start, end, ['inhouse', 'stay']),
   ]);
+
 
   const stays = bookings
     .filter((b) => (b.startDate && b.endDate))
