@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
-import { mbBookingToRoom, mbConfigured, mbFetchBookings } from "../_shared/misterbooking.ts";
+import { mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
 // ─── MisterBooking ────────────────────────────────────────────────
 // Récupère les chambres occupées du jour depuis l'API connectedDevices.
