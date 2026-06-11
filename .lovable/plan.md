@@ -1,65 +1,50 @@
-# Webhook Mews — synchronisation temps réel
+# Fix MisterBooking "0 rooms detected" — switch to Mapping + CRM APIs
 
-## Objectif
-Permettre à Mews de notifier nettobloc en temps réel (au lieu du polling actuel) : quand un client fait check-in/check-out ou qu'une chambre change d'état côté Mews, l'information remonte immédiatement dans l'application — comme pour MisterBooking et Apaleo.
+## Root cause
 
-## Comment Mews envoie les événements (vérifié dans la doc)
-Mews envoie un POST avec ce format (« General Webhook ») :
-```json
-{
-  "EnterpriseId": "851df8c8-...",
-  "IntegrationId": "c8bee838-...",
-  "Events": [
-    { "Discriminator": "ServiceOrderUpdated", "Value": { "Id": "..." } },
-    { "Discriminator": "ResourceUpdated",     "Value": { "Id": "..." } }
-  ]
-}
-```
-Points clés :
-- Le message identifie l'établissement via `EnterpriseId`.
-- Chaque événement ne contient que l'ID de l'entité, **pas le détail** → il faut rappeler l'API Mews pour récupérer l'état réel.
-- Mews attend une réponse **rapide** (sinon il renvoie le message en boucle) → on répond `200` tout de suite et on traite en arrière-plan.
+Our code reads rooms/bookings from `connectedDevices/customers` (Connected Devices API), which these partner credentials are **not** granted. The docs you uploaded confirm the APIs you DO have, and the correct replacements:
 
-## Ce qui sera construit
+- **Mapping API** — `POST /misterbooking/mappingRoomRate` → returns the **full room list** (every room with `id` + `name` = room number), grouped by accommodation service. Request body: `{ "hotelId": 1934 }`.
+- **CRM API** — `POST /misterbooking/crm/bookings` → returns current reservations with `roomNumber`, `roomId`, `startDate`, `endDate`, `checkIn`, `checkOut`, `status`, `customerId`. Request body: `{ "hotelId", "startDate", "endDate", "status" }`.
+- **Housekeeping API** — `POST /misterbooking/houseKeeping/update` (write-only, already used) → push clean/dirty status. No read endpoint exists, so the room list must come from Mapping.
 
-### 1. Nouvelle edge function `mews-webhook` (publique, sans JWT)
-- Reçoit le POST de Mews, répond `200` immédiatement.
-- Traite en arrière-plan (`EdgeRuntime.waitUntil`) :
-  - Ne garde que les événements utiles : `ServiceOrderUpdated` (réservations → check-in/out) et `ResourceUpdated` (état chambre). Ignore le reste.
-  - Identifie l'hôtel nettobloc correspondant à `EnterpriseId`.
-  - Déclenche une re-synchronisation ciblée de cet hôtel via `pms-sync`.
-- URL à renseigner côté Mews :
-  ```
-  https://rarhqnvvbjzfdevnghnz.supabase.co/functions/v1/mews-webhook
-  ```
+Auth is unchanged: same WSSE `X-Wsse` header + HMAC `X-Signature` via the existing `mbPost`.
 
-### 2. Association `EnterpriseId` → hôtel
-- Lecture des configs PMS Mews actives.
-- Si l'`EnterpriseId` n'est pas encore connu pour une config, appel unique à `configuration/get` (Mews) pour le récupérer, puis mémorisation dans `credentials.enterpriseId` afin d'éviter de refaire l'appel à chaque webhook.
-- Correspondance ensuite instantanée.
+## Credentials
 
-### 3. Nouvelle action privilégiée `sync_hotel` dans `pms-sync`
-- Action protégée (auth service-role / cron, jamais anonyme).
-- Synchronise **un seul hôtel** en réutilisant tout le pipeline existant `performSync` (récupération chambres + réservations Mews, upsert `rooms`, logs, propositions de registre).
-- Appelée par `mews-webhook`.
+You provided new partner credentials — store/refresh as secrets:
+- `MISTERBOOKING_WSSE_LOGIN` = `237`
+- `MISTERBOOKING_WSSE_PASSWORD` = `Y2v6Quq9jWME`
+- `MISTERBOOKING_HMAC_SECRET` = `542ba9effef8037839a0911e13e9832036bab2620687147126c460e08e383ef4`
 
-### 4. Configuration
-- Déclaration de `mews-webhook` dans `supabase/config.toml` avec `verify_jwt = false` (endpoint public appelé par Mews).
-- Mise à jour de la mémoire projet (intégration Mews : webhook temps réel).
+## Changes
 
-## Comportement résultant
-- **Check-out** détecté → chambre passe en « à blanc » immédiatement.
-- **Check-in** détecté → chambre « occupée / recouche ».
-- **Changement d'état housekeeping côté Mews** → reflété dans nettobloc.
-- Le **polling existant** (cron `pms-sync` action `poll`) reste actif en repli, donc aucune régression même si un webhook est manqué.
+### 1. `supabase/functions/_shared/misterbooking.ts`
+- **Add `mbFetchRoomMapping(hotelId)`** → calls `mappingRoomRate`, flattens `data.rooms[].roomList[]` into `{ roomId, roomNumber }[]` (the complete room inventory).
+- **Replace `mbFetchBookings`** to call `crm/bookings` instead of `connectedDevices/customers`:
+  - Send `{ hotelId, startDate: today, endDate: today, status }`. The `status` param selects in-house stays (docs list: new / stays / in-house "Séjours en chambre"). Implementation tries the in-house value first, falling back to `stays`, logging the raw response so we can pin the exact accepted string from the Edge logs.
+  - Response shape change: `data.bookings` is an **object keyed by bookingId** (not an array) — map `Object.values()` into the existing `MbBooking[]`.
+  - Keep E-code error detection (E01/E02/E03) with clear French messages.
+- **Add `mbBuildRoomList(mapping, bookings, today)`**: start from the full mapping (every room), then overlay each current booking's status/cleaning type via the existing `mbBookingToRoom`. Rooms with no current booking default to "needs cleaning" per project registry rules. This guarantees a non-zero room list even when there are few active stays.
 
-## Détails techniques
-- Pas de signature HMAC dans le General Webhook Mews (contrairement à MisterBooking) : la sécurité repose sur l'URL + la validation par `EnterpriseId` connu. Un événement dont l'`EnterpriseId` ne correspond à aucune config Mews active est ignoré.
-- Dé-duplication : un seul `sync_hotel` par hôtel et par message webhook, même si plusieurs événements arrivent ensemble.
-- Aucune migration de base de données nécessaire (l'`enterpriseId` est stocké dans le JSON `credentials` existant).
+### 2. `supabase/functions/pms-sync/index.ts`
+- `fetchMisterBookingRooms` now: fetch mapping + bookings, merge with `mbBuildRoomList`, return the full room set (so "Test connection" shows every room, with occupancy/cleaning where guests are present).
 
-## Fichiers concernés
-- `supabase/functions/mews-webhook/index.ts` (nouveau)
-- `supabase/functions/pms-sync/index.ts` (ajout action `sync_hotel`)
-- `supabase/config.toml` (déclaration de la fonction)
-- Mémoire projet (intégration Mews)
+### 3. `supabase/functions/pms-sync-queue-process/index.ts`
+- Its housekeeping push needs `roomId` per room. Resolve room numbers → `roomId` using `mbFetchRoomMapping` (Mapping API) instead of the old booking lookup, then call `houseKeeping/update`.
+
+### 4. `supabase/functions/pms-forecast/index.ts`
+- Switch to `crm/bookings` with `status` = stays over the forecast window `[today, today+N]`, mapping `Object.values(data.bookings)`. Gives real 7/14/30-day forecast from the CRM API.
+
+### 5. Memory
+- Update **MisterBooking Integration** memory: reads via Mapping (`mappingRoomRate`) for the room list + CRM (`crm/bookings`) for current stays/forecast; Connected Devices is NOT used. Housekeeping API is write-only.
+
+## Validation
+1. Update the three secrets.
+2. Deploy `pms-sync`, `pms-forecast`, `pms-sync-queue-process`.
+3. Call `pms-sync` for hotel 1934 and read Edge logs to confirm the room count and the accepted `crm/bookings` status value; pin it.
+4. Confirm the UI "Test connection" lists rooms (and shows occupied/checkout where stays exist).
+
+## Technical notes
+- `mappingRoomRate` is the documented source of `roomId` (referenced by the housekeeping update endpoint), so it ties reads and writes together cleanly.
+- Date window for current stays is `[today, today]`; we still client-filter to `startDate <= today <= endDate` for safety.
