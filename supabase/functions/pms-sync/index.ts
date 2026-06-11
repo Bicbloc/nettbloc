@@ -3,9 +3,10 @@ import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAu
 import { mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
 // ─── MisterBooking ────────────────────────────────────────────────
-// Récupère les chambres occupées du jour depuis l'API connectedDevices.
-// MisterBooking n'expose pas la liste complète des chambres : on connaît
-// uniquement les chambres avec une réservation en cours.
+// Lecture via l'API Mapping (inventaire complet des chambres) + l'API CRM
+// (séjours en cours). L'API Connected Devices n'est PAS utilisée (non
+// accordée à ces identifiants partenaire). On renvoie TOUTES les chambres,
+// avec l'occupation superposée là où un client est présent.
 async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
   if (!mbConfigured()) {
     throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
@@ -14,24 +15,23 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
 
   const today = new Date().toISOString().split('T')[0];
-  const bookings = await mbFetchBookings(hotelId);
-  const seen = new Set<string>();
-  const rooms: ExtractedRoom[] = [];
-  for (const b of bookings) {
-    const r = mbBookingToRoom(b, today);
-    if (!r.roomNumber) continue; // chambre non affectée
-    const key = r.roomNumber.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rooms.push({
+  const [mapping, bookings] = await Promise.all([
+    mbFetchRoomMapping(hotelId),
+    mbFetchBookings(hotelId),
+  ]);
+
+  const merged = mbBuildRoomList(mapping, bookings, today);
+  const rooms: ExtractedRoom[] = merged
+    .filter((r) => r.roomNumber)
+    .map((r) => ({
       roomNumber: r.roomNumber,
       status: r.status,
       cleaningType: r.cleaningType,
-      guestName: r.guestName ?? undefined,
-      arrivalDate: r.arrivalDate ?? undefined,
-      departureDate: r.departureDate ?? undefined,
-    });
-  }
+      guestName: r.guestName,
+      arrivalDate: r.arrivalDate,
+      departureDate: r.departureDate,
+    }));
+  console.log(`[pms-sync] MisterBooking hotel=${hotelId}: ${rooms.length} chambres (mapping=${mapping.length}, séjours=${bookings.length})`);
   return rooms;
 }
 
