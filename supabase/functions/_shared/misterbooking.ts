@@ -300,3 +300,55 @@ export function mbBookingToRoom(b: MbBooking, today: string) {
     departureDate: departure || null,
   };
 }
+
+export interface MbExtractedRoom {
+  roomNumber: string;
+  roomId?: number;
+  status: string;
+  cleaningType: string;
+  guestName?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+}
+
+// Construit la liste complète des chambres : on part de l'inventaire (mapping)
+// puis on superpose l'occupation issue des réservations en cours. Les chambres
+// sans réservation restent « à nettoyer » (règle registre du projet).
+export function mbBuildRoomList(
+  mapping: MbRoom[],
+  bookings: MbBooking[],
+  todayStr: string,
+): MbExtractedRoom[] {
+  const byNumber = new Map<string, MbExtractedRoom>();
+
+  // 1. Inventaire complet, par défaut « à nettoyer ».
+  for (const m of mapping) {
+    const num = String(m.roomNumber || '').trim();
+    if (!num) continue;
+    byNumber.set(num.toLowerCase(), {
+      roomNumber: num,
+      roomId: m.roomId,
+      status: 'needs-cleaning',
+      cleaningType: 'none',
+    });
+  }
+
+  // 2. Superposition des séjours actuels.
+  for (const b of bookings) {
+    const r = mbBookingToRoom(b, todayStr);
+    if (!r.roomNumber) continue;
+    const key = r.roomNumber.toLowerCase();
+    const existing = byNumber.get(key);
+    byNumber.set(key, {
+      roomNumber: r.roomNumber,
+      roomId: r.roomId || existing?.roomId,
+      status: r.status,
+      cleaningType: r.cleaningType,
+      guestName: r.guestName ?? undefined,
+      arrivalDate: r.arrivalDate ?? undefined,
+      departureDate: r.departureDate ?? undefined,
+    });
+  }
+
+  return Array.from(byNumber.values());
+}
