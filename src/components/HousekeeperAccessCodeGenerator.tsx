@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Copy, Key } from 'lucide-react';
+import { APP_ORIGIN } from '@/constants/appUrl';
 
 interface HousekeeperAccessCodeGeneratorProps {
   hotelId: string;
