@@ -844,6 +844,7 @@ Deno.serve(async (req) => {
             cleaningType: r.cleaningType,
             condition: r.condition ?? null,
             guestName: r.guestName ?? null,
+            guestCount: r.guestCount ?? null,
             arrivalDate: r.arrivalDate ?? null,
             departureDate: r.departureDate ?? null,
           })),
