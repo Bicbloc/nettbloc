@@ -109,6 +109,7 @@ interface ExtractedRoom {
   floor?: number;
   roomType?: string;
   guestName?: string;
+  guestCount?: number;
   arrivalDate?: string;
   departureDate?: string;
   notes?: string;
