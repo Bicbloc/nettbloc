@@ -265,6 +265,47 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
     }
   };
 
+  const [resettingUser, setResettingUser] = useState<AllUser | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const resetUserData = async (user: AllUser) => {
+    setIsResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Non authentifié');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId: user.id }),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || `Erreur ${response.status}`);
+      }
+
+      toast({
+        title: "Compte réinitialisé ✅",
+        description: `Données effacées : ${result.cleared_from?.join(', ') || 'aucune donnée'}`,
+      });
+      setResettingUser(null);
+      loadUsers();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: error.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const toggleSuspend = async (userId: string, suspend: boolean, reason?: string) => {
     try {
       const { error } = await supabase
@@ -851,6 +892,15 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                                 )}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {user.user_type === 'establishment' && (
+                                <DropdownMenuItem
+                                  onClick={() => setResettingUser(user)}
+                                  className="text-orange-600 focus:text-orange-600"
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Réinitialiser le compte
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => setDeletingUser(user)}
                                 className="text-destructive focus:text-destructive"
@@ -965,6 +1015,37 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? 'Suppression...' : 'Supprimer définitivement'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Account Confirmation Dialog */}
+      <AlertDialog open={!!resettingUser} onOpenChange={(open) => !open && setResettingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-orange-600">⚠️ Réinitialisation du compte</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Vous êtes sur le point de réinitialiser le compte de <strong>{resettingUser?.email}</strong>.</p>
+              <p>Le compte et les hôtels seront conservés, mais toutes les données suivantes seront <strong>définitivement effacées</strong> :</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                <li>Chambres, affectations et registre des chambres</li>
+                <li>Données PMS (en attente, file de synchro, prévisions)</li>
+                <li>Journaux, rapports et instructions quotidiennes</li>
+                <li>Tâches, incidents, objets trouvés et notifications</li>
+                <li>Inventaires et livraisons de linge</li>
+              </ul>
+              <p className="font-semibold text-orange-600">Attention : cette action est irréversible !</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResetting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resettingUser && resetUserData(resettingUser)}
+              disabled={isResetting}
+              className="bg-orange-600 text-white hover:bg-orange-600/90"
+            >
+              {isResetting ? 'Réinitialisation...' : 'Réinitialiser'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
