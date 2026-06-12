@@ -367,15 +367,15 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
 
             {/* Action buttons */}
             {room.status !== 'clean' && (
-              <div className="flex flex-col gap-2">
+              <div className="flex shrink-0 flex-col gap-1.5">
                 <IncidentReportWizard 
                   hotelId={hotelId} 
                   userType="housekeeper"
                   userName={housekeeperName}
                   defaultLocation={room.room_number}
                   trigger={
-                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un incident">
-                      <AlertCircle className="h-5 w-5" />
+                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" title="Signaler un incident">
+                      <AlertCircle className="h-4 w-4" />
                     </Button>
                   }
                 />
@@ -389,8 +389,8 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                   guestStaying={room.guest_staying}
                   guestCheckedOut={room.guest_checked_out}
                   trigger={
-                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un objet trouvé">
-                      <Package className="h-5 w-5" />
+                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" title="Signaler un objet trouvé">
+                      <Package className="h-4 w-4" />
                     </Button>
                   }
                 />
