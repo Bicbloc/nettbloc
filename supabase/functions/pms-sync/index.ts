@@ -28,6 +28,7 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
       status: r.status,
       cleaningType: r.cleaningType,
       guestName: r.guestName,
+      guestCount: r.guestCount,
       arrivalDate: r.arrivalDate,
       departureDate: r.departureDate,
     }));
