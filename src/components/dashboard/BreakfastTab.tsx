@@ -71,6 +71,13 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     loadBreakfastConfig(currentHotelId)
       .then(setConfig)
       .finally(() => setLoading(false));
+    supabase
+      .from('hotel_pms_configs')
+      .select('pms_type')
+      .eq('hotel_id', currentHotelId)
+      .eq('is_active', true)
+      .maybeSingle()
+      .then(({ data }) => setPmsType(data?.pms_type ?? null));
   }, [currentHotelId]);
 
   // Charge les chambres du registre + l'inclusion PDJ récupérée du PMS.
