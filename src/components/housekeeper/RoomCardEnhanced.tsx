@@ -292,7 +292,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 
                 {/* Priority badge */}
                 {room.cleaning_priority && room.cleaning_priority > 1 && (
-                  <Badge className={`text-sm font-semibold ${
+                  <Badge className={`text-xs font-semibold ${
                     room.cleaning_priority === 3 
                       ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg' 
                       : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white'
@@ -329,7 +329,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 {/* Cleaning type badge */}
                 {room.cleaning_type && (
                   <Badge 
-                    className={`text-sm font-medium ${isFullCleaning(room.cleaning_type) 
+                    className={`text-xs font-medium ${isFullCleaning(room.cleaning_type) 
                       ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white' 
                       : 'bg-gradient-to-r from-sky-400 to-blue-500 text-white'
                     }`}
