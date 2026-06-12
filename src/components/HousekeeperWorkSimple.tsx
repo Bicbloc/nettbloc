@@ -1182,13 +1182,58 @@ const HousekeeperWorkContent: React.FC = () => {
       <HousekeeperHeader
         hotelName={hotel?.name || 'Mon Hôtel'}
         housekeeperName={housekeeperName}
+        governessName={governessName}
         isConnected={isConnected}
         newRoomsCount={newRoomsCount}
         onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
         onLogout={handleLogout}
       />
 
+      {/* Étape obligatoire : pointage à l'ouverture de la session */}
+      {!startTime && (
+        <div className="flex-1 overflow-y-auto overscroll-contain flex items-center justify-center px-6 pb-24">
+          <Card className="w-full max-w-sm p-6 text-center space-y-5 rounded-3xl shadow-lg">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+              <Timer className="h-8 w-8 text-emerald-600" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold">Pointez votre arrivée</h2>
+              <p className="text-sm text-muted-foreground">
+                C'est la première étape obligatoire pour démarrer votre session.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/50 p-3 space-y-1 text-sm">
+              <div className="flex items-center justify-center gap-1.5 font-medium">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                {hotel?.name || 'Mon Hôtel'}
+              </div>
+              {governessName && (
+                <p className="text-xs text-muted-foreground">
+                  Gouvernante du jour : <span className="font-semibold text-foreground">{governessName}</span>
+                </p>
+              )}
+            </div>
+            <Button
+              size="lg"
+              onClick={handleStartPointage}
+              className="w-full h-12 rounded-2xl gap-2 bg-emerald-500 hover:bg-emerald-600 text-base font-bold active:scale-[0.98]"
+            >
+              <Play className="h-5 w-5 fill-current" />
+              Commencer ma journée
+            </Button>
+            <button
+              onClick={() => navigate('/housekeeper/hotels')}
+              className="text-xs text-muted-foreground underline underline-offset-2"
+            >
+              Changer d'établissement
+            </button>
+          </Card>
+        </div>
+      )}
+
+      {startTime && (
       <div className="flex-1 overflow-y-auto overscroll-contain">
+
       {/* Notification banner compacte et glissable */}
       <StaffNotificationBanner hotelId={hotelId || undefined} />
 
