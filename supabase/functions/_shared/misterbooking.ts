@@ -291,6 +291,23 @@ export function mbGuestName(b: MbBooking): string | null {
   return name || null;
 }
 
+const toNum = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+// Nombre d'occupants (pax) d'une réservation. On additionne adultes + enfants +
+// bébés si ces champs sont présents, sinon on retombe sur un champ pax/occupancy.
+export function mbGuestCount(b: MbBooking): number | null {
+  const adults = toNum(b.adults ?? b.nbAdults);
+  const children = toNum(b.children ?? b.nbChildren);
+  const babies = toNum(b.babies ?? b.nbBabies);
+  const sum = adults + children + babies;
+  if (sum > 0) return sum;
+  const direct = toNum(b.pax ?? b.nbPax ?? b.occupancy);
+  return direct > 0 ? direct : null;
+}
+
 const truthy = (v: boolean | number | undefined) => v === true || v === 1 || (v as unknown) === '1';
 
 // Convertit une réservation MisterBooking en chambre opérationnelle Nettobloc.
