@@ -512,19 +512,41 @@ export function mbBuildRoomList(
     });
   }
 
+  // Index roomId -> numéro pour résoudre les réservations dont `roomNumber`
+  // est vide (crm/bookings renvoie parfois seulement `roomId`).
+  const numberById = new Map<number, string>();
+  for (const m of mapping) {
+    if (m.roomId) numberById.set(Number(m.roomId), String(m.roomNumber || '').trim());
+  }
+
+  // Priorité de superposition quand plusieurs réservations touchent la même
+  // chambre (ex. départ + arrivée le même jour) : le DÉPART gagne (la chambre
+  // doit repasser « à blanc »), puis l'arrivée, puis la recouche.
+  const rank = (s: string) => (s === 'checkout' ? 3 : s === 'arrival' ? 2 : s === 'occupied' ? 1 : 0);
+
   // 2. Superposition des séjours actuels.
   for (const b of bookings) {
     const r = mbBookingToRoom(b, todayStr);
+    if (!r.roomNumber && b.roomId) r.roomNumber = numberById.get(Number(b.roomId)) || '';
     if (!r.roomNumber) continue;
     const key = r.roomNumber.toLowerCase();
     const existing = byNumber.get(key);
+
+    if (existing && rank(existing.status) > rank(r.status)) {
+      // On garde le statut prioritaire (départ), mais on complète le client
+      // (ex. nom de l'arrivant sur un départ/arrivée le même jour).
+      if (!existing.guestName && r.guestName) existing.guestName = r.guestName;
+      if (!existing.guestCount && r.guestCount) existing.guestCount = r.guestCount ?? undefined;
+      continue;
+    }
+
     byNumber.set(key, {
       roomNumber: r.roomNumber,
       roomId: r.roomId || existing?.roomId,
       status: r.status,
       cleaningType: r.cleaningType,
-      guestName: r.guestName ?? undefined,
-      guestCount: r.guestCount ?? undefined,
+      guestName: r.guestName ?? existing?.guestName,
+      guestCount: r.guestCount ?? existing?.guestCount,
       arrivalDate: r.arrivalDate ?? undefined,
       departureDate: r.departureDate ?? undefined,
     });
