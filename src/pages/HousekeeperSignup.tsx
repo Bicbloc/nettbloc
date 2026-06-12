@@ -19,9 +19,17 @@ export default function HousekeeperSignup() {
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { language } = useLanguage();
   const isEn = language === 'en';
+
+  useEffect(() => {
+    const prefillEmail = searchParams.get('email');
+    const prefillName = searchParams.get('name');
+    if (prefillEmail) setEmail(prefillEmail);
+    if (prefillName) setName(prefillName);
+  }, [searchParams]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
