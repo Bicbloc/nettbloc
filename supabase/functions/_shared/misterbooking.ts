@@ -334,6 +334,7 @@ export function mbBookingToRoom(b: MbBooking, today: string) {
     status,
     cleaningType,
     guestName: mbGuestName(b),
+    guestCount: mbGuestCount(b),
     arrivalDate: arrival || null,
     departureDate: departure || null,
   };
@@ -345,6 +346,7 @@ export interface MbExtractedRoom {
   status: string;
   cleaningType: string;
   guestName?: string;
+  guestCount?: number;
   arrivalDate?: string;
   departureDate?: string;
 }
