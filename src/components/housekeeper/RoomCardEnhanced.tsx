@@ -424,23 +424,23 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex items-center gap-2 pt-1">
             {isStartable && (
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'in_progress')}
-                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-xl shadow-blue-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="min-w-0 flex-1 h-10 text-sm font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-300/40 rounded-xl transition-all duration-200 active:scale-[0.98]"
                 >
-                  <Play className="h-5 w-5 mr-2 fill-current" />
-                  COMMENCER
+                  <Play className="h-4 w-4 mr-1.5 fill-current shrink-0" />
+                  <span className="truncate">COMMENCER</span>
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-10 w-10 shrink-0 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             )}
@@ -448,48 +448,48 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'clean', notes || undefined)}
-                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-xl shadow-green-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="min-w-0 flex-1 h-10 text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-300/40 rounded-xl transition-all duration-200 active:scale-[0.98]"
                 >
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  TERMINER
+                  <CheckCircle className="h-4 w-4 mr-1.5 shrink-0" />
+                  <span className="truncate">TERMINER</span>
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-10 w-10 shrink-0 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             )}
             {room.status === 'clean' && (
-              <div className="flex items-center justify-center w-full py-4 bg-green-100/80 rounded-xl">
-                <CheckCircle className="h-6 w-6 mr-2 text-green-600" />
-                <span className="font-bold text-green-700 text-lg">Chambre terminée</span>
-                <Sparkles className="h-5 w-5 ml-2 text-green-500" />
+              <div className="flex items-center justify-center w-full py-2.5 bg-green-100/80 rounded-xl">
+                <CheckCircle className="h-5 w-5 mr-2 text-green-600 shrink-0" />
+                <span className="font-bold text-green-700 text-sm">Chambre terminée</span>
+                <Sparkles className="h-4 w-4 ml-2 text-green-500 shrink-0" />
               </div>
             )}
           </div>
 
           {/* Swipe hints with animation */}
           {room.status === 'in_progress' && (
-            <div className="flex items-center justify-center gap-2 pt-2 text-blue-600">
+            <div className="flex items-center justify-center gap-1.5 pt-1.5 text-blue-600">
               <div className="flex items-center animate-pulse">
-                <ChevronRight className="h-4 w-4" />
-                <ChevronRight className="h-4 w-4 -ml-2" />
-                <ChevronRight className="h-4 w-4 -ml-2" />
+                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2" />
               </div>
-              <span className="text-sm font-medium">Glissez pour terminer</span>
+              <span className="text-[11px] font-medium">Glissez pour terminer</span>
             </div>
           )}
           {isActionable && room.status !== 'in_progress' && (
-            <div className="flex items-center justify-center gap-2 pt-2 text-slate-500">
-              <div className="flex items-center">
-                <ChevronRight className="h-4 w-4 animate-pulse" />
-                <ChevronRight className="h-4 w-4 -ml-2 animate-pulse delay-75" />
+            <div className="flex items-center justify-center gap-1.5 pt-1.5 text-slate-500">
+              <div className="flex items-center shrink-0">
+                <ChevronRight className="h-3.5 w-3.5 animate-pulse" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2 animate-pulse delay-75" />
               </div>
-              <span className="text-sm">Glissez court = commencer | long = terminer</span>
+              <span className="text-[11px] text-center">Glissez court = commencer · long = terminer</span>
             </div>
           )}
         </div>
