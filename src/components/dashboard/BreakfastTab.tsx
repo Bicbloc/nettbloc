@@ -552,6 +552,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                         </div>
                       </div>
                     )}
+                    </>
+                    )}
                   </CardContent>
                 </Card>
 
