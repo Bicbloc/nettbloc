@@ -49,6 +49,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pmsType, setPmsType] = useState<string | null>(null);
+  const isMisterBooking = pmsType === 'mister_booking';
 
   // Plans tarifaires PMS : récupération + sélection « inclus ».
   const [ratePlans, setRatePlans] = useState<PmsRatePlan[] | null>(null);
