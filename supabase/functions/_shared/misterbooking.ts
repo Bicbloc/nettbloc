@@ -348,6 +348,7 @@ export async function mbFetchOperationalBookings(
 }
 
 
+
 // Met à jour le statut housekeeping (clean/dirty) de chambres côté MisterBooking.
 export async function mbUpdateHousekeeping(
   hotelId: number,
