@@ -491,15 +491,24 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       le petit-déjeuner. Les chambres réservées sur ces plans seront marquées
                       « inclus » automatiquement (non facturées).
                     </CardDescription>
-                    <Button
-                      variant="secondary" size="sm" className="gap-2 w-fit mt-2"
-                      onClick={handleLoadRatePlans} disabled={ratePlansLoading}
-                    >
-                      <Download className="h-4 w-4" />
-                      {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
-                    </Button>
+                    {!isMisterBooking && (
+                      <Button
+                        variant="secondary" size="sm" className="gap-2 w-fit mt-2"
+                        onClick={handleLoadRatePlans} disabled={ratePlansLoading}
+                      >
+                        <Download className="h-4 w-4" />
+                        {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {isMisterBooking ? (
+                      <p className="text-sm text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+                        MisterBooking ne fournit pas ses plans tarifaires via son API. Marquez les
+                        chambres « incluses » manuellement (ou activez « Chambres incluses par défaut »).
+                      </p>
+                    ) : (
+                    <>
                     {(config.included_rate_plan_ids?.length ?? 0) > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {config.included_rate_plan_ids.length} plan(s) marqué(s) « inclus ».
