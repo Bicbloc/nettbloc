@@ -280,19 +280,19 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
       )}
       
       {/* Card content */}
-      <div className="relative p-3.5" style={{ zIndex: 1 }}>
-        <div className="space-y-2.5">
+      <div className="relative p-2.5" style={{ zIndex: 1 }}>
+        <div className="space-y-2">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                   {room.room_number}
                 </span>
                 
                 {/* Priority badge */}
                 {room.cleaning_priority && room.cleaning_priority > 1 && (
-                  <Badge className={`text-sm font-semibold ${
+                  <Badge className={`text-xs font-semibold ${
                     room.cleaning_priority === 3 
                       ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg' 
                       : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white'
@@ -329,7 +329,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 {/* Cleaning type badge */}
                 {room.cleaning_type && (
                   <Badge 
-                    className={`text-sm font-medium ${isFullCleaning(room.cleaning_type) 
+                    className={`text-xs font-medium ${isFullCleaning(room.cleaning_type) 
                       ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white' 
                       : 'bg-gradient-to-r from-sky-400 to-blue-500 text-white'
                     }`}
@@ -342,7 +342,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 {/* Status badge */}
                 <Badge 
                   variant="outline"
-                  className={`text-sm font-medium ${
+                  className={`text-xs font-medium ${
                     room.status === 'clean'
                       ? 'bg-green-100 text-green-700 border-green-400'
                       : room.status === 'in_progress'
@@ -367,15 +367,15 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
 
             {/* Action buttons */}
             {room.status !== 'clean' && (
-              <div className="flex flex-col gap-2">
+              <div className="flex shrink-0 flex-col gap-1.5">
                 <IncidentReportWizard 
                   hotelId={hotelId} 
                   userType="housekeeper"
                   userName={housekeeperName}
                   defaultLocation={room.room_number}
                   trigger={
-                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un incident">
-                      <AlertCircle className="h-5 w-5" />
+                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" title="Signaler un incident">
+                      <AlertCircle className="h-4 w-4" />
                     </Button>
                   }
                 />
@@ -389,8 +389,8 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                   guestStaying={room.guest_staying}
                   guestCheckedOut={room.guest_checked_out}
                   trigger={
-                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un objet trouvé">
-                      <Package className="h-5 w-5" />
+                    <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" title="Signaler un objet trouvé">
+                      <Package className="h-4 w-4" />
                     </Button>
                   }
                 />
@@ -424,23 +424,23 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex items-center gap-2 pt-1">
             {isStartable && (
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'in_progress')}
-                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-xl shadow-blue-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="min-w-0 flex-1 h-10 text-sm font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-300/40 rounded-xl transition-all duration-200 active:scale-[0.98]"
                 >
-                  <Play className="h-5 w-5 mr-2 fill-current" />
-                  COMMENCER
+                  <Play className="h-4 w-4 mr-1.5 fill-current shrink-0" />
+                  <span className="truncate">COMMENCER</span>
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-10 w-10 shrink-0 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             )}
@@ -448,48 +448,48 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'clean', notes || undefined)}
-                  className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-xl shadow-green-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="min-w-0 flex-1 h-10 text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-300/40 rounded-xl transition-all duration-200 active:scale-[0.98]"
                 >
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  TERMINER
+                  <CheckCircle className="h-4 w-4 mr-1.5 shrink-0" />
+                  <span className="truncate">TERMINER</span>
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
                   variant="outline"
                   size="icon"
-                  className="h-12 w-12 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                  className="h-10 w-10 shrink-0 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             )}
             {room.status === 'clean' && (
-              <div className="flex items-center justify-center w-full py-4 bg-green-100/80 rounded-xl">
-                <CheckCircle className="h-6 w-6 mr-2 text-green-600" />
-                <span className="font-bold text-green-700 text-lg">Chambre terminée</span>
-                <Sparkles className="h-5 w-5 ml-2 text-green-500" />
+              <div className="flex items-center justify-center w-full py-2.5 bg-green-100/80 rounded-xl">
+                <CheckCircle className="h-5 w-5 mr-2 text-green-600 shrink-0" />
+                <span className="font-bold text-green-700 text-sm">Chambre terminée</span>
+                <Sparkles className="h-4 w-4 ml-2 text-green-500 shrink-0" />
               </div>
             )}
           </div>
 
           {/* Swipe hints with animation */}
           {room.status === 'in_progress' && (
-            <div className="flex items-center justify-center gap-2 pt-2 text-blue-600">
+            <div className="flex items-center justify-center gap-1.5 pt-1.5 text-blue-600">
               <div className="flex items-center animate-pulse">
-                <ChevronRight className="h-4 w-4" />
-                <ChevronRight className="h-4 w-4 -ml-2" />
-                <ChevronRight className="h-4 w-4 -ml-2" />
+                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2" />
               </div>
-              <span className="text-sm font-medium">Glissez pour terminer</span>
+              <span className="text-[11px] font-medium">Glissez pour terminer</span>
             </div>
           )}
           {isActionable && room.status !== 'in_progress' && (
-            <div className="flex items-center justify-center gap-2 pt-2 text-slate-500">
-              <div className="flex items-center">
-                <ChevronRight className="h-4 w-4 animate-pulse" />
-                <ChevronRight className="h-4 w-4 -ml-2 animate-pulse delay-75" />
+            <div className="flex items-center justify-center gap-1.5 pt-1.5 text-slate-500">
+              <div className="flex items-center shrink-0">
+                <ChevronRight className="h-3.5 w-3.5 animate-pulse" />
+                <ChevronRight className="h-3.5 w-3.5 -ml-2 animate-pulse delay-75" />
               </div>
-              <span className="text-sm">Glissez court = commencer | long = terminer</span>
+              <span className="text-[11px] text-center">Glissez court = commencer · long = terminer</span>
             </div>
           )}
         </div>
