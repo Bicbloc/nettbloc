@@ -288,17 +288,72 @@ const toNum = (v: unknown): number => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
-// Nombre d'occupants (pax) d'une réservation. On additionne adultes + enfants +
-// bébés si ces champs sont présents, sinon on retombe sur un champ pax/occupancy.
+// Nombre d'occupants (pax). crm/bookings renvoie `occupancy` sous forme de
+// tableau [{ type, count }] : on additionne les `count`. Tolère aussi un
+// nombre simple pour compatibilité.
 export function mbGuestCount(b: MbBooking): number | null {
-  const adults = toNum(b.adults ?? b.nbAdults);
-  const children = toNum(b.children ?? b.nbChildren);
-  const babies = toNum(b.babies ?? b.nbBabies);
-  const sum = adults + children + babies;
-  if (sum > 0) return sum;
-  const direct = toNum(b.pax ?? b.nbPax ?? b.occupancy);
+  const occ = b.occupancy;
+  if (Array.isArray(occ)) {
+    const sum = occ.reduce((s, o) => s + toNum(o?.count), 0);
+    return sum > 0 ? sum : null;
+  }
+  const direct = toNum(occ);
   return direct > 0 ? direct : null;
 }
+
+// ─── Client Profiles API (crm/customers) ──────────────────────────
+// crm/bookings ne renvoie PAS le nom du client (seulement customerId).
+// On récupère les fiches clients sur la plage et on indexe par customerId
+// pour résoudre « Nom Prénom ».
+export interface MbCustomer {
+  customerId: number;
+  lastName?: string;
+  firstName?: string;
+  civility?: string;
+}
+
+export async function mbFetchCustomers(
+  hotelId: number,
+  startDate?: string,
+  endDate?: string,
+): Promise<Map<number, MbCustomer>> {
+  const start = startDate || today();
+  const end = endDate || start;
+  const map = new Map<number, MbCustomer>();
+  try {
+    const data = await mbPost<{
+      data?: { customers?: Record<string, MbCustomer> | MbCustomer[]; errors?: any[] };
+      errors?: any[];
+    }>('crm/customers', { hotelId, startDate: start, endDate: end });
+    const errors = mbExtractErrors(data);
+    if (errors) {
+      console.warn(`[misterbooking] crm/customers erreur: ${errors[0]?.description || errors[0]?.code}`);
+      return map;
+    }
+    const raw = data?.data?.customers;
+    const list: MbCustomer[] = Array.isArray(raw) ? raw : raw ? Object.values(raw) : [];
+    for (const c of list) {
+      const id = Number(c.customerId);
+      if (id) map.set(id, c);
+    }
+    console.log(`[misterbooking] crm/customers hotel=${hotelId} -> ${map.size} clients`);
+  } catch (err) {
+    console.warn(`[misterbooking] crm/customers échec: ${(err as Error).message}`);
+  }
+  return map;
+}
+
+// Renseigne le nom client (guestInfo) des réservations depuis la map clients.
+export function mbAttachCustomers(bookings: MbBooking[], customers: Map<number, MbCustomer>): void {
+  for (const b of bookings) {
+    if (b.guestInfo?.lastName || b.guestInfo?.firstName) continue;
+    const c = customers.get(Number(b.customerId));
+    if (c && (c.lastName || c.firstName)) {
+      b.guestInfo = { lastName: c.lastName, firstName: c.firstName, civility: c.civility };
+    }
+  }
+}
+
 
 const truthy = (v: boolean | number | undefined) => v === true || v === 1 || (v as unknown) === '1';
 
