@@ -122,6 +122,7 @@ const HousekeeperWorkContent: React.FC = () => {
   
   const hotelId = getHotelId();
   const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
+  const { governessName } = useGovernessOfDay(hotelId, housekeeperProfile?.name);
 
   // Charger/sauvegarder le pointage
   useEffect(() => {
