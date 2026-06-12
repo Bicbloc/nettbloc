@@ -424,23 +424,30 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       Importez les prestations directement depuis votre PMS (Mews / Apaleo) —
                       une seule configuration — ou ajoutez-les manuellement.
                     </CardDescription>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Button
-                        variant="secondary" size="sm" className="gap-2 w-fit"
-                        onClick={handleImportProducts} disabled={importing}
-                      >
-                        <Download className="h-4 w-4" />
-                        {importing ? 'Import en cours…' : 'Importer depuis le PMS'}
-                      </Button>
-                      <Button
-                        variant="outline" size="sm" className="gap-2 w-fit"
-                        onClick={handlePreviewProducts} disabled={previewLoading}
-                        title="Voir les prestations récupérables depuis le PMS"
-                      >
-                        <Eye className="h-4 w-4" />
-                        {previewLoading ? 'Test…' : 'Tester / voir'}
-                      </Button>
-                    </div>
+                    {isMisterBooking ? (
+                      <p className="text-xs text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/10 p-2 mt-2">
+                        MisterBooking n'expose pas de catalogue de prestations facturables via son API.
+                        Ajoutez vos types de petit-déjeuner manuellement ci-dessous.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button
+                          variant="secondary" size="sm" className="gap-2 w-fit"
+                          onClick={handleImportProducts} disabled={importing}
+                        >
+                          <Download className="h-4 w-4" />
+                          {importing ? 'Import en cours…' : 'Importer depuis le PMS'}
+                        </Button>
+                        <Button
+                          variant="outline" size="sm" className="gap-2 w-fit"
+                          onClick={handlePreviewProducts} disabled={previewLoading}
+                          title="Voir les prestations récupérables depuis le PMS"
+                        >
+                          <Eye className="h-4 w-4" />
+                          {previewLoading ? 'Test…' : 'Tester / voir'}
+                        </Button>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {config.breakfast_types.length === 0 && (
