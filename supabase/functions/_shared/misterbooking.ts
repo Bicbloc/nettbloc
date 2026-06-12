@@ -86,21 +86,32 @@ export async function mbVerifySignature(rawBody: string, received: string | null
 }
 
 // POST authentifié (WSSE + X-Signature) vers un endpoint MisterBooking.
+// Les 5xx transitoires (l'API renvoie parfois un 500 vide) sont retentés
+// une fois après un court délai, avec un en-tête WSSE régénéré.
 export async function mbPost<T = any>(path: string, payload: unknown): Promise<T> {
   const rawBody = JSON.stringify(payload);
-  const wsse = await buildWsseHeader();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Wsse': wsse,
-  };
-  const signature = await mbSignBody(rawBody);
-  if (signature) headers['X-Signature'] = signature;
 
-  const res = await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
-    method: 'POST',
-    headers,
-    body: rawBody,
-  });
+  const doRequest = async (): Promise<Response> => {
+    const wsse = await buildWsseHeader();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Wsse': wsse,
+    };
+    const signature = await mbSignBody(rawBody);
+    if (signature) headers['X-Signature'] = signature;
+    return await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
+      method: 'POST',
+      headers,
+      body: rawBody,
+    });
+  };
+
+  let res = await doRequest();
+  if (res.status >= 500) {
+    await res.text().catch(() => '');
+    await new Promise((r) => setTimeout(r, 800));
+    res = await doRequest();
+  }
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`MisterBooking ${path} échoué [${res.status}]: ${text}`);
