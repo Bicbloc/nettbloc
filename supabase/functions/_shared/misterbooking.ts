@@ -233,6 +233,9 @@ async function mbCrmBookings(
     : raw && typeof raw === 'object'
       ? Object.values(raw)
       : [];
+  if (list.length > 0) {
+    console.log(`[mb-hk-probe] raw booking (status=${status}) -> ${JSON.stringify(list[0]).slice(0, 1800)}`);
+  }
   return list;
 }
 
