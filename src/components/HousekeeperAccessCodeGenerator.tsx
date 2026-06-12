@@ -82,7 +82,8 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
               email: email,
               type: 'activation',
               companyName: housekeeperName,
-              accessCode: accessCode
+              accessCode: accessCode,
+              activationLink: `${APP_ORIGIN}/housekeeper/signup?email=${encodeURIComponent(email)}&name=${encodeURIComponent(housekeeperName)}`
             }
           });
 
