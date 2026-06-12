@@ -138,17 +138,27 @@ const RoomRegistry = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { data, error } = await supabase
-        .from('hotel_rooms_registry')
-        .delete()
-        .in('id', ids)
-        .select('id');
-      if (error) throw error;
-      if (!data || data.length === 0) {
+      if (ids.length === 0) return 0;
+      // Delete in chunks to avoid exceeding the request URL length limit
+      // (a single `.in('id', [...])` with hundreds of ids returns 400 Bad Request).
+      const CHUNK = 100;
+      let deleted = 0;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const { data, error } = await supabase
+          .from('hotel_rooms_registry')
+          .delete()
+          .in('id', slice)
+          .select('id');
+        if (error) throw error;
+        deleted += data?.length ?? 0;
+      }
+      if (deleted === 0) {
         throw new Error("Aucun espace supprimé. Vous n'avez peut-être pas les droits sur cet hôtel.");
       }
-      return data.length;
+      return deleted;
     },
+
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
       setSelectedIds(new Set());
