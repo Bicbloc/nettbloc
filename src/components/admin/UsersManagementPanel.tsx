@@ -1019,6 +1019,37 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Account Confirmation Dialog */}
+      <AlertDialog open={!!resettingUser} onOpenChange={(open) => !open && setResettingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-orange-600">⚠️ Réinitialisation du compte</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Vous êtes sur le point de réinitialiser le compte de <strong>{resettingUser?.email}</strong>.</p>
+              <p>Le compte et les hôtels seront conservés, mais toutes les données suivantes seront <strong>définitivement effacées</strong> :</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                <li>Chambres, affectations et registre des chambres</li>
+                <li>Données PMS (en attente, file de synchro, prévisions)</li>
+                <li>Journaux, rapports et instructions quotidiennes</li>
+                <li>Tâches, incidents, objets trouvés et notifications</li>
+                <li>Inventaires et livraisons de linge</li>
+              </ul>
+              <p className="font-semibold text-orange-600">Attention : cette action est irréversible !</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResetting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resettingUser && resetUserData(resettingUser)}
+              disabled={isResetting}
+              className="bg-orange-600 text-white hover:bg-orange-600/90"
+            >
+              {isResetting ? 'Réinitialisation...' : 'Réinitialiser'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
