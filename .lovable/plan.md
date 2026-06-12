@@ -1,50 +1,30 @@
-# Fix MisterBooking "0 rooms detected" — switch to Mapping + CRM APIs
+# MisterBooking — Push ménage + UI facturation petit-déjeuner
 
-## Root cause
+## Objectif
+1. Fiabiliser la remontée « chambre propre/sale » vers MisterBooking (format de date attendu).
+2. Afficher un message clair côté admin quand le PMS est MisterBooking, au lieu de listes vides pour les prestations (« charges ») et les plans tarifaires.
 
-Our code reads rooms/bookings from `connectedDevices/customers` (Connected Devices API), which these partner credentials are **not** granted. The docs you uploaded confirm the APIs you DO have, and the correct replacements:
+## Contexte (constats)
+- L'API MisterBooking intégrée n'expose **ni catalogue de prestations facturables, ni plans tarifaires**. Dans `breakfast-pms-sync`, `fetch_products` et `fetch_rate_plans` renvoient donc volontairement des tableaux vides pour `mister_booking`. Ce n'est pas un bug : c'est une limite de l'API partenaire. → On ne peut pas « récupérer » ces données ; on doit l'expliquer à l'utilisateur.
+- Le push « propre/sale » fonctionne déjà : `RoomSyncService.updateStatus` → `pms_sync_queue` → `pms-sync-queue-process` → `mbUpdateHousekeeping` (`houseKeeping/update`). Seul risque : la date envoyée est un ISO complet (`new Date().toISOString()`) alors que MisterBooking attend `YYYY-MM-DD`.
 
-- **Mapping API** — `POST /misterbooking/mappingRoomRate` → returns the **full room list** (every room with `id` + `name` = room number), grouped by accommodation service. Request body: `{ "hotelId": 1934 }`.
-- **CRM API** — `POST /misterbooking/crm/bookings` → returns current reservations with `roomNumber`, `roomId`, `startDate`, `endDate`, `checkIn`, `checkOut`, `status`, `customerId`. Request body: `{ "hotelId", "startDate", "endDate", "status" }`.
-- **Housekeeping API** — `POST /misterbooking/houseKeeping/update` (write-only, already used) → push clean/dirty status. No read endpoint exists, so the room list must come from Mapping.
+## Changements
 
-Auth is unchanged: same WSSE `X-Wsse` header + HMAC `X-Signature` via the existing `mbPost`.
+### 1. Format de date du push ménage (fix fiabilité)
+- Dans `supabase/functions/pms-sync-queue-process/index.ts`, à l'appel `mbUpdateHousekeeping`, envoyer la date au format `YYYY-MM-DD` (date du jour) au lieu de `new Date().toISOString()`.
 
-## Credentials
+### 2. UI facturation petit-déjeuner (clarté MisterBooking)
+- Dans `src/components/dashboard/BreakfastTab.tsx`, détecter quand le PMS configuré est `mister_booking` (via la config déjà chargée / `pms` renvoyé par les fetch).
+- Quand c'est MisterBooking :
+  - Remplacer les listes vides « prestations » et « plans tarifaires inclus » par un message d'information clair indiquant que MisterBooking ne fournit pas le catalogue de prestations ni les plans tarifaires via son API, et que l'inclusion petit-déjeuner doit être gérée autrement (ex. manuellement).
+  - Masquer ou désactiver les boutons « Importer les prestations » / « Récupérer les plans tarifaires » dans ce cas pour éviter les retours vides perçus comme une erreur.
 
-You provided new partner credentials — store/refresh as secrets:
-- `MISTERBOOKING_WSSE_LOGIN` = `237`
-- `MISTERBOOKING_WSSE_PASSWORD` = `Y2v6Quq9jWME`
-- `MISTERBOOKING_HMAC_SECRET` = `542ba9effef8037839a0911e13e9832036bab2620687147126c460e08e383ef4`
+## Détails techniques
+- La détection du type PMS côté front peut s'appuyer sur le champ `pms` déjà retourné par `fetchPmsProducts` / `fetchPmsRatePlans` (`pms: 'mister_booking'`), ou sur la config PMS active de l'hôtel.
+- Aucune migration de base de données nécessaire.
+- Aucun secret supplémentaire requis.
+- Les fonctions edge sont redéployées automatiquement.
 
-## Changes
-
-### 1. `supabase/functions/_shared/misterbooking.ts`
-- **Add `mbFetchRoomMapping(hotelId)`** → calls `mappingRoomRate`, flattens `data.rooms[].roomList[]` into `{ roomId, roomNumber }[]` (the complete room inventory).
-- **Replace `mbFetchBookings`** to call `crm/bookings` instead of `connectedDevices/customers`:
-  - Send `{ hotelId, startDate: today, endDate: today, status }`. The `status` param selects in-house stays (docs list: new / stays / in-house "Séjours en chambre"). Implementation tries the in-house value first, falling back to `stays`, logging the raw response so we can pin the exact accepted string from the Edge logs.
-  - Response shape change: `data.bookings` is an **object keyed by bookingId** (not an array) — map `Object.values()` into the existing `MbBooking[]`.
-  - Keep E-code error detection (E01/E02/E03) with clear French messages.
-- **Add `mbBuildRoomList(mapping, bookings, today)`**: start from the full mapping (every room), then overlay each current booking's status/cleaning type via the existing `mbBookingToRoom`. Rooms with no current booking default to "needs cleaning" per project registry rules. This guarantees a non-zero room list even when there are few active stays.
-
-### 2. `supabase/functions/pms-sync/index.ts`
-- `fetchMisterBookingRooms` now: fetch mapping + bookings, merge with `mbBuildRoomList`, return the full room set (so "Test connection" shows every room, with occupancy/cleaning where guests are present).
-
-### 3. `supabase/functions/pms-sync-queue-process/index.ts`
-- Its housekeeping push needs `roomId` per room. Resolve room numbers → `roomId` using `mbFetchRoomMapping` (Mapping API) instead of the old booking lookup, then call `houseKeeping/update`.
-
-### 4. `supabase/functions/pms-forecast/index.ts`
-- Switch to `crm/bookings` with `status` = stays over the forecast window `[today, today+N]`, mapping `Object.values(data.bookings)`. Gives real 7/14/30-day forecast from the CRM API.
-
-### 5. Memory
-- Update **MisterBooking Integration** memory: reads via Mapping (`mappingRoomRate`) for the room list + CRM (`crm/bookings`) for current stays/forecast; Connected Devices is NOT used. Housekeeping API is write-only.
-
-## Validation
-1. Update the three secrets.
-2. Deploy `pms-sync`, `pms-forecast`, `pms-sync-queue-process`.
-3. Call `pms-sync` for hotel 1934 and read Edge logs to confirm the room count and the accepted `crm/bookings` status value; pin it.
-4. Confirm the UI "Test connection" lists rooms (and shows occupied/checkout where stays exist).
-
-## Technical notes
-- `mappingRoomRate` is the documented source of `roomId` (referenced by the housekeeping update endpoint), so it ties reads and writes together cleanly.
-- Date window for current stays is `[today, today]`; we still client-filter to `startDate <= today <= endDate` for safety.
+## Hors périmètre
+- Aucun nouvel endpoint MisterBooking (l'API ne les expose pas).
+- Pas de modification de la logique de facturation Mews/Apaleo.
