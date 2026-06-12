@@ -342,7 +342,7 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                 {/* Status badge */}
                 <Badge 
                   variant="outline"
-                  className={`text-sm font-medium ${
+                  className={`text-xs font-medium ${
                     room.status === 'clean'
                       ? 'bg-green-100 text-green-700 border-green-400'
                       : room.status === 'in_progress'
