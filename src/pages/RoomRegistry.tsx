@@ -139,6 +139,13 @@ const RoomRegistry = () => {
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       if (ids.length === 0) return 0;
+
+      // Room numbers being deleted (used to also purge the operational `rooms` table)
+      const roomNumbers = (rooms || [])
+        .filter((r) => ids.includes(r.id))
+        .map((r) => r.room_number)
+        .filter(Boolean);
+
       // Delete in chunks to avoid exceeding the request URL length limit
       // (a single `.in('id', [...])` with hundreds of ids returns 400 Bad Request).
       const CHUNK = 100;
@@ -156,11 +163,35 @@ const RoomRegistry = () => {
       if (deleted === 0) {
         throw new Error("Aucun espace supprimé. Vous n'avez peut-être pas les droits sur cet hôtel.");
       }
+
+      // Cascade: remove the same rooms from the operational tables so they
+      // disappear from the Assignment and Rooms views too.
+      if (activeHotelId && roomNumbers.length > 0) {
+        for (let i = 0; i < roomNumbers.length; i += CHUNK) {
+          const slice = roomNumbers.slice(i, i + CHUNK);
+
+          // Find matching operational rooms to delete their assignments first
+          const { data: opRooms } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('hotel_id', activeHotelId)
+            .in('room_number', slice);
+
+          const opRoomIds = (opRooms || []).map((r) => r.id);
+          if (opRoomIds.length > 0) {
+            await supabase.from('assignments').delete().in('room_id', opRoomIds);
+            await supabase.from('rooms').delete().in('id', opRoomIds);
+          }
+        }
+      }
+
       return deleted;
     },
 
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['rooms-registry'] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
       setSelectedIds(new Set());
       toast({ title: "Suppression effectuée", description: `${count} espace(s) supprimé(s)` });
     },
