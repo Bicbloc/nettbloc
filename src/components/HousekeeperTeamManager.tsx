@@ -173,11 +173,15 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
             <UserPlus className="h-5 w-5" />
             Équipe des femmes de chambre
           </CardTitle>
-          <Button onClick={() => setShowInviteDialog(true)}>
+          <Button onClick={() => setShowInviteDialog(true)} className="animate-spotlight">
             <UserPlus className="h-4 w-4 mr-2" />
-            Inviter
+            Inviter une femme de chambre
           </Button>
         </div>
+        <p className="text-sm text-muted-foreground mt-2">
+          Créez une femme de chambre manuellement pour obtenir son code d'accès, ou
+          communiquez-lui un code : elle pourra alors soumettre sa demande pour rejoindre l'hôtel.
+        </p>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
