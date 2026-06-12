@@ -340,3 +340,17 @@
 .animate-badge-pulse {
   animation: badge-pulse 1s ease-in-out infinite;
 }
+
+/* Spotlight animé pour attirer l'attention (ex: Inviter une femme de chambre) */
+@keyframes spotlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+.animate-spotlight {
+  animation: spotlight-pulse 1.6s ease-in-out infinite;
+}

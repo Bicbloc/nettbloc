@@ -264,14 +264,23 @@ export function AssignmentTab({
           <CardContent className="flex flex-col items-center justify-center py-12">
             <UserPlus className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Aucune femme de chambre</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Ajoutez des femmes de chambre pour commencer l'affectation
+            <p className="text-muted-foreground text-center mb-2 max-w-md">
+              Les chambres sont prêtes à être affectées. Pour commencer, ajoutez votre équipe :
             </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
+            <ul className="text-sm text-muted-foreground text-left mb-6 max-w-md space-y-1 list-disc pl-5">
+              <li><strong>Inviter une femme de chambre</strong> : créez-la manuellement et obtenez son code d'accès.</li>
+              <li><strong>Gérer l'équipe</strong> : donnez un code d'accès, elles soumettent leur demande pour rejoindre l'hôtel.</li>
+            </ul>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                onClick={() => setShowInviteDialog(true)}
+                className="animate-spotlight"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
                 Inviter une femme de chambre
               </Button>
               <Button variant="outline" onClick={() => setActiveTab('access-codes')}>
+                <Key className="mr-2 h-4 w-4" />
                 Gérer l'équipe
               </Button>
             </div>
@@ -367,12 +376,6 @@ export function AssignmentTab({
           </div>
           
           {/* Dialogs */}
-          <HousekeeperInviteDialog
-            open={showInviteDialog}
-            onOpenChange={setShowInviteDialog}
-            hotelId={hotelId}
-          />
-          
           <CreateColumnDialog
             open={showCreateColumnDialog}
             onOpenChange={setShowCreateColumnDialog}
@@ -392,6 +395,13 @@ export function AssignmentTab({
 
         )
       )}
+
+      {/* Toujours monté pour fonctionner depuis l'état vide comme depuis la grille */}
+      <HousekeeperInviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        hotelId={hotelId}
+      />
     </div>
   );
 }
