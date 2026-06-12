@@ -416,14 +416,17 @@ export function mbBuildRoomList(
 ): MbExtractedRoom[] {
   const byNumber = new Map<string, MbExtractedRoom>();
 
-  // 1. Inventaire complet, par défaut « à nettoyer ».
+  // 1. Inventaire complet. MisterBooking n'expose PAS d'API de lecture du
+  //    statut ménage (Housekeeping API en écriture seule pour ce partenaire).
+  //    On marque donc les chambres SANS séjour avec le sentinel 'unknown' :
+  //    pms-sync conservera leur état local propre/sale au lieu de l'écraser.
   for (const m of mapping) {
     const num = String(m.roomNumber || '').trim();
     if (!num) continue;
     byNumber.set(num.toLowerCase(), {
       roomNumber: num,
       roomId: m.roomId,
-      status: 'needs-cleaning',
+      status: 'unknown',
       cleaningType: 'none',
     });
   }
