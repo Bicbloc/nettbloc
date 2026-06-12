@@ -484,6 +484,12 @@ function toDbCleaningType(t?: string): string {
 // Statut chambre : propre / hors service -> pas besoin de ménage
 function toDbStatus(room: ExtractedRoom): string {
   if (room.cleaningType === 'hors_service' || room.status === 'out-of-service') return 'out-of-service';
+  // Départ détecté (MisterBooking/PMS) -> client sorti, à blanc (sale).
+  if (room.status === 'checkout') return 'checkout';
+  // Sentinel 'unknown' : le PMS ne fournit pas l'état ménage. Pour une chambre
+  // NOUVELLE (sans état local), on retombe sur « à nettoyer ». La conservation
+  // de l'état existant est gérée dans performSync.
+  if (room.status === 'unknown') return 'needs-cleaning';
   if (room.status === 'clean' && room.cleaningType === 'none') return 'clean';
   return 'needs-cleaning';
 }
