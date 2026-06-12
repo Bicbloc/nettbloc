@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Copy, Key } from 'lucide-react';
+import { APP_ORIGIN } from '@/constants/appUrl';
 
 interface HousekeeperAccessCodeGeneratorProps {
   hotelId: string;
@@ -82,7 +83,8 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
               email: email,
               type: 'activation',
               companyName: housekeeperName,
-              accessCode: accessCode
+              accessCode: accessCode,
+              activationLink: `${APP_ORIGIN}/housekeeper/signup?email=${encodeURIComponent(email)}&name=${encodeURIComponent(housekeeperName)}`
             }
           });
 
