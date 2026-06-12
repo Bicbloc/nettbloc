@@ -181,6 +181,9 @@ export async function mbFetchRoomMapping(hotelId: number): Promise<MbRoom[]> {
   }
 
   const services = data?.data?.rooms || [];
+  if (services[0]?.roomList?.[0]) {
+    console.log(`[mb-hk-probe] raw mapping room -> ${JSON.stringify(services[0].roomList[0]).slice(0, 1200)}`);
+  }
   const out: MbRoom[] = [];
   const seen = new Set<number>();
   for (const svc of services) {
