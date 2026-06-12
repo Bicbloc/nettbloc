@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
-import { mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
+import { mbAttachCustomers, mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchCustomers, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
 // ─── MisterBooking ────────────────────────────────────────────────
 // Lecture via l'API Mapping (inventaire complet des chambres) + l'API CRM
