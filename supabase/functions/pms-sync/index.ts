@@ -15,7 +15,6 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
 
   const today = new Date().toISOString().split('T')[0];
-  await mbProbeHousekeeping(hotelId).catch(() => {});
   const [mapping, bookings, customers] = await Promise.all([
     mbFetchRoomMapping(hotelId),
     mbFetchOperationalBookings(hotelId, today),
