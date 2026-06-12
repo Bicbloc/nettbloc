@@ -265,6 +265,47 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
     }
   };
 
+  const [resettingUser, setResettingUser] = useState<AllUser | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const resetUserData = async (user: AllUser) => {
+    setIsResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Non authentifié');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId: user.id }),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || `Erreur ${response.status}`);
+      }
+
+      toast({
+        title: "Compte réinitialisé ✅",
+        description: `Données effacées : ${result.cleared_from?.join(', ') || 'aucune donnée'}`,
+      });
+      setResettingUser(null);
+      loadUsers();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: error.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const toggleSuspend = async (userId: string, suspend: boolean, reason?: string) => {
     try {
       const { error } = await supabase
