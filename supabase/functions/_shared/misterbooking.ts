@@ -317,8 +317,16 @@ export async function mbFetchCustomers(
   startDate?: string,
   endDate?: string,
 ): Promise<Map<number, MbCustomer>> {
-  const start = startDate || today();
-  const end = endDate || start;
+  // crm/customers filtre par date de réservation : les clients « en chambre »
+  // ont souvent réservé il y a plusieurs jours. On élargit la fenêtre à ~30 j
+  // en arrière (limite API : 1 mois) pour les retrouver.
+  const d = (off: number) => {
+    const x = new Date();
+    x.setDate(x.getDate() + off);
+    return x.toISOString().split('T')[0];
+  };
+  const start = startDate || d(-30);
+  const end = endDate || d(1);
   const map = new Map<number, MbCustomer>();
   try {
     const data = await mbPost<{
