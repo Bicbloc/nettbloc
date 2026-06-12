@@ -167,6 +167,8 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "terminé": "completed",
   "Terminée": "Completed",
   "Terminées": "Completed",
+  "Rien à faire": "Nothing to do",
+  "rien à faire": "nothing to do",
   "À faire": "To do",
   "à faire": "to do",
   "Fait": "Done",

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
-import { mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
+import { mbAttachCustomers, mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchCustomers, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
 // ─── MisterBooking ────────────────────────────────────────────────
 // Lecture via l'API Mapping (inventaire complet des chambres) + l'API CRM
@@ -15,10 +15,14 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
 
   const today = new Date().toISOString().split('T')[0];
-  const [mapping, bookings] = await Promise.all([
+  const [mapping, bookings, customers] = await Promise.all([
     mbFetchRoomMapping(hotelId),
     mbFetchBookings(hotelId),
+    mbFetchCustomers(hotelId),
   ]);
+
+  // Résout les noms clients (crm/bookings ne les renvoie pas) avant fusion.
+  mbAttachCustomers(bookings, customers);
 
   const merged = mbBuildRoomList(mapping, bookings, today);
   const rooms: ExtractedRoom[] = merged
@@ -28,6 +32,7 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
       status: r.status,
       cleaningType: r.cleaningType,
       guestName: r.guestName,
+      guestCount: r.guestCount,
       arrivalDate: r.arrivalDate,
       departureDate: r.departureDate,
     }));
@@ -108,6 +113,7 @@ interface ExtractedRoom {
   floor?: number;
   roomType?: string;
   guestName?: string;
+  guestCount?: number;
   arrivalDate?: string;
   departureDate?: string;
   notes?: string;
@@ -842,6 +848,7 @@ Deno.serve(async (req) => {
             cleaningType: r.cleaningType,
             condition: r.condition ?? null,
             guestName: r.guestName ?? null,
+            guestCount: r.guestCount ?? null,
             arrivalDate: r.arrivalDate ?? null,
             departureDate: r.departureDate ?? null,
           })),

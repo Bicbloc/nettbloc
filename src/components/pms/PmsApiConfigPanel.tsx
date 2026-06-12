@@ -28,6 +28,7 @@ interface PreviewRoom {
   cleaningType: string;
   condition?: string | null;
   guestName: string | null;
+  guestCount?: number | null;
   arrivalDate: string | null;
   departureDate: string | null;
 }
@@ -786,7 +787,10 @@ export function PmsApiConfigPanel({ onActiveChange }: { onActiveChange?: (active
                               <td className="px-3 py-2">
                                 <Badge variant="outline" className={c.className}>{c.label}</Badge>
                               </td>
-                              <td className="px-3 py-2 text-muted-foreground">{r.guestName ?? '—'}</td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                {r.guestName ?? '—'}
+                                {r.guestCount ? ` · ${r.guestCount} pax` : ''}
+                              </td>
                             </tr>
                           );
                         })}

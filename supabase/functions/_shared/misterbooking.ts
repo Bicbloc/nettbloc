@@ -123,6 +123,8 @@ export interface MbBooking {
   checkIn: boolean | number;
   checkOut: boolean | number;
   roomNumber: string | null;
+  // Occupants : crm/bookings renvoie un tableau [{ type, count }].
+  occupancy?: Array<{ type?: string; count?: number | string }> | number | string;
   guestInfo?: {
     civility?: string;
     lastName?: string;
@@ -281,6 +283,86 @@ export function mbGuestName(b: MbBooking): string | null {
   return name || null;
 }
 
+const toNum = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+// Nombre d'occupants (pax). crm/bookings renvoie `occupancy` sous forme de
+// tableau [{ type, count }] : on additionne les `count`. Tolère aussi un
+// nombre simple pour compatibilité.
+export function mbGuestCount(b: MbBooking): number | null {
+  const occ = b.occupancy;
+  if (Array.isArray(occ)) {
+    const sum = occ.reduce((s, o) => s + toNum(o?.count), 0);
+    return sum > 0 ? sum : null;
+  }
+  const direct = toNum(occ);
+  return direct > 0 ? direct : null;
+}
+
+// ─── Client Profiles API (crm/customers) ──────────────────────────
+// crm/bookings ne renvoie PAS le nom du client (seulement customerId).
+// On récupère les fiches clients sur la plage et on indexe par customerId
+// pour résoudre « Nom Prénom ».
+export interface MbCustomer {
+  customerId: number;
+  lastName?: string;
+  firstName?: string;
+  civility?: string;
+}
+
+export async function mbFetchCustomers(
+  hotelId: number,
+  startDate?: string,
+  endDate?: string,
+): Promise<Map<number, MbCustomer>> {
+  // crm/customers filtre par date de réservation : les clients « en chambre »
+  // ont souvent réservé il y a plusieurs jours. On élargit la fenêtre à ~30 j
+  // en arrière (limite API : 1 mois) pour les retrouver.
+  const d = (off: number) => {
+    const x = new Date();
+    x.setDate(x.getDate() + off);
+    return x.toISOString().split('T')[0];
+  };
+  const start = startDate || d(-30);
+  const end = endDate || d(1);
+  const map = new Map<number, MbCustomer>();
+  try {
+    const data = await mbPost<{
+      data?: { customers?: Record<string, MbCustomer> | MbCustomer[]; errors?: any[] };
+      errors?: any[];
+    }>('crm/customers', { hotelId, startDate: start, endDate: end });
+    const errors = mbExtractErrors(data);
+    if (errors) {
+      console.warn(`[misterbooking] crm/customers erreur: ${errors[0]?.description || errors[0]?.code}`);
+      return map;
+    }
+    const raw = data?.data?.customers;
+    const list: MbCustomer[] = Array.isArray(raw) ? raw : raw ? Object.values(raw) : [];
+    for (const c of list) {
+      const id = Number(c.customerId);
+      if (id) map.set(id, c);
+    }
+    console.log(`[misterbooking] crm/customers hotel=${hotelId} -> ${map.size} clients`);
+  } catch (err) {
+    console.warn(`[misterbooking] crm/customers échec: ${(err as Error).message}`);
+  }
+  return map;
+}
+
+// Renseigne le nom client (guestInfo) des réservations depuis la map clients.
+export function mbAttachCustomers(bookings: MbBooking[], customers: Map<number, MbCustomer>): void {
+  for (const b of bookings) {
+    if (b.guestInfo?.lastName || b.guestInfo?.firstName) continue;
+    const c = customers.get(Number(b.customerId));
+    if (c && (c.lastName || c.firstName)) {
+      b.guestInfo = { lastName: c.lastName, firstName: c.firstName, civility: c.civility };
+    }
+  }
+}
+
+
 const truthy = (v: boolean | number | undefined) => v === true || v === 1 || (v as unknown) === '1';
 
 // Convertit une réservation MisterBooking en chambre opérationnelle Nettobloc.
@@ -307,6 +389,7 @@ export function mbBookingToRoom(b: MbBooking, today: string) {
     status,
     cleaningType,
     guestName: mbGuestName(b),
+    guestCount: mbGuestCount(b),
     arrivalDate: arrival || null,
     departureDate: departure || null,
   };
@@ -318,6 +401,7 @@ export interface MbExtractedRoom {
   status: string;
   cleaningType: string;
   guestName?: string;
+  guestCount?: number;
   arrivalDate?: string;
   departureDate?: string;
 }
@@ -356,6 +440,7 @@ export function mbBuildRoomList(
       status: r.status,
       cleaningType: r.cleaningType,
       guestName: r.guestName ?? undefined,
+      guestCount: r.guestCount ?? undefined,
       arrivalDate: r.arrivalDate ?? undefined,
       departureDate: r.departureDate ?? undefined,
     });
