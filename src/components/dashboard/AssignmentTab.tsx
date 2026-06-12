@@ -376,12 +376,6 @@ export function AssignmentTab({
           </div>
           
           {/* Dialogs */}
-          <HousekeeperInviteDialog
-            open={showInviteDialog}
-            onOpenChange={setShowInviteDialog}
-            hotelId={hotelId}
-          />
-          
           <CreateColumnDialog
             open={showCreateColumnDialog}
             onOpenChange={setShowCreateColumnDialog}
@@ -401,6 +395,13 @@ export function AssignmentTab({
 
         )
       )}
+
+      {/* Toujours monté pour fonctionner depuis l'état vide comme depuis la grille */}
+      <HousekeeperInviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        hotelId={hotelId}
+      />
     </div>
   );
 }
