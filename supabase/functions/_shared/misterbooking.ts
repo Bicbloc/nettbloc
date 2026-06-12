@@ -123,6 +123,16 @@ export interface MbBooking {
   checkIn: boolean | number;
   checkOut: boolean | number;
   roomNumber: string | null;
+  // Nombre d'occupants : MisterBooking expose ces champs selon les versions.
+  adults?: number | string;
+  children?: number | string;
+  babies?: number | string;
+  nbAdults?: number | string;
+  nbChildren?: number | string;
+  nbBabies?: number | string;
+  pax?: number | string;
+  nbPax?: number | string;
+  occupancy?: number | string;
   guestInfo?: {
     civility?: string;
     lastName?: string;
