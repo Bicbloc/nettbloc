@@ -892,6 +892,15 @@ export function UsersManagementPanel({ defaultUserType, lockUserType, title }: U
                                 )}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {user.user_type === 'establishment' && (
+                                <DropdownMenuItem
+                                  onClick={() => setResettingUser(user)}
+                                  className="text-orange-600 focus:text-orange-600"
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Réinitialiser le compte
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => setDeletingUser(user)}
                                 className="text-destructive focus:text-destructive"
