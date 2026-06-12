@@ -1,12 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAuthorizedCronRequest, unauthorizedResponse } from "../_shared/cronAuth.ts";
-import { mbAttachCustomers, mbBuildRoomList, mbConfigured, mbFetchBookings, mbFetchCustomers, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
+import { mbAttachCustomers, mbBuildRoomList, mbConfigured, mbFetchCustomers, mbFetchOperationalBookings, mbFetchRoomMapping } from "../_shared/misterbooking.ts";
 
 // ─── MisterBooking ────────────────────────────────────────────────
 // Lecture via l'API Mapping (inventaire complet des chambres) + l'API CRM
-// (séjours en cours). L'API Connected Devices n'est PAS utilisée (non
-// accordée à ces identifiants partenaire). On renvoie TOUTES les chambres,
-// avec l'occupation superposée là où un client est présent.
+// (séjours en cours + arrivées/départs du jour). L'API Connected Devices
+// n'est PAS utilisée (non accordée à ces identifiants partenaire). On renvoie
+// TOUTES les chambres, avec l'occupation superposée là où un client est présent.
 async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
   if (!mbConfigured()) {
     throw new Error('Identifiants partenaire MisterBooking manquants (secrets WSSE).');
@@ -17,7 +17,7 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
   const today = new Date().toISOString().split('T')[0];
   const [mapping, bookings, customers] = await Promise.all([
     mbFetchRoomMapping(hotelId),
-    mbFetchBookings(hotelId),
+    mbFetchOperationalBookings(hotelId, today),
     mbFetchCustomers(hotelId),
   ]);
 
