@@ -86,21 +86,32 @@ export async function mbVerifySignature(rawBody: string, received: string | null
 }
 
 // POST authentifié (WSSE + X-Signature) vers un endpoint MisterBooking.
+// Les 5xx transitoires (l'API renvoie parfois un 500 vide) sont retentés
+// une fois après un court délai, avec un en-tête WSSE régénéré.
 export async function mbPost<T = any>(path: string, payload: unknown): Promise<T> {
   const rawBody = JSON.stringify(payload);
-  const wsse = await buildWsseHeader();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Wsse': wsse,
-  };
-  const signature = await mbSignBody(rawBody);
-  if (signature) headers['X-Signature'] = signature;
 
-  const res = await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
-    method: 'POST',
-    headers,
-    body: rawBody,
-  });
+  const doRequest = async (): Promise<Response> => {
+    const wsse = await buildWsseHeader();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Wsse': wsse,
+    };
+    const signature = await mbSignBody(rawBody);
+    if (signature) headers['X-Signature'] = signature;
+    return await fetch(`${MB_BASE_URL}/${path.replace(/^\//, '')}`, {
+      method: 'POST',
+      headers,
+      body: rawBody,
+    });
+  };
+
+  let res = await doRequest();
+  if (res.status >= 500) {
+    await res.text().catch(() => '');
+    await new Promise((r) => setTimeout(r, 800));
+    res = await doRequest();
+  }
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`MisterBooking ${path} échoué [${res.status}]: ${text}`);
@@ -264,6 +275,76 @@ export async function mbFetchBookings(
 
   if (!anySuccess && lastError) throw lastError;
   return Array.from(byId.values());
+}
+
+// Statut annulé ? (tolérant aux variantes de libellés)
+function mbIsCancelled(b: MbBooking): boolean {
+  const s = String(b.status || '').toLowerCase();
+  return s.includes('cancel') || s.includes('annul') || s.includes('noshow') || s.includes('no-show');
+}
+
+// Réservations OPÉRATIONNELLES du jour : séjours en chambre (inhouse) +
+// séjours ayant DÉBUTÉ dans le passé récent ou aujourd'hui (status=stay sur
+// une fenêtre glissante de ~27 j, limite API < 1 mois). Cette 2e requête est
+// indispensable pour voir :
+//  - les arrivées du jour (pas encore « inhouse »),
+//  - les DÉPARTS du jour : une fois le check-out fait, la réservation sort de
+//    « inhouse » mais reste visible via « stay » avec checkOut=1 → la chambre
+//    doit passer « à blanc » (sale).
+// On ne garde que les réservations chevauchant AUJOURD'HUI
+// (startDate <= today <= endDate), hors annulations.
+export async function mbFetchOperationalBookings(
+  hotelId: number,
+  todayStr?: string,
+): Promise<MbBooking[]> {
+  const todayDate = todayStr || today();
+  const shift = (base: string, days: number) => {
+    const d = new Date(`${base}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+  const windowStart = shift(todayDate, -27);
+  const tomorrow = shift(todayDate, 1);
+
+  const byId = new Map<number, MbBooking>();
+  let lastError: unknown = null;
+  let anySuccess = false;
+
+  const runs: Array<{ start: string; end: string; status: MbBookingStatus }> = [
+    { start: todayDate, end: todayDate, status: 'inhouse' },
+    { start: windowStart, end: tomorrow, status: 'stay' },
+  ];
+
+  for (const run of runs) {
+    try {
+      const list = await mbCrmBookings(hotelId, run.start, run.end, run.status);
+      anySuccess = true;
+      for (const b of list) {
+        const id = Number(b.bookingId);
+        if (!byId.has(id)) byId.set(id, b);
+      }
+      console.log(
+        `[misterbooking] crm/bookings hotel=${hotelId} ${run.start}->${run.end} status=${run.status} -> ${list.length} réservations`,
+      );
+    } catch (err) {
+      lastError = err;
+      console.warn(`[misterbooking] crm/bookings status=${run.status} échec: ${(err as Error).message}`);
+    }
+  }
+
+  if (!anySuccess && lastError) throw lastError;
+
+  const relevant = Array.from(byId.values()).filter((b) => {
+    if (mbIsCancelled(b)) return false;
+    const start = (b.startDate || '').split('T')[0];
+    const end = (b.endDate || '').split('T')[0];
+    if (!start || !end) return false;
+    return start <= todayDate && end >= todayDate;
+  });
+  console.log(
+    `[misterbooking] réservations opérationnelles hotel=${hotelId} ${todayDate} -> ${relevant.length}/${byId.size}`,
+  );
+  return relevant;
 }
 
 
@@ -431,19 +512,41 @@ export function mbBuildRoomList(
     });
   }
 
+  // Index roomId -> numéro pour résoudre les réservations dont `roomNumber`
+  // est vide (crm/bookings renvoie parfois seulement `roomId`).
+  const numberById = new Map<number, string>();
+  for (const m of mapping) {
+    if (m.roomId) numberById.set(Number(m.roomId), String(m.roomNumber || '').trim());
+  }
+
+  // Priorité de superposition quand plusieurs réservations touchent la même
+  // chambre (ex. départ + arrivée le même jour) : le DÉPART gagne (la chambre
+  // doit repasser « à blanc »), puis l'arrivée, puis la recouche.
+  const rank = (s: string) => (s === 'checkout' ? 3 : s === 'arrival' ? 2 : s === 'occupied' ? 1 : 0);
+
   // 2. Superposition des séjours actuels.
   for (const b of bookings) {
     const r = mbBookingToRoom(b, todayStr);
+    if (!r.roomNumber && b.roomId) r.roomNumber = numberById.get(Number(b.roomId)) || '';
     if (!r.roomNumber) continue;
     const key = r.roomNumber.toLowerCase();
     const existing = byNumber.get(key);
+
+    if (existing && rank(existing.status) > rank(r.status)) {
+      // On garde le statut prioritaire (départ), mais on complète le client
+      // (ex. nom de l'arrivant sur un départ/arrivée le même jour).
+      if (!existing.guestName && r.guestName) existing.guestName = r.guestName;
+      if (!existing.guestCount && r.guestCount) existing.guestCount = r.guestCount ?? undefined;
+      continue;
+    }
+
     byNumber.set(key, {
       roomNumber: r.roomNumber,
       roomId: r.roomId || existing?.roomId,
       status: r.status,
       cleaningType: r.cleaningType,
-      guestName: r.guestName ?? undefined,
-      guestCount: r.guestCount ?? undefined,
+      guestName: r.guestName ?? existing?.guestName,
+      guestCount: r.guestCount ?? existing?.guestCount,
       arrivalDate: r.arrivalDate ?? undefined,
       departureDate: r.departureDate ?? undefined,
     });
