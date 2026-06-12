@@ -15,10 +15,14 @@ async function fetchMisterBookingRooms(credentials: PmsCredentials): Promise<Ext
   if (!hotelId) throw new Error('ID établissement MisterBooking manquant (Property ID).');
 
   const today = new Date().toISOString().split('T')[0];
-  const [mapping, bookings] = await Promise.all([
+  const [mapping, bookings, customers] = await Promise.all([
     mbFetchRoomMapping(hotelId),
     mbFetchBookings(hotelId),
+    mbFetchCustomers(hotelId),
   ]);
+
+  // Résout les noms clients (crm/bookings ne les renvoie pas) avant fusion.
+  mbAttachCustomers(bookings, customers);
 
   const merged = mbBuildRoomList(mapping, bookings, today);
   const rooms: ExtractedRoom[] = merged
