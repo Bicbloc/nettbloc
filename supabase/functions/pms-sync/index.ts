@@ -532,19 +532,37 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
 
     const { data: existingRooms } = await adminClient
       .from('rooms')
-      .select('room_number, status')
+      .select('room_number, status, cleaning_type')
       .eq('hotel_id', hotel_id);
-    const existingRoomStatusMap = new Map(
-      (existingRooms || []).map((room: any) => [String(room.room_number), String(room.status || '')])
+    const existingRoomMap = new Map(
+      (existingRooms || []).map((room: any) => [String(room.room_number), {
+        status: String(room.status || ''),
+        cleaning_type: String(room.cleaning_type || ''),
+      }])
     );
 
     for (const room of rooms) {
-      const existingStatus = existingRoomStatusMap.get(String(room.roomNumber));
+      const existing = existingRoomMap.get(String(room.roomNumber));
+      const existingStatus = existing?.status || '';
       const nextStatus = toDbStatus(room);
-      const preservedStatus =
-        existingStatus === 'checkout' || existingStatus === 'ready-to-clean'
-          ? existingStatus
-          : nextStatus;
+
+      let preservedStatus: string;
+      let nextCleaningType = toDbCleaningType(room.cleaningType);
+
+      if (room.status === 'unknown') {
+        // Le PMS ne renvoie pas l'état ménage : on CONSERVE l'état local
+        // (une chambre marquée propre par la femme de chambre reste propre,
+        // un départ « checkout » reste un départ). Nouvelle chambre -> à nettoyer.
+        preservedStatus = existingStatus || 'needs-cleaning';
+        if (existing?.cleaning_type) nextCleaningType = existing.cleaning_type;
+      } else {
+        // Séjour/départ détecté : on applique, sauf si un signal manuel
+        // « client sorti » est déjà posé localement.
+        preservedStatus =
+          existingStatus === 'checkout' || existingStatus === 'ready-to-clean'
+            ? existingStatus
+            : nextStatus;
+      }
 
       // Opérations du jour : on (re)crée la chambre dans rooms.
       const { error: roomUpsertError } = await adminClient
@@ -553,7 +571,7 @@ async function performSync(adminClient: any, pmsConfig: any): Promise<number> {
           hotel_id,
           room_number: room.roomNumber,
           status: preservedStatus,
-          cleaning_type: toDbCleaningType(room.cleaningType),
+          cleaning_type: nextCleaningType,
           floor: room.floor ?? null,
           room_type: room.roomType ?? null,
           updated_at: new Date().toISOString(),
