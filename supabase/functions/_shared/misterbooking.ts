@@ -348,21 +348,6 @@ export async function mbFetchOperationalBookings(
 }
 
 
-// PROBE temporaire : tente de LIRE le statut ménage depuis MisterBooking.
-// On essaie plusieurs endpoints candidats et on logue la structure brute pour
-// déterminer si une API de lecture existe pour ce partenaire.
-export async function mbProbeHousekeeping(hotelId: number): Promise<void> {
-  const candidates = ['houseKeeping/list', 'houseKeeping/get', 'houseKeeping', 'houseKeeping/status'];
-  const today = new Date().toISOString().split('T')[0];
-  for (const path of candidates) {
-    try {
-      const data = await mbPost<any>(path, { hotelId, date: today });
-      console.log(`[mb-hk-probe] ${path} OK -> ${JSON.stringify(data).slice(0, 1500)}`);
-    } catch (err) {
-      console.warn(`[mb-hk-probe] ${path} échec: ${(err as Error).message}`);
-    }
-  }
-}
 
 // Met à jour le statut housekeeping (clean/dirty) de chambres côté MisterBooking.
 export async function mbUpdateHousekeeping(
