@@ -385,6 +385,7 @@ export function mbBuildRoomList(
       status: r.status,
       cleaningType: r.cleaningType,
       guestName: r.guestName ?? undefined,
+      guestCount: r.guestCount ?? undefined,
       arrivalDate: r.arrivalDate ?? undefined,
       departureDate: r.departureDate ?? undefined,
     });
