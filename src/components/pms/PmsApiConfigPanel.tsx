@@ -28,6 +28,7 @@ interface PreviewRoom {
   cleaningType: string;
   condition?: string | null;
   guestName: string | null;
+  guestCount?: number | null;
   arrivalDate: string | null;
   departureDate: string | null;
 }
