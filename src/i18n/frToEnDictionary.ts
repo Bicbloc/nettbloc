@@ -1126,6 +1126,9 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Gestion de l'team": "Team management",
   "Gestion d'équipe": "Team management",
   "Gérer l'équipe": "Manage team",
+  "Inviter une femme de chambre": "Invite a housekeeper",
+  "Créer manuellement": "Create manually",
+  "Donner un code d'accès": "Give an access code",
   "Mon équipe": "My team",
   "Permissions personnalisées": "Custom permissions",
 
