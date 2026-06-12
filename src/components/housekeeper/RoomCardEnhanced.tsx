@@ -280,13 +280,13 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
       )}
       
       {/* Card content */}
-      <div className="relative p-3.5" style={{ zIndex: 1 }}>
-        <div className="space-y-2.5">
+      <div className="relative p-2.5" style={{ zIndex: 1 }}>
+        <div className="space-y-2">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                   {room.room_number}
                 </span>
                 
