@@ -50,6 +50,14 @@ export const HousekeeperHeader: React.FC<HousekeeperHeaderProps> = ({
                 <Building2 className="h-3 w-3 text-white/60 flex-shrink-0" />
                 <span className="text-xs text-white/70 truncate">{hotelName}</span>
               </div>
+              {governessName && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <UserCheck className="h-3 w-3 text-amber-200 flex-shrink-0" />
+                  <span className="text-[11px] text-amber-100 truncate">
+                    Gouvernante du jour : <span className="font-semibold">{governessName}</span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
