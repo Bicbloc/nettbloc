@@ -49,6 +49,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pmsType, setPmsType] = useState<string | null>(null);
+  const isMisterBooking = pmsType === 'mister_booking';
 
   // Plans tarifaires PMS : récupération + sélection « inclus ».
   const [ratePlans, setRatePlans] = useState<PmsRatePlan[] | null>(null);
@@ -69,6 +71,13 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
     loadBreakfastConfig(currentHotelId)
       .then(setConfig)
       .finally(() => setLoading(false));
+    supabase
+      .from('hotel_pms_configs')
+      .select('pms_type')
+      .eq('hotel_id', currentHotelId)
+      .eq('is_active', true)
+      .maybeSingle()
+      .then(({ data }) => setPmsType(data?.pms_type ?? null));
   }, [currentHotelId]);
 
   // Charge les chambres du registre + l'inclusion PDJ récupérée du PMS.
@@ -415,23 +424,30 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       Importez les prestations directement depuis votre PMS (Mews / Apaleo) —
                       une seule configuration — ou ajoutez-les manuellement.
                     </CardDescription>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Button
-                        variant="secondary" size="sm" className="gap-2 w-fit"
-                        onClick={handleImportProducts} disabled={importing}
-                      >
-                        <Download className="h-4 w-4" />
-                        {importing ? 'Import en cours…' : 'Importer depuis le PMS'}
-                      </Button>
-                      <Button
-                        variant="outline" size="sm" className="gap-2 w-fit"
-                        onClick={handlePreviewProducts} disabled={previewLoading}
-                        title="Voir les prestations récupérables depuis le PMS"
-                      >
-                        <Eye className="h-4 w-4" />
-                        {previewLoading ? 'Test…' : 'Tester / voir'}
-                      </Button>
-                    </div>
+                    {isMisterBooking ? (
+                      <p className="text-xs text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/10 p-2 mt-2">
+                        MisterBooking n'expose pas de catalogue de prestations facturables via son API.
+                        Ajoutez vos types de petit-déjeuner manuellement ci-dessous.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button
+                          variant="secondary" size="sm" className="gap-2 w-fit"
+                          onClick={handleImportProducts} disabled={importing}
+                        >
+                          <Download className="h-4 w-4" />
+                          {importing ? 'Import en cours…' : 'Importer depuis le PMS'}
+                        </Button>
+                        <Button
+                          variant="outline" size="sm" className="gap-2 w-fit"
+                          onClick={handlePreviewProducts} disabled={previewLoading}
+                          title="Voir les prestations récupérables depuis le PMS"
+                        >
+                          <Eye className="h-4 w-4" />
+                          {previewLoading ? 'Test…' : 'Tester / voir'}
+                        </Button>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {config.breakfast_types.length === 0 && (
@@ -475,15 +491,24 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                       le petit-déjeuner. Les chambres réservées sur ces plans seront marquées
                       « inclus » automatiquement (non facturées).
                     </CardDescription>
-                    <Button
-                      variant="secondary" size="sm" className="gap-2 w-fit mt-2"
-                      onClick={handleLoadRatePlans} disabled={ratePlansLoading}
-                    >
-                      <Download className="h-4 w-4" />
-                      {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
-                    </Button>
+                    {!isMisterBooking && (
+                      <Button
+                        variant="secondary" size="sm" className="gap-2 w-fit mt-2"
+                        onClick={handleLoadRatePlans} disabled={ratePlansLoading}
+                      >
+                        <Download className="h-4 w-4" />
+                        {ratePlansLoading ? 'Récupération…' : 'Récupérer les plans tarifaires'}
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {isMisterBooking ? (
+                      <p className="text-sm text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+                        MisterBooking ne fournit pas ses plans tarifaires via son API. Marquez les
+                        chambres « incluses » manuellement (ou activez « Chambres incluses par défaut »).
+                      </p>
+                    ) : (
+                    <>
                     {(config.included_rate_plan_ids?.length ?? 0) > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {config.included_rate_plan_ids.length} plan(s) marqué(s) « inclus ».
@@ -526,6 +551,8 @@ export function BreakfastTab({ currentHotelId }: BreakfastTabProps) {
                           })}
                         </div>
                       </div>
+                    )}
+                    </>
                     )}
                   </CardContent>
                 </Card>

@@ -255,7 +255,8 @@ async function processRow(admin: any, row: any): Promise<void> {
       throw new Error(`Chambre MisterBooking introuvable (roomId) pour la chambre ${row.room_number}`);
     }
     const result = await mbUpdateHousekeeping(ctx.mbHotelId!, [
-      { roomId, status: mbStatus, date: new Date().toISOString() },
+      // MisterBooking attend une date au format YYYY-MM-DD (pas un ISO complet).
+      { roomId, status: mbStatus, date: new Date().toISOString().split('T')[0] },
     ]);
     if (!result?.success) {
       throw new Error(`Mise à jour housekeeping MisterBooking refusée: ${JSON.stringify(result?.data || {})}`);
